@@ -1,0 +1,199 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { AppointmentCard } from "@/components/ehr/AppointmentCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+
+// todo: remove mock functionality
+const mockAppointments = [
+  {
+    id: "1",
+    pacienteNombre: "María González López",
+    hora: "09:00",
+    duracion: "30 min",
+    motivo: "Control de diabetes",
+    status: "completada" as const,
+  },
+  {
+    id: "2",
+    pacienteNombre: "Juan Pérez Ramírez",
+    hora: "09:30",
+    duracion: "30 min",
+    motivo: "Revisión postoperatoria",
+    status: "en_curso" as const,
+  },
+  {
+    id: "3",
+    pacienteNombre: "Ana Martínez Sánchez",
+    hora: "10:00",
+    duracion: "45 min",
+    motivo: "Primera consulta",
+    status: "pendiente" as const,
+  },
+  {
+    id: "4",
+    pacienteNombre: "Roberto Hernández García",
+    hora: "10:45",
+    duracion: "30 min",
+    motivo: "Seguimiento hipertensión",
+    status: "pendiente" as const,
+  },
+  {
+    id: "5",
+    pacienteNombre: "Laura Jiménez Torres",
+    hora: "11:30",
+    duracion: "30 min",
+    motivo: "Resultados de laboratorio",
+    status: "pendiente" as const,
+  },
+  {
+    id: "6",
+    pacienteNombre: "Carlos Mendoza Ruiz",
+    hora: "12:00",
+    duracion: "45 min",
+    motivo: "Evaluación prequirúrgica",
+    status: "pendiente" as const,
+  },
+];
+
+export default function Citas() {
+  const [, setLocation] = useLocation();
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [viewFilter, setViewFilter] = useState("todas");
+
+  const filteredAppointments = mockAppointments.filter((apt) => {
+    if (viewFilter === "todas") return true;
+    return apt.status === viewFilter;
+  });
+
+  const stats = {
+    total: mockAppointments.length,
+    completadas: mockAppointments.filter((a) => a.status === "completada").length,
+    pendientes: mockAppointments.filter((a) => a.status === "pendiente").length,
+    enCurso: mockAppointments.filter((a) => a.status === "en_curso").length,
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold">Agenda de Citas</h1>
+          <p className="text-muted-foreground">
+            Gestión de citas y consultas
+          </p>
+        </div>
+        <Button data-testid="button-new-appointment">
+          <Plus className="h-4 w-4 mr-2" />
+          Nueva Cita
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-1 space-y-4">
+          <Card>
+            <CardContent className="p-4">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                className="rounded-md"
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Resumen del Día</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total</span>
+                <Badge variant="secondary">{stats.total}</Badge>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Completadas</span>
+                <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                  {stats.completadas}
+                </Badge>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">En curso</span>
+                <Badge className="bg-primary text-primary-foreground">
+                  {stats.enCurso}
+                </Badge>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Pendientes</span>
+                <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+                  {stats.pendientes}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-3">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon">
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <CardTitle className="text-lg font-medium">
+                    {date?.toLocaleDateString("es-MX", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </CardTitle>
+                  <Button variant="ghost" size="icon">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Select value={viewFilter} onValueChange={setViewFilter}>
+                  <SelectTrigger className="w-[150px]" data-testid="select-appointment-filter">
+                    <SelectValue placeholder="Filtrar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas</SelectItem>
+                    <SelectItem value="pendiente">Pendientes</SelectItem>
+                    <SelectItem value="en_curso">En curso</SelectItem>
+                    <SelectItem value="completada">Completadas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {filteredAppointments.map((apt) => (
+                <AppointmentCard
+                  key={apt.id}
+                  {...apt}
+                  onStartConsult={() => console.log("Start:", apt.id)}
+                  onViewPatient={() => setLocation(`/pacientes/${apt.id}`)}
+                />
+              ))}
+
+              {filteredAppointments.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No hay citas para mostrar</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
