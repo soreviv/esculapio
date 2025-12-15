@@ -10,7 +10,7 @@ export interface MedicalNoteCardProps {
   fecha: string;
   hora: string;
   medicoNombre: string;
-  especialidad: string;
+  especialidad?: string;
   motivoConsulta?: string;
   diagnosticos?: string[];
   firmada: boolean;

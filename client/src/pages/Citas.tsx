@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { AppointmentCard } from "@/components/ehr/AppointmentCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -13,74 +15,47 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
-
-// todo: remove mock functionality
-const mockAppointments = [
-  {
-    id: "1",
-    pacienteNombre: "María González López",
-    hora: "09:00",
-    duracion: "30 min",
-    motivo: "Control de diabetes",
-    status: "completada" as const,
-  },
-  {
-    id: "2",
-    pacienteNombre: "Juan Pérez Ramírez",
-    hora: "09:30",
-    duracion: "30 min",
-    motivo: "Revisión postoperatoria",
-    status: "en_curso" as const,
-  },
-  {
-    id: "3",
-    pacienteNombre: "Ana Martínez Sánchez",
-    hora: "10:00",
-    duracion: "45 min",
-    motivo: "Primera consulta",
-    status: "pendiente" as const,
-  },
-  {
-    id: "4",
-    pacienteNombre: "Roberto Hernández García",
-    hora: "10:45",
-    duracion: "30 min",
-    motivo: "Seguimiento hipertensión",
-    status: "pendiente" as const,
-  },
-  {
-    id: "5",
-    pacienteNombre: "Laura Jiménez Torres",
-    hora: "11:30",
-    duracion: "30 min",
-    motivo: "Resultados de laboratorio",
-    status: "pendiente" as const,
-  },
-  {
-    id: "6",
-    pacienteNombre: "Carlos Mendoza Ruiz",
-    hora: "12:00",
-    duracion: "45 min",
-    motivo: "Evaluación prequirúrgica",
-    status: "pendiente" as const,
-  },
-];
+import { type AppointmentWithDetails } from "@shared/schema";
 
 export default function Citas() {
   const [, setLocation] = useLocation();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [viewFilter, setViewFilter] = useState("todas");
 
-  const filteredAppointments = mockAppointments.filter((apt) => {
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery<AppointmentWithDetails[]>({
+    queryKey: ["/api/appointments"],
+  });
+
+  const selectedDateStr = date?.toISOString().split('T')[0] || "";
+  
+  const dayAppointments = appointments.filter(apt => apt.fecha === selectedDateStr);
+
+  const filteredAppointments = dayAppointments.filter((apt) => {
     if (viewFilter === "todas") return true;
     return apt.status === viewFilter;
   });
 
   const stats = {
-    total: mockAppointments.length,
-    completadas: mockAppointments.filter((a) => a.status === "completada").length,
-    pendientes: mockAppointments.filter((a) => a.status === "pendiente").length,
-    enCurso: mockAppointments.filter((a) => a.status === "en_curso").length,
+    total: dayAppointments.length,
+    completadas: dayAppointments.filter((a) => a.status === "completada").length,
+    pendientes: dayAppointments.filter((a) => a.status === "pendiente").length,
+    enCurso: dayAppointments.filter((a) => a.status === "en_curso").length,
+  };
+
+  const goToNextDay = () => {
+    if (date) {
+      const next = new Date(date);
+      next.setDate(next.getDate() + 1);
+      setDate(next);
+    }
+  };
+
+  const goToPrevDay = () => {
+    if (date) {
+      const prev = new Date(date);
+      prev.setDate(prev.getDate() - 1);
+      setDate(prev);
+    }
   };
 
   return (
@@ -147,7 +122,7 @@ export default function Citas() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" onClick={goToPrevDay}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <CardTitle className="text-lg font-medium">
@@ -158,7 +133,7 @@ export default function Citas() {
                       day: "numeric",
                     })}
                   </CardTitle>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" onClick={goToNextDay}>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -176,16 +151,25 @@ export default function Citas() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {filteredAppointments.map((apt) => (
-                <AppointmentCard
-                  key={apt.id}
-                  {...apt}
-                  onStartConsult={() => console.log("Start:", apt.id)}
-                  onViewPatient={() => setLocation(`/pacientes/${apt.id}`)}
-                />
-              ))}
-
-              {filteredAppointments.length === 0 && (
+              {appointmentsLoading ? (
+                [1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-[80px] rounded-lg" />
+                ))
+              ) : filteredAppointments.length > 0 ? (
+                filteredAppointments.map((apt) => (
+                  <AppointmentCard
+                    key={apt.id}
+                    id={apt.id}
+                    pacienteNombre={`${apt.patientNombre} ${apt.patientApellido}`}
+                    hora={apt.hora}
+                    duracion={apt.duracion}
+                    motivo={apt.motivo || undefined}
+                    status={apt.status as "pendiente" | "en_curso" | "completada" | "no_asistio"}
+                    onStartConsult={() => setLocation(`/pacientes/${apt.patientId}`)}
+                    onViewPatient={() => setLocation(`/pacientes/${apt.patientId}`)}
+                  />
+                ))
+              ) : (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">No hay citas para mostrar</p>
                 </div>

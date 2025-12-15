@@ -8,7 +8,7 @@ export interface PatientCardProps {
   id: string;
   nombre: string;
   apellidoPaterno: string;
-  apellidoMaterno: string;
+  apellidoMaterno?: string;
   curp: string;
   fechaNacimiento: string;
   sexo: "M" | "F";
@@ -56,7 +56,7 @@ export function PatientCard({
   onViewRecord,
   onSchedule,
 }: PatientCardProps) {
-  const fullName = `${nombre} ${apellidoPaterno} ${apellidoMaterno}`;
+  const fullName = `${nombre} ${apellidoPaterno} ${apellidoMaterno || ""}`;
   const age = calculateAge(fechaNacimiento);
 
   return (

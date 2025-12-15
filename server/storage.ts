@@ -5,10 +5,11 @@ import {
   type Vitals, type InsertVitals,
   type Prescription, type InsertPrescription,
   type Appointment, type InsertAppointment,
+  type AppointmentWithDetails, type MedicalNoteWithDetails, type PrescriptionWithDetails,
   users, patients, medicalNotes, vitals, prescriptions, appointments
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, ilike, or } from "drizzle-orm";
+import { eq, desc, and, ilike, or, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -44,8 +45,16 @@ export interface IStorage {
   getAppointments(): Promise<Appointment[]>;
   getAppointmentsByPatient(patientId: string): Promise<Appointment[]>;
   getAppointmentsByDate(fecha: string): Promise<Appointment[]>;
+  getAppointmentsWithDetails(): Promise<AppointmentWithDetails[]>;
+  getAppointmentsByDateWithDetails(fecha: string): Promise<AppointmentWithDetails[]>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined>;
+  
+  // Enriched Medical Notes
+  getMedicalNotesWithDetails(patientId: string): Promise<MedicalNoteWithDetails[]>;
+  
+  // Enriched Prescriptions
+  getPrescriptionsWithDetails(patientId: string): Promise<PrescriptionWithDetails[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -183,6 +192,128 @@ export class DatabaseStorage implements IStorage {
   async updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined> {
     const [updated] = await db.update(appointments).set(appointment).where(eq(appointments.id, id)).returning();
     return updated;
+  }
+
+  // Enriched appointments with patient and medico details
+  async getAppointmentsWithDetails(): Promise<AppointmentWithDetails[]> {
+    const result = await db
+      .select({
+        id: appointments.id,
+        patientId: appointments.patientId,
+        medicoId: appointments.medicoId,
+        fecha: appointments.fecha,
+        hora: appointments.hora,
+        duracion: appointments.duracion,
+        motivo: appointments.motivo,
+        status: appointments.status,
+        createdAt: appointments.createdAt,
+        patientNombre: patients.nombre,
+        patientApellido: patients.apellidoPaterno,
+        medicoNombre: users.nombre,
+        medicoEspecialidad: users.especialidad,
+      })
+      .from(appointments)
+      .leftJoin(patients, eq(appointments.patientId, patients.id))
+      .leftJoin(users, eq(appointments.medicoId, users.id))
+      .orderBy(desc(appointments.fecha));
+    
+    return result.map(r => ({
+      ...r,
+      patientNombre: r.patientNombre || "Paciente",
+      patientApellido: r.patientApellido || "",
+      medicoNombre: r.medicoNombre || "Médico",
+    }));
+  }
+
+  async getAppointmentsByDateWithDetails(fecha: string): Promise<AppointmentWithDetails[]> {
+    const result = await db
+      .select({
+        id: appointments.id,
+        patientId: appointments.patientId,
+        medicoId: appointments.medicoId,
+        fecha: appointments.fecha,
+        hora: appointments.hora,
+        duracion: appointments.duracion,
+        motivo: appointments.motivo,
+        status: appointments.status,
+        createdAt: appointments.createdAt,
+        patientNombre: patients.nombre,
+        patientApellido: patients.apellidoPaterno,
+        medicoNombre: users.nombre,
+        medicoEspecialidad: users.especialidad,
+      })
+      .from(appointments)
+      .leftJoin(patients, eq(appointments.patientId, patients.id))
+      .leftJoin(users, eq(appointments.medicoId, users.id))
+      .where(eq(appointments.fecha, fecha))
+      .orderBy(appointments.hora);
+    
+    return result.map(r => ({
+      ...r,
+      patientNombre: r.patientNombre || "Paciente",
+      patientApellido: r.patientApellido || "",
+      medicoNombre: r.medicoNombre || "Médico",
+    }));
+  }
+
+  // Enriched medical notes with medico details
+  async getMedicalNotesWithDetails(patientId: string): Promise<MedicalNoteWithDetails[]> {
+    const result = await db
+      .select({
+        id: medicalNotes.id,
+        patientId: medicalNotes.patientId,
+        medicoId: medicalNotes.medicoId,
+        tipo: medicalNotes.tipo,
+        fecha: medicalNotes.fecha,
+        motivoConsulta: medicalNotes.motivoConsulta,
+        subjetivo: medicalNotes.subjetivo,
+        objetivo: medicalNotes.objetivo,
+        analisis: medicalNotes.analisis,
+        plan: medicalNotes.plan,
+        diagnosticos: medicalNotes.diagnosticos,
+        firmada: medicalNotes.firmada,
+        createdAt: medicalNotes.createdAt,
+        medicoNombre: users.nombre,
+        medicoEspecialidad: users.especialidad,
+      })
+      .from(medicalNotes)
+      .leftJoin(users, eq(medicalNotes.medicoId, users.id))
+      .where(eq(medicalNotes.patientId, patientId))
+      .orderBy(desc(medicalNotes.fecha));
+    
+    return result.map(r => ({
+      ...r,
+      medicoNombre: r.medicoNombre || "Médico",
+    }));
+  }
+
+  // Enriched prescriptions with medico details
+  async getPrescriptionsWithDetails(patientId: string): Promise<PrescriptionWithDetails[]> {
+    const result = await db
+      .select({
+        id: prescriptions.id,
+        patientId: prescriptions.patientId,
+        medicoId: prescriptions.medicoId,
+        medicamento: prescriptions.medicamento,
+        presentacion: prescriptions.presentacion,
+        dosis: prescriptions.dosis,
+        via: prescriptions.via,
+        frecuencia: prescriptions.frecuencia,
+        duracion: prescriptions.duracion,
+        indicaciones: prescriptions.indicaciones,
+        status: prescriptions.status,
+        createdAt: prescriptions.createdAt,
+        medicoNombre: users.nombre,
+      })
+      .from(prescriptions)
+      .leftJoin(users, eq(prescriptions.medicoId, users.id))
+      .where(eq(prescriptions.patientId, patientId))
+      .orderBy(desc(prescriptions.createdAt));
+    
+    return result.map(r => ({
+      ...r,
+      medicoNombre: r.medicoNombre || "Médico",
+    }));
   }
 }
 

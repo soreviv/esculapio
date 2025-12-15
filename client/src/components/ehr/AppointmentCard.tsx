@@ -9,7 +9,7 @@ export interface AppointmentCardProps {
   pacienteNombre: string;
   hora: string;
   duracion: string;
-  motivo: string;
+  motivo?: string;
   status: "pendiente" | "en_curso" | "completada" | "no_asistio";
   onStartConsult?: () => void;
   onViewPatient?: () => void;
@@ -58,9 +58,11 @@ export function AppointmentCard({
               <span>{duracion}</span>
             </div>
             
-            <p className="text-sm text-muted-foreground mt-1 truncate">
-              {motivo}
-            </p>
+            {motivo && (
+              <p className="text-sm text-muted-foreground mt-1 truncate">
+                {motivo}
+              </p>
+            )}
           </div>
         </div>
 

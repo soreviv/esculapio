@@ -119,3 +119,20 @@ export type InsertPrescription = z.infer<typeof insertPrescriptionSchema>;
 export type Prescription = typeof prescriptions.$inferSelect;
 export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 export type Appointment = typeof appointments.$inferSelect;
+
+// Enriched types with joined data
+export type AppointmentWithDetails = Appointment & {
+  patientNombre: string;
+  patientApellido: string;
+  medicoNombre: string;
+  medicoEspecialidad?: string | null;
+};
+
+export type MedicalNoteWithDetails = MedicalNote & {
+  medicoNombre: string;
+  medicoEspecialidad?: string | null;
+};
+
+export type PrescriptionWithDetails = Prescription & {
+  medicoNombre: string;
+};

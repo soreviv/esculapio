@@ -71,10 +71,10 @@ export async function registerRoutes(
     }
   });
 
-  // Medical Notes
+  // Medical Notes (with doctor details)
   app.get("/api/patients/:patientId/notes", async (req, res) => {
     try {
-      const notes = await storage.getMedicalNotes(req.params.patientId);
+      const notes = await storage.getMedicalNotesWithDetails(req.params.patientId);
       res.json(notes);
     } catch (error) {
       res.status(500).json({ error: "Error fetching notes" });
@@ -150,10 +150,10 @@ export async function registerRoutes(
     }
   });
 
-  // Prescriptions
+  // Prescriptions (with doctor details)
   app.get("/api/patients/:patientId/prescriptions", async (req, res) => {
     try {
-      const prescriptions = await storage.getPrescriptions(req.params.patientId);
+      const prescriptions = await storage.getPrescriptionsWithDetails(req.params.patientId);
       res.json(prescriptions);
     } catch (error) {
       res.status(500).json({ error: "Error fetching prescriptions" });
@@ -185,15 +185,15 @@ export async function registerRoutes(
     }
   });
 
-  // Appointments
+  // Appointments (with patient and doctor details)
   app.get("/api/appointments", async (req, res) => {
     try {
       const fecha = req.query.fecha as string;
       if (fecha) {
-        const appointments = await storage.getAppointmentsByDate(fecha);
+        const appointments = await storage.getAppointmentsByDateWithDetails(fecha);
         res.json(appointments);
       } else {
-        const appointments = await storage.getAppointments();
+        const appointments = await storage.getAppointmentsWithDetails();
         res.json(appointments);
       }
     } catch (error) {

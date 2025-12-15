@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AllergyAlert } from "@/components/ehr/AllergyAlert";
 import { VitalsDisplay, VitalSign } from "@/components/ehr/VitalsDisplay";
 import { MedicalNoteCard } from "@/components/ehr/MedicalNoteCard";
@@ -24,106 +26,9 @@ import {
   MapPin,
   Droplet,
 } from "lucide-react";
-
-// todo: remove mock functionality
-const mockPatient = {
-  id: "1",
-  nombre: "María",
-  apellidoPaterno: "González",
-  apellidoMaterno: "López",
-  curp: "GOLM850315MDFRPN09",
-  fechaNacimiento: "1985-03-15",
-  sexo: "F" as const,
-  status: "activo" as const,
-  alergias: ["Penicilina", "Aspirina"],
-  telefono: "55 1234 5678",
-  email: "maria.gonzalez@email.com",
-  direccion: "Av. Reforma 123, Col. Centro, CDMX, CP 06000",
-  grupoSanguineo: "O+",
-  contactoEmergencia: "Juan González",
-  telefonoEmergencia: "55 8765 4321",
-};
-
-// todo: remove mock functionality
-const mockVitals: VitalSign[] = [
-  { label: "Presión Arterial", value: "135/85", unit: "mmHg", icon: "heart", status: "warning" },
-  { label: "Frecuencia Cardíaca", value: 78, unit: "lpm", icon: "activity", status: "normal" },
-  { label: "Temperatura", value: 36.8, unit: "°C", icon: "thermometer", status: "normal" },
-  { label: "Saturación O2", value: 97, unit: "%", icon: "droplets", status: "normal" },
-  { label: "Frecuencia Resp.", value: 18, unit: "rpm", icon: "wind", status: "normal" },
-  { label: "Peso", value: 68.5, unit: "kg", icon: "scale", status: "normal" },
-];
-
-// todo: remove mock functionality
-const mockNotes = [
-  {
-    id: "1",
-    tipo: "nota_evolucion" as const,
-    fecha: "15/12/2025",
-    hora: "10:30",
-    medicoNombre: "Dr. Roberto García",
-    especialidad: "Medicina Interna",
-    motivoConsulta: "Control de diabetes tipo 2",
-    diagnosticos: ["E11.9 DM Tipo 2", "I10 Hipertensión"],
-    firmada: true,
-  },
-  {
-    id: "2",
-    tipo: "nota_evolucion" as const,
-    fecha: "01/12/2025",
-    hora: "09:15",
-    medicoNombre: "Dr. Roberto García",
-    especialidad: "Medicina Interna",
-    motivoConsulta: "Revisión de laboratorios",
-    diagnosticos: ["E11.9 DM Tipo 2"],
-    firmada: true,
-  },
-  {
-    id: "3",
-    tipo: "historia_clinica" as const,
-    fecha: "15/11/2025",
-    hora: "11:00",
-    medicoNombre: "Dr. Roberto García",
-    especialidad: "Medicina Interna",
-    motivoConsulta: "Primera consulta",
-    diagnosticos: ["E11.9 DM Tipo 2", "I10 Hipertensión", "E66.9 Obesidad"],
-    firmada: true,
-  },
-];
-
-// todo: remove mock functionality
-const mockPrescriptions = [
-  {
-    medicamento: "Metformina",
-    presentacion: "Tabletas 850mg",
-    dosis: "1 tableta",
-    via: "Oral",
-    frecuencia: "Cada 12 horas",
-    duracion: "30 días",
-    indicaciones: "Tomar con alimentos. Evitar alcohol.",
-    status: "activa" as const,
-  },
-  {
-    medicamento: "Losartán",
-    presentacion: "Tabletas 50mg",
-    dosis: "1 tableta",
-    via: "Oral",
-    frecuencia: "Cada 24 horas",
-    duracion: "30 días",
-    indicaciones: "Tomar por la mañana.",
-    status: "activa" as const,
-  },
-  {
-    medicamento: "Atorvastatina",
-    presentacion: "Tabletas 20mg",
-    dosis: "1 tableta",
-    via: "Oral",
-    frecuencia: "Cada 24 horas",
-    duracion: "30 días",
-    indicaciones: "Tomar por la noche.",
-    status: "completada" as const,
-  },
-];
+import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertMedicalNote, type InsertVitals } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 function calculateAge(fechaNacimiento: string): number {
   const today = new Date();
@@ -136,15 +41,157 @@ function calculateAge(fechaNacimiento: string): number {
   return age;
 }
 
+function formatVitals(vitals: Vitals): VitalSign[] {
+  const signs: VitalSign[] = [];
+  
+  if (vitals.presionSistolica && vitals.presionDiastolica) {
+    const bp = `${vitals.presionSistolica}/${vitals.presionDiastolica}`;
+    const status = vitals.presionSistolica > 130 || vitals.presionDiastolica > 85 ? "warning" : "normal";
+    signs.push({ label: "Presión Arterial", value: bp, unit: "mmHg", icon: "heart", status });
+  }
+  
+  if (vitals.frecuenciaCardiaca) {
+    const status = vitals.frecuenciaCardiaca < 60 || vitals.frecuenciaCardiaca > 100 ? "warning" : "normal";
+    signs.push({ label: "Frecuencia Cardíaca", value: vitals.frecuenciaCardiaca, unit: "lpm", icon: "activity", status });
+  }
+  
+  if (vitals.temperatura) {
+    const status = vitals.temperatura > 37.5 ? "critical" : "normal";
+    signs.push({ label: "Temperatura", value: vitals.temperatura, unit: "°C", icon: "thermometer", status });
+  }
+  
+  if (vitals.saturacionOxigeno) {
+    const status = vitals.saturacionOxigeno < 95 ? "warning" : "normal";
+    signs.push({ label: "Saturación O2", value: vitals.saturacionOxigeno, unit: "%", icon: "droplets", status });
+  }
+  
+  if (vitals.frecuenciaRespiratoria) {
+    signs.push({ label: "Frecuencia Resp.", value: vitals.frecuenciaRespiratoria, unit: "rpm", icon: "wind", status: "normal" });
+  }
+  
+  if (vitals.peso) {
+    signs.push({ label: "Peso", value: vitals.peso, unit: "kg", icon: "scale", status: "normal" });
+  }
+  
+  return signs;
+}
+
 export default function PatientDetail() {
   const [, setLocation] = useLocation();
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState("expediente");
+  const { toast } = useToast();
 
-  const patient = mockPatient;
-  const fullName = `${patient.nombre} ${patient.apellidoPaterno} ${patient.apellidoMaterno}`;
+  const { data: patient, isLoading: patientLoading } = useQuery<Patient>({
+    queryKey: ["/api/patients", params.id],
+    enabled: !!params.id,
+  });
+
+  const { data: notes = [], isLoading: notesLoading } = useQuery<MedicalNoteWithDetails[]>({
+    queryKey: ["/api/patients", params.id, "notes"],
+    enabled: !!params.id,
+  });
+
+  const { data: latestVitals } = useQuery<Vitals | null>({
+    queryKey: ["/api/patients", params.id, "vitals", "latest"],
+    enabled: !!params.id,
+  });
+
+  const { data: prescriptions = [] } = useQuery<PrescriptionWithDetails[]>({
+    queryKey: ["/api/patients", params.id, "prescriptions"],
+    enabled: !!params.id,
+  });
+
+  const createNoteMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const noteData: InsertMedicalNote = {
+        patientId: patient?.id || "",
+        medicoId: "system",
+        tipo: data.tipo,
+        motivoConsulta: data.motivoConsulta || null,
+        subjetivo: data.subjetivo || null,
+        objetivo: data.objetivo || null,
+        analisis: data.analisis || null,
+        plan: data.plan || null,
+        diagnosticos: data.diagnosticos ? data.diagnosticos.split(",").map((d: string) => d.trim()).filter(Boolean) : null,
+      };
+      const response = await apiRequest("POST", "/api/notes", noteData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", params.id, "notes"] });
+      toast({
+        title: "Nota creada",
+        description: "La nota médica ha sido registrada.",
+      });
+    },
+  });
+
+  const createVitalsMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const vitalsData: InsertVitals = {
+        patientId: patient?.id || "",
+        presionSistolica: data.presionSistolica ? parseInt(data.presionSistolica) : null,
+        presionDiastolica: data.presionDiastolica ? parseInt(data.presionDiastolica) : null,
+        frecuenciaCardiaca: data.frecuenciaCardiaca ? parseInt(data.frecuenciaCardiaca) : null,
+        frecuenciaRespiratoria: data.frecuenciaRespiratoria ? parseInt(data.frecuenciaRespiratoria) : null,
+        temperatura: data.temperatura ? parseFloat(data.temperatura) : null,
+        saturacionOxigeno: data.saturacionOxigeno ? parseInt(data.saturacionOxigeno) : null,
+        peso: data.peso ? parseFloat(data.peso) : null,
+        talla: data.talla ? parseInt(data.talla) : null,
+        glucosa: data.glucosa ? parseInt(data.glucosa) : null,
+      };
+      const response = await apiRequest("POST", "/api/vitals", vitalsData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", params.id, "vitals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", params.id, "vitals", "latest"] });
+      toast({
+        title: "Signos registrados",
+        description: "Los signos vitales han sido registrados.",
+      });
+    },
+  });
+
+  if (patientLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <Skeleton className="h-[400px]" />
+          <div className="lg:col-span-3">
+            <Skeleton className="h-[600px]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!patient) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-muted-foreground">Paciente no encontrado</p>
+        <Button variant="ghost" onClick={() => setLocation("/pacientes")}>
+          Volver a pacientes
+        </Button>
+      </div>
+    );
+  }
+
+  const fullName = `${patient.nombre} ${patient.apellidoPaterno} ${patient.apellidoMaterno || ""}`;
   const age = calculateAge(patient.fechaNacimiento);
   const initials = `${patient.nombre[0]}${patient.apellidoPaterno[0]}`;
+  const vitalsForDisplay = latestVitals ? formatVitals(latestVitals) : [];
+  const vitalsDate = latestVitals?.fecha 
+    ? new Date(latestVitals.fecha).toLocaleDateString("es-MX", { 
+        day: "2-digit", 
+        month: "2-digit", 
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    : undefined;
 
   return (
     <div className="p-6 space-y-6">
@@ -164,16 +211,16 @@ export default function PatientDetail() {
         <div className="flex gap-2">
           <RecordVitalsDialog
             pacienteNombre={fullName}
-            onSave={(data) => console.log("Vitals:", data)}
+            onSave={(data) => createVitalsMutation.mutate(data)}
           />
           <NewNoteDialog
             pacienteNombre={fullName}
-            onSave={(data) => console.log("Note:", data)}
+            onSave={(data) => createNoteMutation.mutate(data)}
           />
         </div>
       </div>
 
-      {patient.alergias.length > 0 && (
+      {patient.alergias && patient.alergias.length > 0 && (
         <AllergyAlert alergias={patient.alergias} />
       )}
 
@@ -204,41 +251,53 @@ export default function PatientDetail() {
                     <p className="font-mono text-xs">{patient.curp}</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-2 text-sm">
-                  <Droplet className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Grupo Sanguíneo</p>
-                    <p>{patient.grupoSanguineo}</p>
+                {patient.grupoSanguineo && (
+                  <div className="flex items-start gap-2 text-sm">
+                    <Droplet className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Grupo Sanguíneo</p>
+                      <p>{patient.grupoSanguineo}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-start gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Teléfono</p>
-                    <p>{patient.telefono}</p>
+                )}
+                {patient.telefono && (
+                  <div className="flex items-start gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Teléfono</p>
+                      <p>{patient.telefono}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-start gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Email</p>
-                    <p className="text-xs break-all">{patient.email}</p>
+                )}
+                {patient.email && (
+                  <div className="flex items-start gap-2 text-sm">
+                    <Mail className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Email</p>
+                      <p className="text-xs break-all">{patient.email}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-start gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Dirección</p>
-                    <p className="text-xs">{patient.direccion}</p>
+                )}
+                {patient.direccion && (
+                  <div className="flex items-start gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Dirección</p>
+                      <p className="text-xs">{patient.direccion}</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              <div className="mt-4 pt-4 border-t">
-                <p className="text-xs text-muted-foreground mb-2">Contacto de Emergencia</p>
-                <p className="text-sm font-medium">{patient.contactoEmergencia}</p>
-                <p className="text-xs text-muted-foreground">{patient.telefonoEmergencia}</p>
-              </div>
+              {patient.contactoEmergencia && (
+                <div className="mt-4 pt-4 border-t">
+                  <p className="text-xs text-muted-foreground mb-2">Contacto de Emergencia</p>
+                  <p className="text-sm font-medium">{patient.contactoEmergencia}</p>
+                  {patient.telefonoEmergencia && (
+                    <p className="text-xs text-muted-foreground">{patient.telefonoEmergencia}</p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -274,19 +333,44 @@ export default function PatientDetail() {
                   <CardTitle className="text-lg font-medium">Notas Médicas</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {mockNotes.map((note) => (
-                    <MedicalNoteCard
-                      key={note.id}
-                      {...note}
-                      onView={() => console.log("View note:", note.id)}
-                    />
-                  ))}
+                  {notesLoading ? (
+                    [1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-[100px]" />
+                    ))
+                  ) : notes.length > 0 ? (
+                    notes.map((note) => (
+                      <MedicalNoteCard
+                        key={note.id}
+                        id={note.id}
+                        tipo={note.tipo as "historia_clinica" | "nota_evolucion" | "nota_egreso" | "interconsulta"}
+                        fecha={new Date(note.fecha).toLocaleDateString("es-MX")}
+                        hora={new Date(note.fecha).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                        medicoNombre={note.medicoNombre}
+                        motivoConsulta={note.motivoConsulta || undefined}
+                        diagnosticos={note.diagnosticos || undefined}
+                        firmada={note.firmada}
+                        onView={() => console.log("View note:", note.id)}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No hay notas médicas registradas
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="signos" className="space-y-4 mt-0">
-              <VitalsDisplay vitals={mockVitals} fechaRegistro="15/12/2025 10:30" />
+              {vitalsForDisplay.length > 0 ? (
+                <VitalsDisplay vitals={vitalsForDisplay} fechaRegistro={vitalsDate} />
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <p className="text-muted-foreground">No hay signos vitales registrados</p>
+                  </CardContent>
+                </Card>
+              )}
               
               <Card>
                 <CardHeader className="pb-3">
@@ -312,9 +396,25 @@ export default function PatientDetail() {
                   </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {mockPrescriptions.map((rx, index) => (
-                    <PrescriptionCard key={index} {...rx} />
-                  ))}
+                  {prescriptions.length > 0 ? (
+                    prescriptions.map((rx) => (
+                      <PrescriptionCard
+                        key={rx.id}
+                        medicamento={rx.medicamento}
+                        presentacion={rx.presentacion || undefined}
+                        dosis={rx.dosis}
+                        via={rx.via}
+                        frecuencia={rx.frecuencia}
+                        duracion={rx.duracion || undefined}
+                        indicaciones={rx.indicaciones || undefined}
+                        status={rx.status as "activa" | "completada" | "cancelada"}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground col-span-2 text-center py-4">
+                      No hay recetas registradas
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

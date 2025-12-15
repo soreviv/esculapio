@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { PatientCard } from "@/components/ehr/PatientCard";
 import { PatientSearch } from "@/components/ehr/PatientSearch";
 import { NewPatientDialog } from "@/components/ehr/NewPatientDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -13,83 +15,60 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Filter, SortAsc } from "lucide-react";
-
-// todo: remove mock functionality
-const mockPatients = [
-  {
-    id: "1",
-    nombre: "María",
-    apellidoPaterno: "González",
-    apellidoMaterno: "López",
-    curp: "GOLM850315MDFRPN09",
-    fechaNacimiento: "1985-03-15",
-    sexo: "F" as const,
-    status: "activo" as const,
-    alergias: ["Penicilina", "Aspirina"],
-  },
-  {
-    id: "2",
-    nombre: "Juan",
-    apellidoPaterno: "Pérez",
-    apellidoMaterno: "Ramírez",
-    curp: "PERJ780620HDFRPM03",
-    fechaNacimiento: "1978-06-20",
-    sexo: "M" as const,
-    status: "en_consulta" as const,
-  },
-  {
-    id: "3",
-    nombre: "Ana",
-    apellidoPaterno: "Martínez",
-    apellidoMaterno: "Sánchez",
-    curp: "MASA920810MDFRNC05",
-    fechaNacimiento: "1992-08-10",
-    sexo: "F" as const,
-    status: "activo" as const,
-  },
-  {
-    id: "4",
-    nombre: "Carlos",
-    apellidoPaterno: "Mendoza",
-    apellidoMaterno: "Ruiz",
-    curp: "MERC900520HDFRRL08",
-    fechaNacimiento: "1990-05-20",
-    sexo: "M" as const,
-    status: "activo" as const,
-  },
-  {
-    id: "5",
-    nombre: "Laura",
-    apellidoPaterno: "Jiménez",
-    apellidoMaterno: "Torres",
-    curp: "JITL880312MDFRMR02",
-    fechaNacimiento: "1988-03-12",
-    sexo: "F" as const,
-    status: "alta" as const,
-    alergias: ["Sulfas"],
-  },
-  {
-    id: "6",
-    nombre: "Roberto",
-    apellidoPaterno: "Hernández",
-    apellidoMaterno: "García",
-    curp: "HEGR750825HDFRRB01",
-    fechaNacimiento: "1975-08-25",
-    sexo: "M" as const,
-    status: "activo" as const,
-    alergias: ["Ibuprofeno"],
-  },
-];
+import { type Patient, type InsertPatient } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Pacientes() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [sortBy, setSortBy] = useState("nombre");
+  const { toast } = useToast();
 
-  const filteredPatients = mockPatients
+  const { data: patients = [], isLoading } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+  });
+
+  const createPatientMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const patientData: InsertPatient = {
+        nombre: data.nombre,
+        apellidoPaterno: data.apellidoPaterno,
+        apellidoMaterno: data.apellidoMaterno || null,
+        curp: data.curp,
+        fechaNacimiento: data.fechaNacimiento,
+        sexo: data.sexo,
+        grupoSanguineo: data.grupoSanguineo || null,
+        telefono: data.telefono || null,
+        email: data.email || null,
+        direccion: data.direccion || null,
+        alergias: data.alergias ? data.alergias.split(",").map((a: string) => a.trim()).filter(Boolean) : null,
+        contactoEmergencia: data.contactoEmergencia || null,
+        telefonoEmergencia: data.telefonoEmergencia || null,
+      };
+      const response = await apiRequest("POST", "/api/patients", patientData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      toast({
+        title: "Paciente registrado",
+        description: "El paciente ha sido registrado exitosamente.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo registrar el paciente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredPatients = patients
     .filter((patient) => {
-      const fullName = `${patient.nombre} ${patient.apellidoPaterno} ${patient.apellidoMaterno}`.toLowerCase();
+      const fullName = `${patient.nombre} ${patient.apellidoPaterno} ${patient.apellidoMaterno || ""}`.toLowerCase();
       const matchesSearch =
         fullName.includes(searchQuery.toLowerCase()) ||
         patient.curp.toLowerCase().includes(searchQuery.toLowerCase());
@@ -113,7 +92,9 @@ export default function Pacientes() {
             Gestión del registro de pacientes
           </p>
         </div>
-        <NewPatientDialog onSave={(data) => console.log("New patient:", data)} />
+        <NewPatientDialog 
+          onSave={(data) => createPatientMutation.mutate(data)} 
+        />
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -163,22 +144,40 @@ export default function Pacientes() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredPatients.map((patient) => (
-          <PatientCard
-            key={patient.id}
-            {...patient}
-            onViewRecord={() => setLocation(`/pacientes/${patient.id}`)}
-            onSchedule={() => console.log("Schedule:", patient.id)}
-          />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-[180px] rounded-lg" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPatients.map((patient) => (
+            <PatientCard
+              key={patient.id}
+              id={patient.id}
+              nombre={patient.nombre}
+              apellidoPaterno={patient.apellidoPaterno}
+              apellidoMaterno={patient.apellidoMaterno || undefined}
+              curp={patient.curp}
+              fechaNacimiento={patient.fechaNacimiento}
+              sexo={patient.sexo as "M" | "F"}
+              status={patient.status as "activo" | "alta" | "en_consulta"}
+              alergias={patient.alergias || undefined}
+              onViewRecord={() => setLocation(`/pacientes/${patient.id}`)}
+              onSchedule={() => setLocation("/citas")}
+            />
+          ))}
+        </div>
+      )}
 
-      {filteredPatients.length === 0 && (
+      {!isLoading && filteredPatients.length === 0 && (
         <div className="text-center py-12">
           <p className="text-muted-foreground">No se encontraron pacientes</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Intente con otros términos de búsqueda
+            {patients.length === 0 
+              ? "Registre un nuevo paciente para comenzar"
+              : "Intente con otros términos de búsqueda"}
           </p>
         </div>
       )}
