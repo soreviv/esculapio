@@ -23,6 +23,7 @@ import {
   HelpCircle,
   Activity,
   Building2,
+  Shield,
 } from "lucide-react";
 
 const menuItems = [
@@ -71,6 +72,11 @@ const systemItems = [
     title: "Configuración",
     url: "/configuracion",
     icon: Settings,
+  },
+  {
+    title: "Aviso de Privacidad",
+    url: "/aviso-privacidad",
+    icon: Shield,
   },
   {
     title: "Ayuda",

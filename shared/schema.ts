@@ -48,7 +48,11 @@ export const medicalNotes = pgTable("medical_notes", {
   analisis: text("analisis"),
   plan: text("plan"),
   diagnosticos: text("diagnosticos").array(),
+  diagnosticosCie10: text("diagnosticos_cie10").array(), // CIE-10 codes
   firmada: boolean("firmada").notNull().default(false),
+  firmaHash: text("firma_hash"), // SHA-256 hash of note content for electronic signature
+  fechaFirma: timestamp("fecha_firma"), // Timestamp when signed
+  firmaUserId: varchar("firma_user_id").references(() => users.id), // Who signed
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -86,6 +90,38 @@ export const prescriptions = pgTable("prescriptions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Audit Logs (NOM-024-SSA3-2012 compliance - trazabilidad)
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  accion: text("accion").notNull(), // crear, leer, actualizar, eliminar, firmar, acceso
+  entidad: text("entidad").notNull(), // patients, medical_notes, prescriptions, vitals
+  entidadId: varchar("entidad_id"),
+  detalles: text("detalles"), // JSON with additional context
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  fecha: timestamp("fecha").notNull().defaultNow(),
+});
+
+// CIE-10 Catalog (NOM-024-SSA3-2012 compliance - diagnósticos estandarizados)
+export const cie10Catalog = pgTable("cie10_catalog", {
+  codigo: varchar("codigo").primaryKey(),
+  descripcion: text("descripcion").notNull(),
+  categoria: text("categoria"),
+});
+
+// Patient Consent Records (LFPDPPP compliance)
+export const patientConsents = pgTable("patient_consents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id),
+  tipoConsentimiento: text("tipo_consentimiento").notNull(), // privacidad, tratamiento_datos, expediente_electronico
+  version: text("version").notNull(),
+  aceptado: boolean("aceptado").notNull().default(false),
+  fechaAceptacion: timestamp("fecha_aceptacion"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Appointments
 export const appointments = pgTable("appointments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -106,6 +142,9 @@ export const insertMedicalNoteSchema = createInsertSchema(medicalNotes).omit({ i
 export const insertVitalsSchema = createInsertSchema(vitals).omit({ id: true, createdAt: true });
 export const insertPrescriptionSchema = createInsertSchema(prescriptions).omit({ id: true, createdAt: true });
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({ id: true, createdAt: true });
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true });
+export const insertCie10Schema = createInsertSchema(cie10Catalog);
+export const insertPatientConsentSchema = createInsertSchema(patientConsents).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -119,6 +158,12 @@ export type InsertPrescription = z.infer<typeof insertPrescriptionSchema>;
 export type Prescription = typeof prescriptions.$inferSelect;
 export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 export type Appointment = typeof appointments.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertCie10 = z.infer<typeof insertCie10Schema>;
+export type Cie10 = typeof cie10Catalog.$inferSelect;
+export type InsertPatientConsent = z.infer<typeof insertPatientConsentSchema>;
+export type PatientConsent = typeof patientConsents.$inferSelect;
 
 // Enriched types with joined data
 export type AppointmentWithDetails = Appointment & {

@@ -19,7 +19,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { UserPlus, Save } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { UserPlus, Save, Shield } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 export interface NewPatientDialogProps {
@@ -41,6 +43,8 @@ export interface PatientFormData {
   alergias: string;
   contactoEmergencia: string;
   telefonoEmergencia: string;
+  consentimientoPrivacidad: boolean;
+  consentimientoExpediente: boolean;
 }
 
 export function NewPatientDialog({ onSave }: NewPatientDialogProps) {
@@ -61,6 +65,8 @@ export function NewPatientDialog({ onSave }: NewPatientDialogProps) {
     alergias: "",
     contactoEmergencia: "",
     telefonoEmergencia: "",
+    consentimientoPrivacidad: false,
+    consentimientoExpediente: false,
   });
 
   const handleSave = () => {
@@ -68,6 +74,15 @@ export function NewPatientDialog({ onSave }: NewPatientDialogProps) {
       toast({
         title: "Error",
         description: "Complete los campos obligatorios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.consentimientoPrivacidad || !formData.consentimientoExpediente) {
+      toast({
+        title: "Consentimiento requerido",
+        description: "El paciente debe aceptar el aviso de privacidad y el consentimiento para el expediente electrónico (LFPDPPP)",
         variant: "destructive",
       });
       return;
@@ -94,10 +109,12 @@ export function NewPatientDialog({ onSave }: NewPatientDialogProps) {
       alergias: "",
       contactoEmergencia: "",
       telefonoEmergencia: "",
+      consentimientoPrivacidad: false,
+      consentimientoExpediente: false,
     });
   };
 
-  const updateField = (field: keyof PatientFormData, value: string) => {
+  const updateField = (field: keyof PatientFormData, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -307,6 +324,56 @@ export function NewPatientDialog({ onSave }: NewPatientDialogProps) {
                   placeholder="10 dígitos"
                   data-testid="input-telefono-emergencia"
                 />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-medium mb-3 text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Consentimiento (LFPDPPP) *
+            </h4>
+            <div className="space-y-4 bg-muted/50 p-4 rounded-md">
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  id="consentimientoPrivacidad"
+                  checked={formData.consentimientoPrivacidad}
+                  onCheckedChange={(checked) => 
+                    updateField("consentimientoPrivacidad", checked === true)
+                  }
+                  data-testid="checkbox-privacidad"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="consentimientoPrivacidad" className="text-sm font-normal cursor-pointer">
+                    Acepto el Aviso de Privacidad
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    He leído y acepto el{" "}
+                    <Link href="/aviso-privacidad" className="text-primary underline" onClick={() => setOpen(false)}>
+                      Aviso de Privacidad
+                    </Link>{" "}
+                    conforme a la LFPDPPP.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  id="consentimientoExpediente"
+                  checked={formData.consentimientoExpediente}
+                  onCheckedChange={(checked) => 
+                    updateField("consentimientoExpediente", checked === true)
+                  }
+                  data-testid="checkbox-expediente"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="consentimientoExpediente" className="text-sm font-normal cursor-pointer">
+                    Autorizo el expediente clínico electrónico
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Autorizo la creación y manejo de mi expediente clínico electrónico conforme a la NOM-024-SSA3-2012.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

@@ -12,6 +12,7 @@ import Pacientes from "@/pages/Pacientes";
 import PatientDetail from "@/pages/PatientDetail";
 import Citas from "@/pages/Citas";
 import Expedientes from "@/pages/Expedientes";
+import AvisoPrivacidad from "@/pages/AvisoPrivacidad";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/pacientes/:id" component={PatientDetail} />
       <Route path="/expedientes" component={Expedientes} />
       <Route path="/citas" component={Citas} />
+      <Route path="/aviso-privacidad" component={AvisoPrivacidad} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -32,7 +32,7 @@ export default function Pacientes() {
 
   const createPatientMutation = useMutation({
     mutationFn: async (data: any) => {
-      const patientData: InsertPatient = {
+      const patientData = {
         nombre: data.nombre,
         apellidoPaterno: data.apellidoPaterno,
         apellidoMaterno: data.apellidoMaterno || null,
@@ -46,6 +46,8 @@ export default function Pacientes() {
         alergias: data.alergias ? data.alergias.split(",").map((a: string) => a.trim()).filter(Boolean) : null,
         contactoEmergencia: data.contactoEmergencia || null,
         telefonoEmergencia: data.telefonoEmergencia || null,
+        consentimientoPrivacidad: data.consentimientoPrivacidad || false,
+        consentimientoExpediente: data.consentimientoExpediente || false,
       };
       const response = await apiRequest("POST", "/api/patients", patientData);
       return response.json();

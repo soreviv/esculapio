@@ -6,7 +6,11 @@ import {
   type Prescription, type InsertPrescription,
   type Appointment, type InsertAppointment,
   type AppointmentWithDetails, type MedicalNoteWithDetails, type PrescriptionWithDetails,
-  users, patients, medicalNotes, vitals, prescriptions, appointments
+  type AuditLog, type InsertAuditLog,
+  type Cie10, type InsertCie10,
+  type PatientConsent, type InsertPatientConsent,
+  users, patients, medicalNotes, vitals, prescriptions, appointments,
+  auditLogs, cie10Catalog, patientConsents
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, ilike, or, sql } from "drizzle-orm";
@@ -55,6 +59,23 @@ export interface IStorage {
   
   // Enriched Prescriptions
   getPrescriptionsWithDetails(patientId: string): Promise<PrescriptionWithDetails[]>;
+  
+  // Audit Logs (NOM-024-SSA3-2012 compliance)
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(limit?: number): Promise<AuditLog[]>;
+  getAuditLogsByEntity(entidad: string, entidadId: string): Promise<AuditLog[]>;
+  
+  // CIE-10 Catalog
+  getCie10Codes(search?: string): Promise<Cie10[]>;
+  getCie10Code(codigo: string): Promise<Cie10 | undefined>;
+  createCie10Code(code: InsertCie10): Promise<Cie10>;
+  
+  // Patient Consents (LFPDPPP compliance)
+  getPatientConsents(patientId: string): Promise<PatientConsent[]>;
+  createPatientConsent(consent: InsertPatientConsent): Promise<PatientConsent>;
+  
+  // Sign Medical Note
+  signMedicalNote(id: string, userId: string, hash: string): Promise<MedicalNote | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -271,7 +292,11 @@ export class DatabaseStorage implements IStorage {
         analisis: medicalNotes.analisis,
         plan: medicalNotes.plan,
         diagnosticos: medicalNotes.diagnosticos,
+        diagnosticosCie10: medicalNotes.diagnosticosCie10,
         firmada: medicalNotes.firmada,
+        firmaHash: medicalNotes.firmaHash,
+        fechaFirma: medicalNotes.fechaFirma,
+        firmaUserId: medicalNotes.firmaUserId,
         createdAt: medicalNotes.createdAt,
         medicoNombre: users.nombre,
         medicoEspecialidad: users.especialidad,
@@ -314,6 +339,68 @@ export class DatabaseStorage implements IStorage {
       ...r,
       medicoNombre: r.medicoNombre || "Médico",
     }));
+  }
+
+  // Audit Logs (NOM-024-SSA3-2012 compliance)
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [newLog] = await db.insert(auditLogs).values(log).returning();
+    return newLog;
+  }
+
+  async getAuditLogs(limit: number = 100): Promise<AuditLog[]> {
+    return db.select().from(auditLogs).orderBy(desc(auditLogs.fecha)).limit(limit);
+  }
+
+  async getAuditLogsByEntity(entidad: string, entidadId: string): Promise<AuditLog[]> {
+    return db.select().from(auditLogs)
+      .where(and(eq(auditLogs.entidad, entidad), eq(auditLogs.entidadId, entidadId)))
+      .orderBy(desc(auditLogs.fecha));
+  }
+
+  // CIE-10 Catalog
+  async getCie10Codes(search?: string): Promise<Cie10[]> {
+    if (search) {
+      return db.select().from(cie10Catalog)
+        .where(or(
+          ilike(cie10Catalog.codigo, `%${search}%`),
+          ilike(cie10Catalog.descripcion, `%${search}%`)
+        ))
+        .limit(50);
+    }
+    return db.select().from(cie10Catalog).limit(100);
+  }
+
+  async getCie10Code(codigo: string): Promise<Cie10 | undefined> {
+    const [code] = await db.select().from(cie10Catalog).where(eq(cie10Catalog.codigo, codigo));
+    return code;
+  }
+
+  async createCie10Code(code: InsertCie10): Promise<Cie10> {
+    const [newCode] = await db.insert(cie10Catalog).values(code).returning();
+    return newCode;
+  }
+
+  // Patient Consents (LFPDPPP compliance)
+  async getPatientConsents(patientId: string): Promise<PatientConsent[]> {
+    return db.select().from(patientConsents)
+      .where(eq(patientConsents.patientId, patientId))
+      .orderBy(desc(patientConsents.createdAt));
+  }
+
+  async createPatientConsent(consent: InsertPatientConsent): Promise<PatientConsent> {
+    const [newConsent] = await db.insert(patientConsents).values(consent).returning();
+    return newConsent;
+  }
+
+  // Sign Medical Note (NOM-024-SSA3-2012 compliance - firma electrónica)
+  async signMedicalNote(id: string, userId: string, hash: string): Promise<MedicalNote | undefined> {
+    const [updated] = await db.update(medicalNotes).set({
+      firmada: true,
+      firmaHash: hash,
+      fechaFirma: new Date(),
+      firmaUserId: userId,
+    }).where(eq(medicalNotes.id, id)).returning();
+    return updated;
   }
 }
 
