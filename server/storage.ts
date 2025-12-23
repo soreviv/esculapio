@@ -36,11 +36,13 @@ export interface IStorage {
   updateMedicalNote(id: string, note: Partial<InsertMedicalNote>): Promise<MedicalNote | undefined>;
   
   // Vitals
+  getAllVitals(): Promise<Vitals[]>;
   getVitals(patientId: string): Promise<Vitals[]>;
   getLatestVitals(patientId: string): Promise<Vitals | undefined>;
   createVitals(vitalsData: InsertVitals): Promise<Vitals>;
   
   // Prescriptions
+  getAllPrescriptions(): Promise<Prescription[]>;
   getPrescriptions(patientId: string): Promise<Prescription[]>;
   createPrescription(prescription: InsertPrescription): Promise<Prescription>;
   updatePrescription(id: string, prescription: Partial<InsertPrescription>): Promise<Prescription | undefined>;
@@ -152,6 +154,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Vitals
+  async getAllVitals(): Promise<Vitals[]> {
+    return db.select().from(vitals).orderBy(desc(vitals.fecha));
+  }
+
   async getVitals(patientId: string): Promise<Vitals[]> {
     return db.select().from(vitals)
       .where(eq(vitals.patientId, patientId))
@@ -172,6 +178,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Prescriptions
+  async getAllPrescriptions(): Promise<Prescription[]> {
+    return db.select().from(prescriptions).orderBy(desc(prescriptions.createdAt));
+  }
+
   async getPrescriptions(patientId: string): Promise<Prescription[]> {
     return db.select().from(prescriptions)
       .where(eq(prescriptions.patientId, patientId))

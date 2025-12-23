@@ -195,6 +195,15 @@ export async function registerRoutes(
   });
 
   // Vitals
+  app.get("/api/vitals", async (req, res) => {
+    try {
+      const vitalsList = await storage.getAllVitals();
+      res.json(vitalsList);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching vitals" });
+    }
+  });
+
   app.get("/api/patients/:patientId/vitals", async (req, res) => {
     try {
       const vitalsList = await storage.getVitals(req.params.patientId);
@@ -240,6 +249,15 @@ export async function registerRoutes(
   });
 
   // Prescriptions (with doctor details)
+  app.get("/api/prescriptions", async (req, res) => {
+    try {
+      const allPrescriptions = await storage.getAllPrescriptions();
+      res.json(allPrescriptions);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching prescriptions" });
+    }
+  });
+
   app.get("/api/patients/:patientId/prescriptions", async (req, res) => {
     try {
       const prescriptions = await storage.getPrescriptionsWithDetails(req.params.patientId);
