@@ -16,6 +16,7 @@ import Laboratorio from "@/pages/Laboratorio";
 import Recetas from "@/pages/Recetas";
 import SignosVitales from "@/pages/SignosVitales";
 import AvisoPrivacidad from "@/pages/AvisoPrivacidad";
+import Ayuda from "@/pages/Ayuda";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/recetas" component={Recetas} />
       <Route path="/signos-vitales" component={SignosVitales} />
       <Route path="/aviso-privacidad" component={AvisoPrivacidad} />
+      <Route path="/ayuda" component={Ayuda} />
       <Route component={NotFound} />
     </Switch>
   );
