@@ -9,8 +9,9 @@ import {
   type AuditLog, type InsertAuditLog,
   type Cie10, type InsertCie10,
   type PatientConsent, type InsertPatientConsent,
+  type LabOrder, type InsertLabOrder, type LabOrderWithDetails,
   users, patients, medicalNotes, vitals, prescriptions, appointments,
-  auditLogs, cie10Catalog, patientConsents
+  auditLogs, cie10Catalog, patientConsents, labOrders
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, ilike, or, sql } from "drizzle-orm";
@@ -78,6 +79,14 @@ export interface IStorage {
   
   // Sign Medical Note
   signMedicalNote(id: string, userId: string, hash: string): Promise<MedicalNote | undefined>;
+  
+  // Lab Orders
+  getAllLabOrders(): Promise<LabOrder[]>;
+  getLabOrders(patientId: string): Promise<LabOrder[]>;
+  getLabOrder(id: string): Promise<LabOrder | undefined>;
+  createLabOrder(order: InsertLabOrder): Promise<LabOrder>;
+  updateLabOrder(id: string, order: Partial<InsertLabOrder>): Promise<LabOrder | undefined>;
+  getLabOrdersWithDetails(): Promise<LabOrderWithDetails[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -411,6 +420,64 @@ export class DatabaseStorage implements IStorage {
       firmaUserId: userId,
     }).where(eq(medicalNotes.id, id)).returning();
     return updated;
+  }
+
+  // Lab Orders
+  async getAllLabOrders(): Promise<LabOrder[]> {
+    return db.select().from(labOrders).orderBy(desc(labOrders.createdAt));
+  }
+
+  async getLabOrders(patientId: string): Promise<LabOrder[]> {
+    return db.select().from(labOrders)
+      .where(eq(labOrders.patientId, patientId))
+      .orderBy(desc(labOrders.createdAt));
+  }
+
+  async getLabOrder(id: string): Promise<LabOrder | undefined> {
+    const [order] = await db.select().from(labOrders).where(eq(labOrders.id, id));
+    return order;
+  }
+
+  async createLabOrder(order: InsertLabOrder): Promise<LabOrder> {
+    const [newOrder] = await db.insert(labOrders).values(order).returning();
+    return newOrder;
+  }
+
+  async updateLabOrder(id: string, order: Partial<InsertLabOrder>): Promise<LabOrder | undefined> {
+    const [updated] = await db.update(labOrders).set(order).where(eq(labOrders.id, id)).returning();
+    return updated;
+  }
+
+  async getLabOrdersWithDetails(): Promise<LabOrderWithDetails[]> {
+    const result = await db
+      .select({
+        id: labOrders.id,
+        patientId: labOrders.patientId,
+        medicoId: labOrders.medicoId,
+        estudios: labOrders.estudios,
+        diagnosticoPresuntivo: labOrders.diagnosticoPresuntivo,
+        indicacionesClinicas: labOrders.indicacionesClinicas,
+        urgente: labOrders.urgente,
+        ayuno: labOrders.ayuno,
+        status: labOrders.status,
+        resultados: labOrders.resultados,
+        fechaResultados: labOrders.fechaResultados,
+        createdAt: labOrders.createdAt,
+        patientNombre: patients.nombre,
+        patientApellido: patients.apellidoPaterno,
+        medicoNombre: users.nombre,
+      })
+      .from(labOrders)
+      .leftJoin(patients, eq(labOrders.patientId, patients.id))
+      .leftJoin(users, eq(labOrders.medicoId, users.id))
+      .orderBy(desc(labOrders.createdAt));
+    
+    return result.map(r => ({
+      ...r,
+      patientNombre: r.patientNombre || "Paciente",
+      patientApellido: r.patientApellido || "",
+      medicoNombre: r.medicoNombre || "Médico",
+    }));
   }
 }
 

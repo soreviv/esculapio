@@ -172,6 +172,20 @@ export async function registerRoutes(
 
   app.patch("/api/notes/:id", async (req, res) => {
     try {
+      // First, get the existing note to check if it's signed
+      const existingNote = await storage.getMedicalNote(req.params.id);
+      if (!existingNote) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      
+      // If note is already signed, only allow signing action (to prevent re-signing)
+      // Once signed, the note cannot be modified (NOM-024-SSA3-2012 compliance)
+      if (existingNote.firmada && !req.body.firmada) {
+        return res.status(403).json({ 
+          error: "La nota ya está firmada y no puede ser modificada. Las notas firmadas son inmutables según la NOM-024-SSA3-2012." 
+        });
+      }
+      
       const note = await storage.updateMedicalNote(req.params.id, req.body);
       if (!note) {
         return res.status(404).json({ error: "Note not found" });
@@ -179,7 +193,7 @@ export async function registerRoutes(
       
       await storage.createAuditLog({
         userId: req.body.updatedBy || note.medicoId,
-        accion: "actualizar",
+        accion: req.body.firmada ? "firmar" : "actualizar",
         entidad: "medical_notes",
         entidadId: note.id,
         detalles: JSON.stringify({ campos: Object.keys(req.body) }),
@@ -502,6 +516,70 @@ export async function registerRoutes(
       res.status(201).json(consent);
     } catch (error) {
       res.status(500).json({ error: "Error creating consent" });
+    }
+  });
+
+  // Lab Orders
+  app.get("/api/lab-orders", async (req, res) => {
+    try {
+      const orders = await storage.getLabOrdersWithDetails();
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching lab orders" });
+    }
+  });
+
+  app.get("/api/patients/:patientId/lab-orders", async (req, res) => {
+    try {
+      const orders = await storage.getLabOrders(req.params.patientId);
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching lab orders" });
+    }
+  });
+
+  app.get("/api/lab-orders/:id", async (req, res) => {
+    try {
+      const order = await storage.getLabOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Lab order not found" });
+      }
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching lab order" });
+    }
+  });
+
+  app.post("/api/lab-orders", async (req, res) => {
+    try {
+      const order = await storage.createLabOrder(req.body);
+      
+      await storage.createAuditLog({
+        userId: req.body.medicoId,
+        accion: "crear",
+        entidad: "lab_order",
+        entidadId: order.id,
+        detalles: JSON.stringify({ estudios: order.estudios }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      
+      res.status(201).json(order);
+    } catch (error) {
+      res.status(500).json({ error: "Error creating lab order" });
+    }
+  });
+
+  app.patch("/api/lab-orders/:id", async (req, res) => {
+    try {
+      const order = await storage.updateLabOrder(req.params.id, req.body);
+      if (!order) {
+        return res.status(404).json({ error: "Lab order not found" });
+      }
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ error: "Error updating lab order" });
     }
   });
 

@@ -135,6 +135,22 @@ export const appointments = pgTable("appointments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Lab Orders (Órdenes de Laboratorio)
+export const labOrders = pgTable("lab_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id),
+  medicoId: varchar("medico_id").notNull().references(() => users.id),
+  estudios: text("estudios").array().notNull(), // List of tests to perform
+  diagnosticoPresuntivo: text("diagnostico_presuntivo"),
+  indicacionesClinicas: text("indicaciones_clinicas"),
+  urgente: boolean("urgente").notNull().default(false),
+  ayuno: boolean("ayuno").notNull().default(false),
+  status: text("status").notNull().default("pendiente"), // pendiente, en_proceso, completada, cancelada
+  resultados: text("resultados"),
+  fechaResultados: timestamp("fecha_resultados"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas and types
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPatientSchema = createInsertSchema(patients).omit({ id: true, createdAt: true });
@@ -145,6 +161,7 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({ i
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true });
 export const insertCie10Schema = createInsertSchema(cie10Catalog);
 export const insertPatientConsentSchema = createInsertSchema(patientConsents).omit({ id: true, createdAt: true });
+export const insertLabOrderSchema = createInsertSchema(labOrders).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -164,6 +181,8 @@ export type InsertCie10 = z.infer<typeof insertCie10Schema>;
 export type Cie10 = typeof cie10Catalog.$inferSelect;
 export type InsertPatientConsent = z.infer<typeof insertPatientConsentSchema>;
 export type PatientConsent = typeof patientConsents.$inferSelect;
+export type InsertLabOrder = z.infer<typeof insertLabOrderSchema>;
+export type LabOrder = typeof labOrders.$inferSelect;
 
 // Enriched types with joined data
 export type AppointmentWithDetails = Appointment & {
@@ -179,5 +198,11 @@ export type MedicalNoteWithDetails = MedicalNote & {
 };
 
 export type PrescriptionWithDetails = Prescription & {
+  medicoNombre: string;
+};
+
+export type LabOrderWithDetails = LabOrder & {
+  patientNombre: string;
+  patientApellido: string;
   medicoNombre: string;
 };
