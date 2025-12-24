@@ -27,13 +27,18 @@ app.use(express.urlencoded({ extended: false }));
 
 const PgSession = connectPgSimple(session);
 
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret && process.env.NODE_ENV === "production") {
+  throw new Error("SESSION_SECRET environment variable is required in production");
+}
+
 app.use(
   session({
     store: new PgSession({
       conString: process.env.DATABASE_URL,
       createTableIfMissing: true,
     }),
-    secret: process.env.SESSION_SECRET || "medirecord-secret-key-change-in-production",
+    secret: sessionSecret || "medirecord-dev-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {

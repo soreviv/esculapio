@@ -56,6 +56,18 @@ Preferred communication style: Simple, everyday language.
 - **Component-Based UI**: Domain-specific EHR components (PatientCard, MedicalNoteCard, VitalsDisplay) encapsulate healthcare-specific UI logic
 - **Path Aliases**: `@/` maps to client/src, `@shared/` maps to shared directory
 
+### Authentication System
+- **Password Hashing**: bcrypt with SALT_ROUNDS=12
+- **Session Storage**: express-session with connect-pg-simple (PostgreSQL-backed sessions)
+- **Session Configuration**: 24-hour max age, httpOnly cookies, sameSite=lax, secure in production
+- **Auth Middleware**: isAuthenticated (all users), isMedico (doctors/admin), isAdmin (admin only) in `server/auth.ts`
+- **Audit Logging**: All protected routes use req.session.userId for NOM-024-SSA3-2012 audit trail compliance
+- **Default Admin**: Created via `scripts/seed-admin.ts` using ADMIN_PASSWORD environment variable
+
+### Scripts
+- `scripts/seed-admin.ts`: Creates admin user with bcrypt-hashed password (requires ADMIN_PASSWORD env var)
+- `scripts/migrate-passwords.ts`: Migrates plaintext passwords to bcrypt hashes (skips already-hashed passwords)
+
 ## External Dependencies
 
 ### Database
