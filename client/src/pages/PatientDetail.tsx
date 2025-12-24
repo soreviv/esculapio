@@ -25,8 +25,11 @@ import {
   Mail,
   MapPin,
   Droplet,
+  Shield,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
-import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertMedicalNote, type InsertVitals } from "@shared/schema";
+import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertMedicalNote, type InsertVitals, type PatientConsent } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -99,6 +102,11 @@ export default function PatientDetail() {
 
   const { data: prescriptions = [] } = useQuery<PrescriptionWithDetails[]>({
     queryKey: ["/api/patients", params.id, "prescriptions"],
+    enabled: !!params.id,
+  });
+
+  const { data: consents = [] } = useQuery<PatientConsent[]>({
+    queryKey: ["/api/patients", params.id, "consents"],
     enabled: !!params.id,
   });
 
@@ -325,6 +333,10 @@ export default function PatientDetail() {
                 <Calendar className="h-4 w-4 mr-2" />
                 Citas
               </TabsTrigger>
+              <TabsTrigger value="consentimientos" className="data-[state=active]:bg-muted" data-testid="tab-consentimientos">
+                <Shield className="h-4 w-4 mr-2" />
+                Consentimientos
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="expediente" className="space-y-4 mt-0">
@@ -453,6 +465,61 @@ export default function PatientDetail() {
                   <p className="text-sm text-muted-foreground">
                     Aquí se mostrará el historial de citas del paciente.
                   </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="consentimientos" className="mt-0">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg font-medium">Consentimientos (LFPDPPP)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {consents.length > 0 ? (
+                    consents.map((consent) => (
+                      <div key={consent.id} className="flex items-start gap-4 p-4 rounded-md border" data-testid={`consent-item-${consent.id}`}>
+                        <div className="p-2 rounded-md bg-primary/10">
+                          {consent.aceptado ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">
+                            {consent.tipoConsentimiento === "privacidad" && "Aviso de Privacidad"}
+                            {consent.tipoConsentimiento === "expediente_electronico" && "Expediente Clínico Electrónico"}
+                            {consent.tipoConsentimiento === "tratamiento_datos" && "Tratamiento de Datos Personales"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Versión: {consent.version}
+                          </p>
+                          {consent.fechaAceptacion && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Aceptado el: {new Date(consent.fechaAceptacion).toLocaleDateString("es-MX", { 
+                                year: "numeric", 
+                                month: "long", 
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </p>
+                          )}
+                        </div>
+                        <Badge variant={consent.aceptado ? "default" : "destructive"}>
+                          {consent.aceptado ? "Aceptado" : "No aceptado"}
+                        </Badge>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No hay registros de consentimiento</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Los consentimientos se registran al momento de dar de alta al paciente.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
