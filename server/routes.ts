@@ -12,7 +12,7 @@ import {
   insertPatientConsentSchema
 } from "@shared/schema";
 import { createHash } from "crypto";
-import { hashPassword, verifyPassword, isAuthenticated, isAdmin, isMedico } from "./auth";
+import { hashPassword, verifyPassword, isAuthenticated, isAdmin, isMedico, isEnfermeria, isMedicoOrEnfermeria } from "./auth";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -167,8 +167,8 @@ export async function registerRoutes(
     }
   });
 
-  // Patients (Protected - requires authentication)
-  app.get("/api/patients", isAuthenticated, async (req, res) => {
+  // Patients (Protected - requires medical/nursing staff)
+  app.get("/api/patients", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const patients = await storage.getPatients();
       res.json(patients);
@@ -177,7 +177,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/search", isAuthenticated, async (req, res) => {
+  app.get("/api/patients/search", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const query = req.query.q as string || "";
       const patients = await storage.searchPatients(query);
@@ -187,7 +187,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/patients/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const patient = await storage.getPatient(req.params.id);
       if (!patient) {
@@ -199,7 +199,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/patients", isAuthenticated, async (req, res) => {
+  app.post("/api/patients", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const parsed = insertPatientSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -247,7 +247,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/patients/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/patients/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const patient = await storage.updatePatient(req.params.id, req.body);
       if (!patient) {
@@ -271,8 +271,8 @@ export async function registerRoutes(
     }
   });
 
-  // Medical Notes (Protected - requires authentication)
-  app.get("/api/patients/:patientId/notes", isAuthenticated, async (req, res) => {
+  // Medical Notes (Protected - staff can read, doctors can write)
+  app.get("/api/patients/:patientId/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const notes = await storage.getMedicalNotesWithDetails(req.params.patientId);
       res.json(notes);
@@ -281,7 +281,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/notes/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/notes/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const note = await storage.getMedicalNote(req.params.id);
       if (!note) {
@@ -354,8 +354,8 @@ export async function registerRoutes(
     }
   });
 
-  // Vitals (Protected)
-  app.get("/api/vitals", isAuthenticated, async (req, res) => {
+  // Vitals (Protected - requires medical/nursing staff)
+  app.get("/api/vitals", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const vitalsList = await storage.getAllVitals();
       res.json(vitalsList);
@@ -364,7 +364,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/vitals", isAuthenticated, async (req, res) => {
+  app.get("/api/patients/:patientId/vitals", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const vitalsList = await storage.getVitals(req.params.patientId);
       res.json(vitalsList);
@@ -373,7 +373,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/vitals/latest", isAuthenticated, async (req, res) => {
+  app.get("/api/patients/:patientId/vitals/latest", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const latest = await storage.getLatestVitals(req.params.patientId);
       res.json(latest || null);
@@ -382,7 +382,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/vitals", isAuthenticated, async (req, res) => {
+  app.post("/api/vitals", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const parsed = insertVitalsSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -407,8 +407,8 @@ export async function registerRoutes(
     }
   });
 
-  // Prescriptions (Protected - requires doctor role for creation)
-  app.get("/api/prescriptions", isAuthenticated, async (req, res) => {
+  // Prescriptions (Protected - staff can read, doctors can write)
+  app.get("/api/prescriptions", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const allPrescriptions = await storage.getAllPrescriptions();
       res.json(allPrescriptions);
@@ -417,7 +417,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/prescriptions", isAuthenticated, async (req, res) => {
+  app.get("/api/patients/:patientId/prescriptions", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const prescriptions = await storage.getPrescriptionsWithDetails(req.params.patientId);
       res.json(prescriptions);
@@ -475,8 +475,8 @@ export async function registerRoutes(
     }
   });
 
-  // Appointments (Protected)
-  app.get("/api/appointments", isAuthenticated, async (req, res) => {
+  // Appointments (Protected - staff access)
+  app.get("/api/appointments", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const fecha = req.query.fecha as string;
       if (fecha) {
@@ -491,7 +491,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/appointments", isAuthenticated, async (req, res) => {
+  app.get("/api/patients/:patientId/appointments", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const appointments = await storage.getAppointmentsByPatient(req.params.patientId);
       res.json(appointments);
@@ -500,7 +500,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/appointments", isAuthenticated, async (req, res) => {
+  app.post("/api/appointments", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const parsed = insertAppointmentSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -525,7 +525,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/appointments/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/appointments/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const appointment = await storage.updateAppointment(req.params.id, req.body);
       if (!appointment) {
@@ -549,8 +549,8 @@ export async function registerRoutes(
     }
   });
 
-  // Users/Doctors (Protected - admin only for listing)
-  app.get("/api/users", isAuthenticated, async (req, res) => {
+  // Users/Doctors (Protected - staff can view, admin for modification)
+  app.get("/api/users", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const users = await storage.getUsers();
       res.json(users);
@@ -572,7 +572,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/audit-logs/:entidad/:entidadId", isAuthenticated, async (req, res) => {
+  app.get("/api/audit-logs/:entidad/:entidadId", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const logs = await storage.getAuditLogsByEntity(req.params.entidad, req.params.entidadId);
       res.json(logs);
@@ -581,7 +581,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/audit-logs", isAuthenticated, async (req, res) => {
+  app.post("/api/audit-logs", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const logData = {
         ...req.body,
@@ -635,8 +635,8 @@ export async function registerRoutes(
     }
   });
 
-  // Patient Consents (Protected)
-  app.get("/api/patients/:patientId/consents", isAuthenticated, async (req, res) => {
+  // Patient Consents (Protected - staff access)
+  app.get("/api/patients/:patientId/consents", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const consents = await storage.getPatientConsents(req.params.patientId);
       res.json(consents);
@@ -645,7 +645,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/patients/:patientId/consents", isAuthenticated, async (req, res) => {
+  app.post("/api/patients/:patientId/consents", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const consentData = {
         ...req.body,
@@ -663,8 +663,8 @@ export async function registerRoutes(
     }
   });
 
-  // Lab Orders (Protected)
-  app.get("/api/lab-orders", isAuthenticated, async (req, res) => {
+  // Lab Orders (Protected - staff can read, doctors can write)
+  app.get("/api/lab-orders", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const orders = await storage.getLabOrdersWithDetails();
       res.json(orders);
@@ -673,7 +673,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/lab-orders", isAuthenticated, async (req, res) => {
+  app.get("/api/patients/:patientId/lab-orders", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const orders = await storage.getLabOrders(req.params.patientId);
       res.json(orders);
@@ -682,7 +682,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/lab-orders/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/lab-orders/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const order = await storage.getLabOrder(req.params.id);
       if (!order) {
