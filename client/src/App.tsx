@@ -17,6 +17,7 @@ import Recetas from "@/pages/Recetas";
 import SignosVitales from "@/pages/SignosVitales";
 import AvisoPrivacidad from "@/pages/AvisoPrivacidad";
 import Ayuda from "@/pages/Ayuda";
+import Configuracion from "@/pages/Configuracion";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/signos-vitales" component={SignosVitales} />
       <Route path="/aviso-privacidad" component={AvisoPrivacidad} />
       <Route path="/ayuda" component={Ayuda} />
+      <Route path="/configuracion" component={Configuracion} />
       <Route component={NotFound} />
     </Switch>
   );
