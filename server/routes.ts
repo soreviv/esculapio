@@ -12,14 +12,163 @@ import {
   insertPatientConsentSchema
 } from "@shared/schema";
 import { createHash } from "crypto";
+import { hashPassword, verifyPassword, isAuthenticated, isAdmin, isMedico } from "./auth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   
-  // Patients
-  app.get("/api/patients", async (req, res) => {
+  // Authentication endpoints
+  app.post("/api/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Usuario y contraseña son requeridos" });
+      }
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        await storage.createAuditLog({
+          userId: null,
+          accion: "login_fallido",
+          entidad: "auth",
+          entidadId: null,
+          detalles: JSON.stringify({ username, reason: "user_not_found" }),
+          ipAddress: req.ip || req.socket.remoteAddress || null,
+          userAgent: req.get("User-Agent") || null,
+          fecha: new Date(),
+        });
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      
+      const isValidPassword = await verifyPassword(password, user.password);
+      if (!isValidPassword) {
+        await storage.createAuditLog({
+          userId: user.id,
+          accion: "login_fallido",
+          entidad: "auth",
+          entidadId: user.id,
+          detalles: JSON.stringify({ reason: "invalid_password" }),
+          ipAddress: req.ip || req.socket.remoteAddress || null,
+          userAgent: req.get("User-Agent") || null,
+          fecha: new Date(),
+        });
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      
+      req.session.userId = user.id;
+      req.session.role = user.role;
+      req.session.nombre = user.nombre;
+      
+      await storage.createAuditLog({
+        userId: user.id,
+        accion: "login",
+        entidad: "auth",
+        entidadId: user.id,
+        detalles: JSON.stringify({ role: user.role }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      
+      res.json({ 
+        id: user.id, 
+        username: user.username, 
+        role: user.role, 
+        nombre: user.nombre,
+        especialidad: user.especialidad,
+        cedula: user.cedula
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Error al iniciar sesión" });
+    }
+  });
+
+  app.post("/api/logout", (req, res) => {
+    const userId = req.session?.userId;
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Error al cerrar sesión" });
+      }
+      if (userId) {
+        storage.createAuditLog({
+          userId,
+          accion: "logout",
+          entidad: "auth",
+          entidadId: userId,
+          detalles: null,
+          ipAddress: req.ip || req.socket.remoteAddress || null,
+          userAgent: req.get("User-Agent") || null,
+          fecha: new Date(),
+        });
+      }
+      res.json({ message: "Sesión cerrada exitosamente" });
+    });
+  });
+
+  app.get("/api/auth/me", (req, res) => {
+    if (req.session?.userId) {
+      res.json({
+        id: req.session.userId,
+        role: req.session.role,
+        nombre: req.session.nombre,
+      });
+    } else {
+      res.status(401).json({ error: "No autenticado" });
+    }
+  });
+
+  app.post("/api/register", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { username, password, role, nombre, especialidad, cedula } = req.body;
+      
+      if (!username || !password || !nombre) {
+        return res.status(400).json({ error: "Username, password y nombre son requeridos" });
+      }
+      
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "El usuario ya existe" });
+      }
+      
+      const hashedPassword = await hashPassword(password);
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+        role: role || "medico",
+        nombre,
+        especialidad,
+        cedula,
+      });
+      
+      await storage.createAuditLog({
+        userId: req.session.userId,
+        accion: "crear",
+        entidad: "users",
+        entidadId: user.id,
+        detalles: JSON.stringify({ role: user.role }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      
+      res.status(201).json({ 
+        id: user.id, 
+        username: user.username, 
+        role: user.role, 
+        nombre: user.nombre 
+      });
+    } catch (error) {
+      console.error("Register error:", error);
+      res.status(500).json({ error: "Error al registrar usuario" });
+    }
+  });
+
+  // Patients (Protected - requires authentication)
+  app.get("/api/patients", isAuthenticated, async (req, res) => {
     try {
       const patients = await storage.getPatients();
       res.json(patients);
@@ -28,7 +177,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/search", async (req, res) => {
+  app.get("/api/patients/search", isAuthenticated, async (req, res) => {
     try {
       const query = req.query.q as string || "";
       const patients = await storage.searchPatients(query);
@@ -38,7 +187,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id", async (req, res) => {
+  app.get("/api/patients/:id", isAuthenticated, async (req, res) => {
     try {
       const patient = await storage.getPatient(req.params.id);
       if (!patient) {
@@ -50,7 +199,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/patients", async (req, res) => {
+  app.post("/api/patients", isAuthenticated, async (req, res) => {
     try {
       const parsed = insertPatientSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -98,7 +247,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/patients/:id", async (req, res) => {
+  app.patch("/api/patients/:id", isAuthenticated, async (req, res) => {
     try {
       const patient = await storage.updatePatient(req.params.id, req.body);
       if (!patient) {
@@ -106,7 +255,7 @@ export async function registerRoutes(
       }
       
       await storage.createAuditLog({
-        userId: req.body.updatedBy || null,
+        userId: req.session.userId || req.body.updatedBy || null,
         accion: "actualizar",
         entidad: "patients",
         entidadId: patient.id,
@@ -122,8 +271,8 @@ export async function registerRoutes(
     }
   });
 
-  // Medical Notes (with doctor details)
-  app.get("/api/patients/:patientId/notes", async (req, res) => {
+  // Medical Notes (Protected - requires authentication)
+  app.get("/api/patients/:patientId/notes", isAuthenticated, async (req, res) => {
     try {
       const notes = await storage.getMedicalNotesWithDetails(req.params.patientId);
       res.json(notes);
@@ -132,7 +281,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/notes/:id", async (req, res) => {
+  app.get("/api/notes/:id", isAuthenticated, async (req, res) => {
     try {
       const note = await storage.getMedicalNote(req.params.id);
       if (!note) {
@@ -144,7 +293,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/notes", async (req, res) => {
+  app.post("/api/notes", isAuthenticated, isMedico, async (req, res) => {
     try {
       const parsed = insertMedicalNoteSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -170,16 +319,13 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/notes/:id", async (req, res) => {
+  app.patch("/api/notes/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
-      // First, get the existing note to check if it's signed
       const existingNote = await storage.getMedicalNote(req.params.id);
       if (!existingNote) {
         return res.status(404).json({ error: "Note not found" });
       }
       
-      // If note is already signed, only allow signing action (to prevent re-signing)
-      // Once signed, the note cannot be modified (NOM-024-SSA3-2012 compliance)
       if (existingNote.firmada && !req.body.firmada) {
         return res.status(403).json({ 
           error: "La nota ya está firmada y no puede ser modificada. Las notas firmadas son inmutables según la NOM-024-SSA3-2012." 
@@ -192,7 +338,7 @@ export async function registerRoutes(
       }
       
       await storage.createAuditLog({
-        userId: req.body.updatedBy || note.medicoId,
+        userId: req.session.userId || req.body.updatedBy || note.medicoId,
         accion: req.body.firmada ? "firmar" : "actualizar",
         entidad: "medical_notes",
         entidadId: note.id,
@@ -208,8 +354,8 @@ export async function registerRoutes(
     }
   });
 
-  // Vitals
-  app.get("/api/vitals", async (req, res) => {
+  // Vitals (Protected)
+  app.get("/api/vitals", isAuthenticated, async (req, res) => {
     try {
       const vitalsList = await storage.getAllVitals();
       res.json(vitalsList);
@@ -218,7 +364,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/vitals", async (req, res) => {
+  app.get("/api/patients/:patientId/vitals", isAuthenticated, async (req, res) => {
     try {
       const vitalsList = await storage.getVitals(req.params.patientId);
       res.json(vitalsList);
@@ -227,7 +373,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/vitals/latest", async (req, res) => {
+  app.get("/api/patients/:patientId/vitals/latest", isAuthenticated, async (req, res) => {
     try {
       const latest = await storage.getLatestVitals(req.params.patientId);
       res.json(latest || null);
@@ -236,7 +382,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/vitals", async (req, res) => {
+  app.post("/api/vitals", isAuthenticated, async (req, res) => {
     try {
       const parsed = insertVitalsSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -244,9 +390,8 @@ export async function registerRoutes(
       }
       const vitals = await storage.createVitals(parsed.data);
       
-      // Create audit log for vitals recording (NOM-024 compliance)
       await storage.createAuditLog({
-        userId: parsed.data.registradoPorId || null,
+        userId: req.session.userId || parsed.data.registradoPorId || null,
         accion: "crear",
         entidad: "vitals",
         entidadId: vitals.id,
@@ -262,8 +407,8 @@ export async function registerRoutes(
     }
   });
 
-  // Prescriptions (with doctor details)
-  app.get("/api/prescriptions", async (req, res) => {
+  // Prescriptions (Protected - requires doctor role for creation)
+  app.get("/api/prescriptions", isAuthenticated, async (req, res) => {
     try {
       const allPrescriptions = await storage.getAllPrescriptions();
       res.json(allPrescriptions);
@@ -272,7 +417,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/prescriptions", async (req, res) => {
+  app.get("/api/patients/:patientId/prescriptions", isAuthenticated, async (req, res) => {
     try {
       const prescriptions = await storage.getPrescriptionsWithDetails(req.params.patientId);
       res.json(prescriptions);
@@ -281,7 +426,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/prescriptions", async (req, res) => {
+  app.post("/api/prescriptions", isAuthenticated, isMedico, async (req, res) => {
     try {
       const parsed = insertPrescriptionSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -289,9 +434,8 @@ export async function registerRoutes(
       }
       const prescription = await storage.createPrescription(parsed.data);
       
-      // Create audit log for prescription creation (NOM-024 compliance)
       await storage.createAuditLog({
-        userId: parsed.data.medicoId,
+        userId: req.session.userId || parsed.data.medicoId,
         accion: "crear",
         entidad: "prescriptions",
         entidadId: prescription.id,
@@ -307,7 +451,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/prescriptions/:id", async (req, res) => {
+  app.patch("/api/prescriptions/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
       const prescription = await storage.updatePrescription(req.params.id, req.body);
       if (!prescription) {
@@ -315,7 +459,7 @@ export async function registerRoutes(
       }
       
       await storage.createAuditLog({
-        userId: req.body.updatedBy || prescription.medicoId,
+        userId: req.session.userId || req.body.updatedBy || prescription.medicoId,
         accion: "actualizar",
         entidad: "prescriptions",
         entidadId: prescription.id,
@@ -331,8 +475,8 @@ export async function registerRoutes(
     }
   });
 
-  // Appointments (with patient and doctor details)
-  app.get("/api/appointments", async (req, res) => {
+  // Appointments (Protected)
+  app.get("/api/appointments", isAuthenticated, async (req, res) => {
     try {
       const fecha = req.query.fecha as string;
       if (fecha) {
@@ -347,7 +491,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/appointments", async (req, res) => {
+  app.get("/api/patients/:patientId/appointments", isAuthenticated, async (req, res) => {
     try {
       const appointments = await storage.getAppointmentsByPatient(req.params.patientId);
       res.json(appointments);
@@ -356,7 +500,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/appointments", async (req, res) => {
+  app.post("/api/appointments", isAuthenticated, async (req, res) => {
     try {
       const parsed = insertAppointmentSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -365,7 +509,7 @@ export async function registerRoutes(
       const appointment = await storage.createAppointment(parsed.data);
       
       await storage.createAuditLog({
-        userId: parsed.data.medicoId,
+        userId: req.session.userId || parsed.data.medicoId,
         accion: "crear",
         entidad: "appointments",
         entidadId: appointment.id,
@@ -381,7 +525,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/appointments/:id", async (req, res) => {
+  app.patch("/api/appointments/:id", isAuthenticated, async (req, res) => {
     try {
       const appointment = await storage.updateAppointment(req.params.id, req.body);
       if (!appointment) {
@@ -389,7 +533,7 @@ export async function registerRoutes(
       }
       
       await storage.createAuditLog({
-        userId: req.body.updatedBy || appointment.medicoId,
+        userId: req.session.userId || req.body.updatedBy || appointment.medicoId,
         accion: "actualizar",
         entidad: "appointments",
         entidadId: appointment.id,
@@ -405,8 +549,8 @@ export async function registerRoutes(
     }
   });
 
-  // Users/Doctors
-  app.get("/api/users", async (req, res) => {
+  // Users/Doctors (Protected - admin only for listing)
+  app.get("/api/users", isAuthenticated, async (req, res) => {
     try {
       const users = await storage.getUsers();
       res.json(users);
@@ -417,8 +561,8 @@ export async function registerRoutes(
 
   // ============= COMPLIANCE ROUTES (NOM-024-SSA3-2012 & LFPDPPP) =============
 
-  // Audit Logs (NOM-024-SSA3-2012 - Trazabilidad)
-  app.get("/api/audit-logs", async (req, res) => {
+  // Audit Logs (Protected - admin only)
+  app.get("/api/audit-logs", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 100;
       const logs = await storage.getAuditLogs(limit);
@@ -428,7 +572,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/audit-logs/:entidad/:entidadId", async (req, res) => {
+  app.get("/api/audit-logs/:entidad/:entidadId", isAuthenticated, async (req, res) => {
     try {
       const logs = await storage.getAuditLogsByEntity(req.params.entidad, req.params.entidadId);
       res.json(logs);
@@ -437,7 +581,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/audit-logs", async (req, res) => {
+  app.post("/api/audit-logs", isAuthenticated, async (req, res) => {
     try {
       const logData = {
         ...req.body,
@@ -455,8 +599,8 @@ export async function registerRoutes(
     }
   });
 
-  // CIE-10 Catalog (NOM-024-SSA3-2012 - Diagnósticos estandarizados)
-  app.get("/api/cie10", async (req, res) => {
+  // CIE-10 Catalog (Protected)
+  app.get("/api/cie10", isAuthenticated, async (req, res) => {
     try {
       const search = req.query.q as string;
       const codes = await storage.getCie10Codes(search);
@@ -466,7 +610,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/cie10/:codigo", async (req, res) => {
+  app.get("/api/cie10/:codigo", isAuthenticated, async (req, res) => {
     try {
       const code = await storage.getCie10Code(req.params.codigo);
       if (!code) {
@@ -478,7 +622,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/cie10", async (req, res) => {
+  app.post("/api/cie10", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const parsed = insertCie10Schema.safeParse(req.body);
       if (!parsed.success) {
@@ -491,8 +635,8 @@ export async function registerRoutes(
     }
   });
 
-  // Patient Consents (LFPDPPP - Consentimiento informado)
-  app.get("/api/patients/:patientId/consents", async (req, res) => {
+  // Patient Consents (Protected)
+  app.get("/api/patients/:patientId/consents", isAuthenticated, async (req, res) => {
     try {
       const consents = await storage.getPatientConsents(req.params.patientId);
       res.json(consents);
@@ -501,7 +645,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/patients/:patientId/consents", async (req, res) => {
+  app.post("/api/patients/:patientId/consents", isAuthenticated, async (req, res) => {
     try {
       const consentData = {
         ...req.body,
@@ -519,8 +663,8 @@ export async function registerRoutes(
     }
   });
 
-  // Lab Orders
-  app.get("/api/lab-orders", async (req, res) => {
+  // Lab Orders (Protected)
+  app.get("/api/lab-orders", isAuthenticated, async (req, res) => {
     try {
       const orders = await storage.getLabOrdersWithDetails();
       res.json(orders);
@@ -529,7 +673,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:patientId/lab-orders", async (req, res) => {
+  app.get("/api/patients/:patientId/lab-orders", isAuthenticated, async (req, res) => {
     try {
       const orders = await storage.getLabOrders(req.params.patientId);
       res.json(orders);
@@ -538,7 +682,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/lab-orders/:id", async (req, res) => {
+  app.get("/api/lab-orders/:id", isAuthenticated, async (req, res) => {
     try {
       const order = await storage.getLabOrder(req.params.id);
       if (!order) {
@@ -550,12 +694,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/lab-orders", async (req, res) => {
+  app.post("/api/lab-orders", isAuthenticated, isMedico, async (req, res) => {
     try {
       const order = await storage.createLabOrder(req.body);
       
       await storage.createAuditLog({
-        userId: req.body.medicoId,
+        userId: req.session.userId || req.body.medicoId,
         accion: "crear",
         entidad: "lab_order",
         entidadId: order.id,
@@ -571,7 +715,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/lab-orders/:id", async (req, res) => {
+  app.patch("/api/lab-orders/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
       const order = await storage.updateLabOrder(req.params.id, req.body);
       if (!order) {
@@ -583,10 +727,10 @@ export async function registerRoutes(
     }
   });
 
-  // Sign Medical Note (NOM-024-SSA3-2012 - Firma electrónica)
-  app.post("/api/notes/:id/sign", async (req, res) => {
+  // Sign Medical Note (NOM-024-SSA3-2012 - Firma electrónica) - Protected
+  app.post("/api/notes/:id/sign", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const { userId } = req.body;
+      const userId = req.session.userId || req.body.userId;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
