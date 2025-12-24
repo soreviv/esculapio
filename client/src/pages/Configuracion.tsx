@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import type { AuditLog } from "@shared/schema";
 import {
   Settings,
   Building2,
@@ -28,6 +33,15 @@ import {
   HardDrive,
   Calendar,
   Download,
+  ClipboardList,
+  Search,
+  RefreshCw,
+  User,
+  FileText,
+  Stethoscope,
+  Activity,
+  Pill,
+  FlaskConical,
 } from "lucide-react";
 
 export default function Configuracion() {
@@ -76,6 +90,10 @@ export default function Configuracion() {
           <TabsTrigger value="normativa" className="data-[state=active]:bg-muted" data-testid="tab-normativa">
             <Shield className="h-4 w-4 mr-2" />
             NOM-024
+          </TabsTrigger>
+          <TabsTrigger value="auditoria" className="data-[state=active]:bg-muted" data-testid="tab-auditoria">
+            <ClipboardList className="h-4 w-4 mr-2" />
+            Auditoría
           </TabsTrigger>
         </TabsList>
 
@@ -734,7 +752,180 @@ export default function Configuracion() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <AuditLogTab />
       </Tabs>
     </div>
+  );
+}
+
+function AuditLogTab() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterEntity, setFilterEntity] = useState<string>("all");
+
+  const { data: auditLogs = [], isLoading, refetch } = useQuery<AuditLog[]>({
+    queryKey: ["/api/audit-logs", 100],
+  });
+
+  const getEntityIcon = (entity: string) => {
+    switch (entity) {
+      case "patient":
+        return <User className="h-4 w-4" />;
+      case "medical_note":
+        return <FileText className="h-4 w-4" />;
+      case "vitals":
+        return <Activity className="h-4 w-4" />;
+      case "prescription":
+        return <Pill className="h-4 w-4" />;
+      case "appointment":
+        return <Calendar className="h-4 w-4" />;
+      case "lab_order":
+        return <FlaskConical className="h-4 w-4" />;
+      default:
+        return <Stethoscope className="h-4 w-4" />;
+    }
+  };
+
+  const getActionBadge = (action: string) => {
+    switch (action) {
+      case "create":
+        return <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Crear</Badge>;
+      case "update":
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Actualizar</Badge>;
+      case "delete":
+        return <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Eliminar</Badge>;
+      case "sign":
+        return <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">Firmar</Badge>;
+      default:
+        return <Badge variant="secondary">{action}</Badge>;
+    }
+  };
+
+  const getEntityName = (entity: string) => {
+    const names: Record<string, string> = {
+      patient: "Paciente",
+      medical_note: "Nota Médica",
+      vitals: "Signos Vitales",
+      prescription: "Receta",
+      appointment: "Cita",
+      lab_order: "Orden Lab.",
+    };
+    return names[entity] || entity;
+  };
+
+  const filteredLogs = auditLogs.filter(log => {
+    const matchesSearch = searchTerm === "" || 
+      (log.detalles?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (log.userId?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
+    const matchesEntity = filterEntity === "all" || log.entidad === filterEntity;
+    return matchesSearch && matchesEntity;
+  });
+
+  return (
+    <TabsContent value="auditoria" className="space-y-4 mt-0">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Registros de Auditoría
+              </CardTitle>
+              <CardDescription>
+                Historial de accesos y modificaciones del sistema (NOM-024)
+              </CardDescription>
+            </div>
+            <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-logs">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Actualizar
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[200px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por descripción o usuario..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-logs"
+                />
+              </div>
+            </div>
+            <Select value={filterEntity} onValueChange={setFilterEntity}>
+              <SelectTrigger className="w-[180px]" data-testid="select-filter-entity">
+                <SelectValue placeholder="Filtrar por entidad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las entidades</SelectItem>
+                <SelectItem value="patient">Pacientes</SelectItem>
+                <SelectItem value="medical_note">Notas Médicas</SelectItem>
+                <SelectItem value="vitals">Signos Vitales</SelectItem>
+                <SelectItem value="prescription">Recetas</SelectItem>
+                <SelectItem value="appointment">Citas</SelectItem>
+                <SelectItem value="lab_order">Órdenes de Lab.</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Cargando registros...
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No se encontraron registros de auditoría
+            </div>
+          ) : (
+            <ScrollArea className="h-[400px]">
+              <div className="space-y-2">
+                {filteredLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-start gap-4 p-3 rounded-md border"
+                    data-testid={`audit-log-${log.id}`}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      {getEntityIcon(log.entidad)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{log.detalles || `${log.accion} en ${log.entidad}`}</span>
+                        {getActionBadge(log.accion)}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {log.userId || "Sistema"}
+                        </span>
+                        <span>{getEntityName(log.entidad)} #{log.entidadId}</span>
+                        <span>
+                          {format(new Date(log.fecha), "dd MMM yyyy, HH:mm", { locale: es })}
+                        </span>
+                      </div>
+                      {log.ipAddress && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          IP: {log.ipAddress}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+
+          <div className="flex items-center justify-between text-sm text-muted-foreground pt-2">
+            <span>Total: {filteredLogs.length} registros</span>
+            <span>Mostrando últimos 100 registros</span>
+          </div>
+        </CardContent>
+      </Card>
+    </TabsContent>
   );
 }
