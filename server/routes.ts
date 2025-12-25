@@ -201,7 +201,15 @@ export async function registerRoutes(
 
   app.post("/api/patients", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const parsed = insertPatientSchema.safeParse(req.body);
+      // Auto-generate numeroExpediente if not provided (NOM-004 compliance)
+      const patientData = { ...req.body };
+      if (!patientData.numeroExpediente) {
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+        patientData.numeroExpediente = `EXP-${timestamp}-${random}`;
+      }
+      
+      const parsed = insertPatientSchema.safeParse(patientData);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }

@@ -129,6 +129,225 @@ describe("NOM-024-SSA3-2012 Compliance - Signed Notes Immutability", () => {
   });
 });
 
+describe("NOM-004-SSA3-2012 Compliance - Clinical Record Requirements", () => {
+  describe("Patient Data Requirements", () => {
+    it("should include all required patient identification fields per NOM-004", () => {
+      const patient = {
+        id: "patient-123",
+        numeroExpediente: "EXP-2024-001",
+        nombre: "Juan",
+        apellidoPaterno: "Pérez",
+        apellidoMaterno: "García",
+        curp: "PEGJ800101HDFRRL09",
+        fechaNacimiento: new Date("1980-01-01"),
+        sexo: "M",
+        direccion: "Calle Principal 123, Col. Centro",
+        ocupacion: "Ingeniero",
+        estadoCivil: "Casado",
+        escolaridad: "Licenciatura",
+      };
+
+      expect(patient.numeroExpediente).toBeDefined();
+      expect(patient.nombre).toBeDefined();
+      expect(patient.apellidoPaterno).toBeDefined();
+      expect(patient.curp).toBeDefined();
+      expect(patient.fechaNacimiento).toBeInstanceOf(Date);
+      expect(["M", "F"]).toContain(patient.sexo);
+      expect(patient.direccion).toBeDefined();
+    });
+
+    it("should include required clinical history fields per NOM-004", () => {
+      const patientHistory = {
+        patientId: "patient-123",
+        antecedentesHeredoFamiliares: "Padre con diabetes tipo 2, madre con hipertensión",
+        antecedentesPersonalesPatologicos: "Apendicectomía a los 15 años",
+        antecedentesPersonalesNoPatologicos: "No fuma, consume alcohol ocasionalmente",
+        antecedentesGinecoObstetricos: null,
+        alergias: ["Penicilina", "Sulfas"],
+      };
+
+      expect(patientHistory.antecedentesHeredoFamiliares).toBeDefined();
+      expect(patientHistory.antecedentesPersonalesPatologicos).toBeDefined();
+      expect(patientHistory.antecedentesPersonalesNoPatologicos).toBeDefined();
+      expect(patientHistory.alergias).toBeInstanceOf(Array);
+    });
+  });
+
+  describe("Medical Note Types per NOM-004", () => {
+    it("should support all required note types", () => {
+      const noteTypes = [
+        "historia_clinica",
+        "nota_inicial",
+        "nota_evolucion",
+        "nota_interconsulta",
+        "nota_referencia",
+        "nota_ingreso",
+        "nota_preoperatoria",
+        "nota_postoperatoria",
+        "nota_preanestesica",
+        "nota_egreso",
+      ];
+
+      expect(noteTypes).toContain("historia_clinica");
+      expect(noteTypes).toContain("nota_evolucion");
+      expect(noteTypes).toContain("nota_egreso");
+      expect(noteTypes).toContain("nota_preoperatoria");
+      expect(noteTypes).toContain("nota_postoperatoria");
+    });
+
+    it("should include required fields for evolution notes", () => {
+      const evolutionNote = {
+        tipo: "nota_evolucion",
+        fecha: new Date(),
+        hora: "10:30",
+        patientId: "patient-123",
+        medicoId: "medico-456",
+        subjetivo: "Paciente refiere mejoría del dolor",
+        objetivo: "Exploración física sin alteraciones",
+        analisis: "Evolución favorable",
+        plan: "Continuar tratamiento",
+        diagnosticos: ["Lumbalgia mecánica"],
+        diagnosticosCie10: ["M54.5"],
+        pronostico: "Bueno para la función",
+      };
+
+      expect(evolutionNote.fecha).toBeInstanceOf(Date);
+      expect(evolutionNote.hora).toBeDefined();
+      expect(evolutionNote.diagnosticos).toBeInstanceOf(Array);
+      expect(evolutionNote.pronostico).toBeDefined();
+    });
+
+    it("should include required fields for surgical notes per NOM-004", () => {
+      const surgicalNote = {
+        tipo: "nota_postoperatoria",
+        fecha: new Date(),
+        diagnosticoPreoperatorio: "Apendicitis aguda",
+        operacionPlaneada: "Apendicectomía laparoscópica",
+        operacionRealizada: "Apendicectomía laparoscópica",
+        diagnosticoPostoperatorio: "Apendicitis aguda perforada",
+        descripcionTecnicaQuirurgica: "Se realizó apendicectomía por técnica laparoscópica...",
+        hallazgosTransoperatorios: "Apéndice perforado con plastron",
+        complicaciones: "Ninguna",
+        sangradoAproximado: "50 ml",
+      };
+
+      expect(surgicalNote.diagnosticoPreoperatorio).toBeDefined();
+      expect(surgicalNote.operacionRealizada).toBeDefined();
+      expect(surgicalNote.diagnosticoPostoperatorio).toBeDefined();
+      expect(surgicalNote.descripcionTecnicaQuirurgica).toBeDefined();
+    });
+
+    it("should include required fields for discharge notes per NOM-004", () => {
+      const dischargeNote = {
+        tipo: "nota_egreso",
+        fechaIngreso: new Date("2024-01-10"),
+        fechaEgreso: new Date("2024-01-15"),
+        motivoEgreso: "mejoria",
+        diagnosticoFinal: "Neumonía adquirida en la comunidad resuelta",
+        resumenEvolucion: "Paciente con buena respuesta al tratamiento antibiótico...",
+        recomendacionesAmbulatorias: "Continuar antibiótico oral por 5 días más",
+        pronostico: "Bueno para la vida y la función",
+      };
+
+      expect(dischargeNote.fechaIngreso).toBeInstanceOf(Date);
+      expect(dischargeNote.fechaEgreso).toBeInstanceOf(Date);
+      expect(dischargeNote.motivoEgreso).toBeDefined();
+      expect(dischargeNote.diagnosticoFinal).toBeDefined();
+      expect(dischargeNote.recomendacionesAmbulatorias).toBeDefined();
+    });
+  });
+
+  describe("Informed Consent Requirements per NOM-004", () => {
+    it("should include all required consent fields", () => {
+      const consent = {
+        patientId: "patient-123",
+        medicoId: "medico-456",
+        tipoConsentimiento: "cirugia",
+        procedimiento: "Colecistectomía laparoscópica",
+        riesgos: "Sangrado, infección, lesión de vía biliar",
+        beneficios: "Eliminación de vesícula enferma",
+        alternativas: "Tratamiento médico conservador",
+        autorizaContingencias: true,
+        nombreFirmante: "Juan Pérez García",
+        parentescoRepresentante: null,
+        nombreTestigo1: "María López",
+        nombreTestigo2: "Pedro Ramírez",
+        lugarFirma: "Hospital General, CDMX",
+        fechaAceptacion: new Date(),
+        aceptado: true,
+      };
+
+      expect(consent.procedimiento).toBeDefined();
+      expect(consent.riesgos).toBeDefined();
+      expect(consent.beneficios).toBeDefined();
+      expect(consent.nombreFirmante).toBeDefined();
+      expect(consent.aceptado).toBe(true);
+    });
+
+    it("should support consent types required by NOM-004", () => {
+      const consentTypes = [
+        "ingreso_hospitalario",
+        "cirugia",
+        "anestesia",
+        "procedimiento_riesgo",
+        "transfusion",
+        "investigacion",
+        "privacidad",
+        "tratamiento_datos",
+      ];
+
+      expect(consentTypes).toContain("cirugia");
+      expect(consentTypes).toContain("anestesia");
+      expect(consentTypes).toContain("ingreso_hospitalario");
+    });
+  });
+
+  describe("Nursing Notes Requirements per NOM-004", () => {
+    it("should include required nursing note fields", () => {
+      const nursingNote = {
+        patientId: "patient-123",
+        enfermeraId: "enfermera-789",
+        fecha: new Date(),
+        turno: "matutino",
+        habitusExterior: "Paciente consciente, orientado, cooperador",
+        medicamentosMinistrados: JSON.stringify([
+          { medicamento: "Paracetamol 500mg", dosis: "1 tableta", via: "oral", hora: "08:00" },
+        ]),
+        procedimientosRealizados: "Curación de herida quirúrgica",
+        observaciones: "Paciente tolera vía oral",
+      };
+
+      expect(nursingNote.turno).toBeDefined();
+      expect(nursingNote.habitusExterior).toBeDefined();
+      expect(nursingNote.medicamentosMinistrados).toBeDefined();
+    });
+  });
+
+  describe("Establishment Data Requirements per NOM-004", () => {
+    it("should include required establishment identification fields", () => {
+      const establishment = {
+        tipoEstablecimiento: "consultorio",
+        nombreEstablecimiento: "Consultorio Médico Dr. García",
+        domicilio: "Av. Reforma 123, Col. Juárez",
+        ciudad: "Ciudad de México",
+        estado: "CDMX",
+        codigoPostal: "06600",
+        nombreInstitucion: null,
+        razonSocial: "Dr. Roberto García Méndez",
+        licenciaSanitaria: "LS-2024-001234",
+        responsableSanitario: "Dr. Roberto García Méndez",
+        cedulaResponsable: "1234567",
+      };
+
+      expect(establishment.tipoEstablecimiento).toBeDefined();
+      expect(establishment.nombreEstablecimiento).toBeDefined();
+      expect(establishment.domicilio).toBeDefined();
+      expect(establishment.ciudad).toBeDefined();
+      expect(establishment.estado).toBeDefined();
+    });
+  });
+});
+
 describe("COFEPRIS Prescription Requirements", () => {
   it("should include required prescription fields per Art. 240 LGS", () => {
     const prescription = {

@@ -305,35 +305,16 @@ export class DatabaseStorage implements IStorage {
   // Enriched medical notes with medico details
   async getMedicalNotesWithDetails(patientId: string): Promise<MedicalNoteWithDetails[]> {
     const result = await db
-      .select({
-        id: medicalNotes.id,
-        patientId: medicalNotes.patientId,
-        medicoId: medicalNotes.medicoId,
-        tipo: medicalNotes.tipo,
-        fecha: medicalNotes.fecha,
-        motivoConsulta: medicalNotes.motivoConsulta,
-        subjetivo: medicalNotes.subjetivo,
-        objetivo: medicalNotes.objetivo,
-        analisis: medicalNotes.analisis,
-        plan: medicalNotes.plan,
-        diagnosticos: medicalNotes.diagnosticos,
-        diagnosticosCie10: medicalNotes.diagnosticosCie10,
-        firmada: medicalNotes.firmada,
-        firmaHash: medicalNotes.firmaHash,
-        fechaFirma: medicalNotes.fechaFirma,
-        firmaUserId: medicalNotes.firmaUserId,
-        createdAt: medicalNotes.createdAt,
-        medicoNombre: users.nombre,
-        medicoEspecialidad: users.especialidad,
-      })
+      .select()
       .from(medicalNotes)
       .leftJoin(users, eq(medicalNotes.medicoId, users.id))
       .where(eq(medicalNotes.patientId, patientId))
       .orderBy(desc(medicalNotes.fecha));
     
     return result.map(r => ({
-      ...r,
-      medicoNombre: r.medicoNombre || "Médico",
+      ...r.medical_notes,
+      medicoNombre: r.users?.nombre || "Médico",
+      medicoEspecialidad: r.users?.especialidad || null,
     }));
   }
 

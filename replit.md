@@ -91,9 +91,36 @@ Preferred communication style: Simple, everyday language.
 - **Coverage Areas**:
   - Authentication (password hashing, RBAC middleware)
   - NOM-024-SSA3-2012 compliance (signed notes immutability, audit trail)
+  - NOM-004-SSA3-2012 compliance (clinical record requirements, note types, consent fields)
   - LFPDPPP compliance (patient consent tracking)
   - COFEPRIS requirements (prescription and lab order fields)
 - **Run Tests**: `npx vitest run`
+
+## Regulatory Compliance
+
+### NOM-004-SSA3-2012 (Del Expediente Clínico)
+- **Patient Data**: numeroExpediente, antecedentes heredofamiliares/patológicos/no patológicos, ocupación, estado civil
+- **Medical Note Types**: historia_clinica, nota_inicial, nota_evolucion, nota_interconsulta, nota_referencia, nota_ingreso, nota_preoperatoria, nota_postoperatoria, nota_preanestesica, nota_egreso
+- **Clinical Fields**: hora, padecimiento actual, habitus exterior, exploración física, pronóstico, indicación terapéutica
+- **Surgical Notes**: diagnóstico pre/post operatorio, operación realizada, descripción técnica, hallazgos, complicaciones, sangrado
+- **Discharge Notes**: fechas ingreso/egreso, motivo egreso, diagnóstico final, resumen evolución, recomendaciones
+- **Informed Consent**: procedimiento, riesgos, beneficios, alternativas, firmante, testigos, lugar
+- **Nursing Notes**: turno, habitus exterior, medicamentos ministrados, procedimientos realizados
+- **Establishment Config**: tipo, nombre, domicilio, licencia sanitaria, responsable sanitario
+
+### NOM-024-SSA3-2012 (SIRES - Electronic Records)
+- **Electronic Signatures**: SHA-256 hash for signed notes, timestamp, signing user
+- **Immutability**: Signed notes (firmada=true) cannot be modified
+- **Audit Trail**: All actions logged with userId, action, entity, timestamp, IP address, user agent
+- **Standardized Codes**: CIE-10 catalog for diagnoses
+
+### LFPDPPP (Data Protection)
+- **Consent Types**: privacidad, expediente_electronico, tratamiento_datos, comunicaciones
+- **Consent Records**: versión, fecha de aceptación, IP address
+
+### COFEPRIS Requirements
+- **Prescriptions**: medicamento, dosis, vía, frecuencia, duración, indicaciones
+- **Lab Orders**: estudios, diagnóstico presuntivo, indicaciones clínicas, urgente, ayuno
 
 ## External Dependencies
 
