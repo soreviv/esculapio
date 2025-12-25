@@ -32,6 +32,9 @@ export { logger };
 const app = express();
 const httpServer = createServer(app);
 
+// Trust proxy for rate limiting to work correctly behind reverse proxies
+app.set("trust proxy", 1);
+
 // Security headers with Helmet
 app.use(helmet({
   contentSecurityPolicy: {
