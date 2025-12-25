@@ -56,6 +56,45 @@ Preferred communication style: Simple, everyday language.
 - **Component-Based UI**: Domain-specific EHR components (PatientCard, MedicalNoteCard, VitalsDisplay) encapsulate healthcare-specific UI logic
 - **Path Aliases**: `@/` maps to client/src, `@shared/` maps to shared directory
 
+### Authentication System
+- **Password Hashing**: bcrypt with SALT_ROUNDS=12
+- **Session Storage**: express-session with connect-pg-simple (PostgreSQL-backed sessions)
+- **Session Configuration**: 24-hour max age, httpOnly cookies, sameSite=lax, secure in production
+- **Auth Middleware**: isAuthenticated (all users), isMedico (doctors/admin), isAdmin (admin only) in `server/auth.ts`
+- **Audit Logging**: All protected routes use req.session.userId for NOM-024-SSA3-2012 audit trail compliance
+- **Default Admin**: Created via `scripts/seed-admin.ts` using ADMIN_PASSWORD environment variable
+
+### Role-Based Access Control (RBAC)
+- **Roles**: admin, medico, enfermeria
+- **Middleware**: `isAuthenticated`, `isAdmin`, `isMedico`, `isEnfermeria`, `isMedicoOrEnfermeria`
+- **Route Protection**:
+  - Patient CRUD: requires `isMedicoOrEnfermeria`
+  - Medical Notes: read requires `isAuthenticated`, create/update requires `isMedico`
+  - Vitals: requires `isMedicoOrEnfermeria`
+  - Prescriptions: read requires `isAuthenticated`, create/update requires `isMedico`
+  - Lab Orders: read requires `isAuthenticated`, create/update requires `isMedico`
+  - Audit Logs: requires `isAdmin`
+  - User Registration: requires `isAdmin`
+
+### Production Logging Security
+- Sensitive PHI paths (/api/patients, /api/notes, /api/vitals, etc.) only log record counts in production
+- Non-sensitive paths redact sensitive fields (password, curp, telefono, diagnostico, etc.)
+- Full JSON logging only in development mode
+
+### Scripts
+- `scripts/seed-admin.ts`: Creates admin user with bcrypt-hashed password (requires ADMIN_PASSWORD env var)
+- `scripts/migrate-passwords.ts`: Migrates plaintext passwords to bcrypt hashes (skips already-hashed passwords)
+
+### Testing
+- **Framework**: Vitest with @vitest/coverage-v8
+- **Test Files**: `tests/` directory
+- **Coverage Areas**:
+  - Authentication (password hashing, RBAC middleware)
+  - NOM-024-SSA3-2012 compliance (signed notes immutability, audit trail)
+  - LFPDPPP compliance (patient consent tracking)
+  - COFEPRIS requirements (prescription and lab order fields)
+- **Run Tests**: `npx vitest run`
+
 ## External Dependencies
 
 ### Database

@@ -1,0 +1,178 @@
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { Lock, User, ShieldCheck, AlertCircle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+
+const loginSchema = z.object({
+  username: z.string().min(1, "El usuario es requerido"),
+  password: z.string().min(1, "La contraseña es requerida"),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
+
+interface LoginResponse {
+  id: string;
+  username: string;
+  role: string;
+  nombre: string;
+  especialidad?: string;
+  cedula?: string;
+}
+
+interface LoginProps {
+  onLogin: (user: LoginResponse) => void;
+}
+
+export default function Login({ onLogin }: LoginProps) {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [showError, setShowError] = useState(false);
+
+  const form = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: async (data: LoginFormData) => {
+      const response = await apiRequest("POST", "/api/login", data);
+      return response.json();
+    },
+    onSuccess: (data: LoginResponse) => {
+      setShowError(false);
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: `Bienvenido, ${data.nombre}`,
+      });
+      onLogin(data);
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      setShowError(true);
+      toast({
+        title: "Error de autenticación",
+        description: "Usuario o contraseña incorrectos",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: LoginFormData) => {
+    setShowError(false);
+    loginMutation.mutate(data);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-2">
+          <div className="flex justify-center mb-4">
+            <div className="p-3 rounded-full bg-primary/10">
+              <ShieldCheck className="h-10 w-10 text-primary" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-login-title">
+            MediRecord
+          </h1>
+          <p className="text-muted-foreground">
+            Sistema de Expediente Clínico Electrónico
+          </p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Iniciar Sesión</CardTitle>
+            <CardDescription>
+              Ingrese sus credenciales para acceder al sistema
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                {showError && (
+                  <div className="flex items-center gap-2 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Usuario o contraseña incorrectos</span>
+                  </div>
+                )}
+                
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Usuario</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            {...field}
+                            placeholder="Ingrese su usuario"
+                            className="pl-10"
+                            data-testid="input-username"
+                            autoComplete="username"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contraseña</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            {...field}
+                            type="password"
+                            placeholder="Ingrese su contraseña"
+                            className="pl-10"
+                            data-testid="input-password"
+                            autoComplete="current-password"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={loginMutation.isPending}
+                  data-testid="button-login"
+                >
+                  {loginMutation.isPending ? "Iniciando sesión..." : "Iniciar Sesión"}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+
+        <div className="text-center text-xs text-muted-foreground space-y-1">
+          <p>Sistema conforme a NOM-024-SSA3-2012</p>
+          <p>Protección de datos según LFPDPPP</p>
+        </div>
+      </div>
+    </div>
+  );
+}
