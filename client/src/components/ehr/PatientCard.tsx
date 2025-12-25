@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Calendar, AlertTriangle } from "lucide-react";
+import { FileText, Calendar, AlertTriangle, Trash2 } from "lucide-react";
 
 export interface PatientCardProps {
   id: string;
@@ -16,6 +16,7 @@ export interface PatientCardProps {
   alergias?: string[];
   onViewRecord?: () => void;
   onSchedule?: () => void;
+  onDelete?: () => void;
 }
 
 function getInitials(nombre: string, apellido: string) {
@@ -55,6 +56,7 @@ export function PatientCard({
   alergias = [],
   onViewRecord,
   onSchedule,
+  onDelete,
 }: PatientCardProps) {
   const fullName = `${nombre} ${apellidoPaterno} ${apellidoMaterno || ""}`;
   const age = calculateAge(fechaNacimiento);
@@ -114,6 +116,14 @@ export function PatientCard({
             data-testid="button-schedule"
           >
             <Calendar className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            data-testid="button-delete"
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </CardContent>
