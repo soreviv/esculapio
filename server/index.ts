@@ -1,13 +1,92 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import pino from "pino";
+import pinoHttp from "pino-http";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import "./auth";
 
+// Structured logging with Pino
+const logger = pino({
+  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === "production" ? "info" : "debug"),
+  transport: process.env.NODE_ENV !== "production" ? {
+    target: "pino-pretty",
+    options: {
+      colorize: true,
+      translateTime: "SYS:standard",
+      ignore: "pid,hostname",
+    },
+  } : undefined,
+  redact: {
+    paths: ["req.headers.cookie", "req.headers.authorization", "res.headers['set-cookie']"],
+    remove: true,
+  },
+});
+
+export { logger };
+
 const app = express();
 const httpServer = createServer(app);
+
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Rate limiting - general API limit
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // 1000 requests per window
+  message: { error: "Demasiadas solicitudes, intente de nuevo más tarde" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Strict rate limiting for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 login attempts per 15 minutes
+  message: { error: "Demasiados intentos de inicio de sesión, intente de nuevo en 15 minutos" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+});
+
+// Apply general rate limiting to all API routes
+app.use("/api/", generalLimiter);
+
+// Apply strict rate limiting to auth routes
+app.use("/api/login", authLimiter);
+app.use("/api/register", authLimiter);
+
+// Structured HTTP request logging
+app.use(pinoHttp({
+  logger,
+  autoLogging: {
+    ignore: (req) => req.url?.startsWith("/assets") || req.url?.startsWith("/@"),
+  },
+  customSuccessMessage: (req, res) => {
+    return `${req.method} ${req.url} ${res.statusCode}`;
+  },
+  customErrorMessage: (req, res) => {
+    return `${req.method} ${req.url} ${res.statusCode} - Error`;
+  },
+  redact: ["req.headers.cookie", "req.headers.authorization"],
+}));
 
 declare module "http" {
   interface IncomingMessage {
@@ -51,14 +130,7 @@ app.use(
 );
 
 export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
+  logger.info({ source }, message);
 }
 
 const SENSITIVE_PATHS = [

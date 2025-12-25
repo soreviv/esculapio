@@ -58,11 +58,31 @@ Preferred communication style: Simple, everyday language.
 
 ### Authentication System
 - **Password Hashing**: bcrypt with SALT_ROUNDS=12
+- **Password Policy**: zxcvbn for strength validation (minimum score 3/4 required)
 - **Session Storage**: express-session with connect-pg-simple (PostgreSQL-backed sessions)
 - **Session Configuration**: 24-hour max age, httpOnly cookies, sameSite=lax, secure in production
 - **Auth Middleware**: isAuthenticated (all users), isMedico (doctors/admin), isAdmin (admin only) in `server/auth.ts`
 - **Audit Logging**: All protected routes use req.session.userId for NOM-024-SSA3-2012 audit trail compliance
 - **Default Admin**: Created via `scripts/seed-admin.ts` using ADMIN_PASSWORD environment variable
+
+### Security Middleware
+- **Helmet.js**: Security headers (CSP, HSTS, X-Frame-Options, etc.)
+- **Rate Limiting**: 
+  - General API: 1000 requests/15min
+  - Auth endpoints: 10 requests/15min (login/register)
+- **Password Validation**: zxcvbn library for password strength analysis
+  - Rejects common passwords and dictionary words
+  - Prevents use of username/name in password
+  - Returns feedback and crack time estimates
+
+### Structured Logging
+- **Library**: Pino with pino-http for request logging
+- **Levels**: debug (development), info (production)
+- **Features**:
+  - Automatic PHI redaction in production
+  - Request/response timing
+  - Pretty printing in development
+  - JSON format in production (ELK-compatible)
 
 ### Role-Based Access Control (RBAC)
 - **Roles**: admin, medico, enfermeria
@@ -95,6 +115,7 @@ Preferred communication style: Simple, everyday language.
   - LFPDPPP compliance (patient consent tracking)
   - COFEPRIS requirements (prescription and lab order fields)
 - **Run Tests**: `npx vitest run`
+- **Coverage**: `npx vitest run --coverage`
 
 ## Regulatory Compliance
 

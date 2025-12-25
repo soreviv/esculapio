@@ -12,7 +12,7 @@ import {
   insertPatientConsentSchema
 } from "@shared/schema";
 import { createHash } from "crypto";
-import { hashPassword, verifyPassword, isAuthenticated, isAdmin, isMedico, isEnfermeria, isMedicoOrEnfermeria } from "./auth";
+import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isEnfermeria, isMedicoOrEnfermeria } from "./auth";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -127,6 +127,17 @@ export async function registerRoutes(
       
       if (!username || !password || !nombre) {
         return res.status(400).json({ error: "Username, password y nombre son requeridos" });
+      }
+      
+      // Validate password strength with zxcvbn
+      const passwordValidation = validatePasswordStrength(password, [username, nombre]);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({ 
+          error: "La contraseña no es suficientemente segura",
+          passwordScore: passwordValidation.score,
+          feedback: passwordValidation.feedback,
+          crackTime: passwordValidation.crackTimeDisplay,
+        });
       }
       
       const existingUser = await storage.getUserByUsername(username);

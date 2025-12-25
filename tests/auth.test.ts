@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { hashPassword, verifyPassword, isAuthenticated, isAdmin, isMedico, isEnfermeria, isMedicoOrEnfermeria } from "../server/auth";
+import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isEnfermeria, isMedicoOrEnfermeria } from "../server/auth";
 import type { Request, Response, NextFunction } from "express";
 
 describe("Password Hashing", () => {
@@ -152,5 +152,44 @@ describe("Authentication Middleware", () => {
       expect(mockNext).not.toHaveBeenCalled();
       expect(statusMock).toHaveBeenCalledWith(403);
     });
+  });
+});
+
+describe("Password Strength Validation (zxcvbn)", () => {
+  it("should reject weak passwords (score < 3)", () => {
+    const result = validatePasswordStrength("password");
+    expect(result.valid).toBe(false);
+    expect(result.score).toBeLessThan(3);
+  });
+
+  it("should reject common passwords", () => {
+    const result = validatePasswordStrength("123456");
+    expect(result.valid).toBe(false);
+    expect(result.score).toBe(0);
+  });
+
+  it("should accept strong passwords (score >= 3)", () => {
+    const result = validatePasswordStrength("Tr0ub4dor&3#Horse!Battery");
+    expect(result.valid).toBe(true);
+    expect(result.score).toBeGreaterThanOrEqual(3);
+  });
+
+  it("should penalize passwords containing user information", () => {
+    const resultWithoutInputs = validatePasswordStrength("DrJuanPerez2024!");
+    const resultWithInputs = validatePasswordStrength("DrJuanPerez2024!", ["DrJuanPerez", "juan.perez@hospital.mx"]);
+    expect(resultWithInputs.score).toBeLessThanOrEqual(resultWithoutInputs.score);
+  });
+
+  it("should provide feedback for weak passwords", () => {
+    const result = validatePasswordStrength("password123");
+    expect(result.valid).toBe(false);
+    expect(result.feedback).toBeDefined();
+    expect(result.crackTimeDisplay).toBeDefined();
+  });
+
+  it("should return crack time estimate", () => {
+    const result = validatePasswordStrength("SecureP@ssw0rd!Complex");
+    expect(result.crackTimeDisplay).toBeDefined();
+    expect(typeof result.crackTimeDisplay).toBe("string");
   });
 });

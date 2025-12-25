@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
+import zxcvbn from "zxcvbn";
 import "express-session";
 
 declare module "express-session" {
@@ -11,6 +12,31 @@ declare module "express-session" {
 }
 
 const SALT_ROUNDS = 12;
+const MIN_PASSWORD_SCORE = 3; // zxcvbn score: 0=weak, 1=poor, 2=fair, 3=good, 4=strong
+
+export interface PasswordValidationResult {
+  valid: boolean;
+  score: number;
+  feedback: {
+    warning: string;
+    suggestions: string[];
+  };
+  crackTimeDisplay: string;
+}
+
+export function validatePasswordStrength(password: string, userInputs: string[] = []): PasswordValidationResult {
+  const result = zxcvbn(password, userInputs);
+  
+  return {
+    valid: result.score >= MIN_PASSWORD_SCORE,
+    score: result.score,
+    feedback: {
+      warning: result.feedback.warning || "",
+      suggestions: result.feedback.suggestions || [],
+    },
+    crackTimeDisplay: result.crack_times_display.offline_slow_hashing_1e4_per_second as string,
+  };
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
