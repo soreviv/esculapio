@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { PatientCard } from "@/components/ehr/PatientCard";
 import { PatientSearch } from "@/components/ehr/PatientSearch";
 import { NewPatientDialog } from "@/components/ehr/NewPatientDialog";
+import { DeletePatientDialog } from "@/components/ehr/DeletePatientDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +25,8 @@ export default function Pacientes() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [sortBy, setSortBy] = useState("nombre");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
   const { toast } = useToast();
 
   const { data: patients = [], isLoading } = useQuery<Patient[]>({
@@ -67,6 +70,39 @@ export default function Pacientes() {
       });
     },
   });
+
+  const deletePatientMutation = useMutation({
+    mutationFn: async (patientId: string) => {
+      await apiRequest("DELETE", `/api/patients/${patientId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      toast({
+        title: "Paciente eliminado",
+        description: "El paciente ha sido eliminado exitosamente.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el paciente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteClick = (patient: Patient) => {
+    setPatientToDelete(patient);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (patientToDelete) {
+      deletePatientMutation.mutate(patientToDelete.id);
+      setIsDeleteDialogOpen(false);
+      setPatientToDelete(null);
+    }
+  };
 
   const filteredPatients = patients
     .filter((patient) => {
@@ -168,6 +204,7 @@ export default function Pacientes() {
               alergias={patient.alergias || undefined}
               onViewRecord={() => setLocation(`/pacientes/${patient.id}`)}
               onSchedule={() => setLocation("/citas")}
+              onDelete={() => handleDeleteClick(patient)}
             />
           ))}
         </div>
@@ -183,6 +220,12 @@ export default function Pacientes() {
           </p>
         </div>
       )}
+
+      <DeletePatientDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }

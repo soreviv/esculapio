@@ -271,6 +271,30 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/patients/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const patient = await storage.deletePatient(req.params.id);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "eliminar",
+        entidad: "patients",
+        entidadId: patient.id,
+        detalles: JSON.stringify({ curp: patient.curp }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Error deleting patient" });
+    }
+  });
+
   // Medical Notes (Protected - staff can read, doctors can write)
   app.get("/api/patients/:patientId/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {

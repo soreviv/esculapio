@@ -28,6 +28,7 @@ export interface IStorage {
   getPatient(id: string): Promise<Patient | undefined>;
   createPatient(patient: InsertPatient): Promise<Patient>;
   updatePatient(id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined>;
+  deletePatient(id: string): Promise<Patient | undefined>;
   searchPatients(query: string): Promise<Patient[]>;
   
   // Medical Notes
@@ -128,6 +129,11 @@ export class DatabaseStorage implements IStorage {
   async updatePatient(id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined> {
     const [updated] = await db.update(patients).set(patient).where(eq(patients.id, id)).returning();
     return updated;
+  }
+
+  async deletePatient(id: string): Promise<Patient | undefined> {
+    const [deleted] = await db.delete(patients).where(eq(patients.id, id)).returning();
+    return deleted;
   }
 
   async searchPatients(query: string): Promise<Patient[]> {
