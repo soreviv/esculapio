@@ -188,3 +188,37 @@ Preferred communication style: Simple, everyday language.
 - **Tailwind CSS**: Utility-first CSS framework
 - **class-variance-authority**: Component variant management
 - **tailwind-merge**: Intelligent class merging via `cn()` utility
+
+### Data Visualization
+- **Recharts**: React charting library for dashboard analytics (bar charts, pie charts)
+
+## Sprint 1 Features (Implemented December 2025)
+
+### Dashboard Analytics
+- **Endpoint**: `GET /api/dashboard/metrics`
+- **Data**: Aggregated statistics including:
+  - Total and active patients count
+  - Daily appointments for the last 7 days
+  - Appointments by status distribution
+  - Medical notes created today
+  - Active prescriptions count
+- **UI Components**: Bar chart (appointments by day), Pie chart (appointment status distribution)
+
+### Patient Timeline
+- **Endpoint**: `GET /api/patients/:id/timeline`
+- **Data**: Chronological aggregation of all patient events:
+  - Medical notes (all types)
+  - Vital signs recordings
+  - Prescriptions
+  - Appointments
+  - Laboratory orders
+- **Features**: Color-coded timeline with icons, sorted newest first
+- **Compliance**: Timeline access logged for NOM-024-SSA3-2012 audit trail
+
+### Advanced Patient Search
+- **Component**: `AdvancedPatientSearch.tsx` with Sheet-based UI
+- **Filters**:
+  - Date range (desde/hasta)
+  - Diagnosis (CIE-10 code)
+  - Treating doctor (medicoId)
+  - Patient status

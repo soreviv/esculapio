@@ -15,11 +15,41 @@ import {
   Clock,
   TrendingUp,
   ChevronRight,
+  Activity,
+  Pill,
+  CheckCircle2,
 } from "lucide-react";
-import { type Patient, type AppointmentWithDetails } from "@shared/schema";
+import { type Patient, type AppointmentWithDetails, type DashboardMetrics } from "@shared/schema";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+
+const COLORS = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
+
+const STATUS_COLORS: Record<string, string> = {
+  programada: "hsl(var(--chart-1))",
+  pendiente: "hsl(var(--chart-2))",
+  completada: "hsl(var(--chart-3))",
+  cancelada: "hsl(var(--chart-4))",
+  no_asistio: "hsl(var(--chart-5))",
+};
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+
+  const { data: metrics, isLoading: metricsLoading } = useQuery<DashboardMetrics>({
+    queryKey: ["/api/dashboard/metrics"],
+  });
 
   const { data: patients = [], isLoading: patientsLoading } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
@@ -33,34 +63,39 @@ export default function Dashboard() {
   const todayStr = today.toISOString().split('T')[0];
   
   const todayAppointments = appointments.filter(apt => apt.fecha === todayStr);
-  const activePatients = patients.filter(p => p.status === "activo").length;
   const recentPatients = patients.slice(0, 3);
 
   const stats = [
     {
       title: "Pacientes Activos",
-      value: activePatients,
-      subtitle: `Total: ${patients.length}`,
+      value: metrics?.pacientesActivos ?? 0,
+      subtitle: `Total: ${metrics?.totalPacientes ?? 0}`,
       icon: Users,
-      trend: patients.length > 0 ? { value: 12, isPositive: true } : undefined,
+      trend: metrics?.totalPacientes ? { value: 12, isPositive: true } : undefined,
     },
     {
       title: "Citas Hoy",
-      value: todayAppointments.length,
-      subtitle: `${todayAppointments.filter(a => a.status === "completada").length} completadas`,
+      value: metrics?.citasHoy ?? 0,
+      subtitle: `${metrics?.citasCompletadas ?? 0} completadas total`,
       icon: Calendar,
     },
     {
-      title: "Expedientes",
-      value: patients.length,
-      subtitle: "Registros totales",
+      title: "Notas Médicas Hoy",
+      value: metrics?.notasMedicasHoy ?? 0,
+      subtitle: "Registradas hoy",
       icon: FileText,
     },
     {
-      title: "Pendientes",
-      value: todayAppointments.filter(a => a.status === "pendiente").length,
-      subtitle: "Citas por atender",
+      title: "Citas Pendientes",
+      value: metrics?.citasPendientes ?? 0,
+      subtitle: "Por atender",
       icon: AlertCircle,
+    },
+    {
+      title: "Recetas Activas",
+      value: metrics?.prescripcionesActivas ?? 0,
+      subtitle: "En tratamiento",
+      icon: Pill,
     },
   ];
 
@@ -71,11 +106,22 @@ export default function Dashboard() {
     day: "numeric",
   });
 
+  const chartData = metrics?.citasPorDia?.map(d => ({
+    fecha: new Date(d.fecha).toLocaleDateString("es-MX", { weekday: "short", day: "numeric" }),
+    citas: d.total,
+  })) ?? [];
+
+  const pieData = metrics?.citasPorEstado?.map(d => ({
+    name: d.estado.charAt(0).toUpperCase() + d.estado.slice(1).replace('_', ' '),
+    value: d.total,
+    color: STATUS_COLORS[d.estado] || COLORS[0],
+  })) ?? [];
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Bienvenido</h1>
+          <h1 className="text-2xl font-semibold" data-testid="text-dashboard-title">Panel de Control</h1>
           <p className="text-muted-foreground">
             <Clock className="inline h-4 w-4 mr-1" />
             {formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1)}
@@ -83,15 +129,15 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-green-600 border-green-600">
-            <TrendingUp className="h-3 w-3 mr-1" />
+            <Activity className="h-3 w-3 mr-1" />
             Sistema activo
           </Badge>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {patientsLoading || appointmentsLoading ? (
-          [1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {metricsLoading ? (
+          [1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-[120px] rounded-lg" />
           ))
         ) : (
@@ -99,6 +145,87 @@ export default function Dashboard() {
             <StatCard key={index} {...stat} />
           ))
         )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-medium flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Citas por Día (Últimos 7 días)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {metricsLoading ? (
+              <Skeleton className="h-[250px] rounded-lg" />
+            ) : chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="fecha" className="text-xs" />
+                  <YAxis allowDecimals={false} className="text-xs" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                    }}
+                  />
+                  <Bar dataKey="citas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No hay datos de citas disponibles
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-medium flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5" />
+              Estado de Citas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {metricsLoading ? (
+              <Skeleton className="h-[250px] rounded-lg" />
+            ) : pieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No hay datos de citas disponibles
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -13,6 +13,7 @@ import { MedicalNoteCard } from "@/components/ehr/MedicalNoteCard";
 import { PrescriptionCard } from "@/components/ehr/PrescriptionCard";
 import { NewNoteDialog } from "@/components/ehr/NewNoteDialog";
 import { RecordVitalsDialog } from "@/components/ehr/RecordVitalsDialog";
+import { PatientTimeline } from "@/components/ehr/PatientTimeline";
 import {
   ArrowLeft,
   Calendar,
@@ -28,6 +29,7 @@ import {
   Shield,
   CheckCircle,
   XCircle,
+  Clock,
 } from "lucide-react";
 import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertMedicalNote, type InsertVitals, type PatientConsent } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -337,6 +339,10 @@ export default function PatientDetail() {
                 <Shield className="h-4 w-4 mr-2" />
                 Consentimientos
               </TabsTrigger>
+              <TabsTrigger value="historia" className="data-[state=active]:bg-muted" data-testid="tab-historia">
+                <Clock className="h-4 w-4 mr-2" />
+                Historia Clínica
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="expediente" className="space-y-4 mt-0">
@@ -522,6 +528,10 @@ export default function PatientDetail() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="historia" className="mt-0">
+              <PatientTimeline patientId={patient.id} />
             </TabsContent>
           </Tabs>
         </div>

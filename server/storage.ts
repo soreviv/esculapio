@@ -10,6 +10,7 @@ import {
   type Cie10, type InsertCie10,
   type PatientConsent, type InsertPatientConsent,
   type LabOrder, type InsertLabOrder, type LabOrderWithDetails,
+  type DashboardMetrics, type PatientSearchFilters, type TimelineEvent,
   users, patients, medicalNotes, vitals, prescriptions, appointments,
   auditLogs, cie10Catalog, patientConsents, labOrders
 } from "@shared/schema";
@@ -88,6 +89,15 @@ export interface IStorage {
   createLabOrder(order: InsertLabOrder): Promise<LabOrder>;
   updateLabOrder(id: string, order: Partial<InsertLabOrder>): Promise<LabOrder | undefined>;
   getLabOrdersWithDetails(): Promise<LabOrderWithDetails[]>;
+  
+  // Dashboard Metrics
+  getDashboardMetrics(): Promise<DashboardMetrics>;
+  
+  // Advanced Patient Search
+  searchPatientsAdvanced(filters: PatientSearchFilters): Promise<Patient[]>;
+  
+  // Patient Timeline
+  getPatientTimeline(patientId: string): Promise<TimelineEvent[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -465,6 +475,280 @@ export class DatabaseStorage implements IStorage {
       patientApellido: r.patientApellido || "",
       medicoNombre: r.medicoNombre || "Médico",
     }));
+  }
+
+  // Dashboard Metrics
+  async getDashboardMetrics(): Promise<DashboardMetrics> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Total patients
+    const [totalPacientesResult] = await db.select({ count: sql<number>`count(*)` }).from(patients);
+    const totalPacientes = Number(totalPacientesResult?.count || 0);
+
+    // Active patients
+    const [pacientesActivosResult] = await db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo'));
+    const pacientesActivos = Number(pacientesActivosResult?.count || 0);
+
+    // Today's appointments
+    const [citasHoyResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
+      .where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`);
+    const citasHoy = Number(citasHoyResult?.count || 0);
+
+    // Pending appointments
+    const [citasPendientesResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
+      .where(eq(appointments.status, 'programada'));
+    const citasPendientes = Number(citasPendientesResult?.count || 0);
+
+    // Completed appointments
+    const [citasCompletadasResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
+      .where(eq(appointments.status, 'completada'));
+    const citasCompletadas = Number(citasCompletadasResult?.count || 0);
+
+    // Today's medical notes
+    const [notasMedicasHoyResult] = await db.select({ count: sql<number>`count(*)` }).from(medicalNotes)
+      .where(sql`DATE(${medicalNotes.fecha}) = DATE(${today.toISOString()})`);
+    const notasMedicasHoy = Number(notasMedicasHoyResult?.count || 0);
+
+    // Active prescriptions
+    const [prescripcionesActivasResult] = await db.select({ count: sql<number>`count(*)` }).from(prescriptions)
+      .where(eq(prescriptions.status, 'activa'));
+    const prescripcionesActivas = Number(prescripcionesActivasResult?.count || 0);
+
+    // Appointments by day (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const citasPorDiaResult = await db.select({
+      fecha: sql<string>`DATE(${appointments.fecha})::text`,
+      total: sql<number>`count(*)`
+    }).from(appointments)
+      .where(sql`${appointments.fecha} >= ${sevenDaysAgo.toISOString()}`)
+      .groupBy(sql`DATE(${appointments.fecha})`)
+      .orderBy(sql`DATE(${appointments.fecha})`);
+    
+    const citasPorDia = citasPorDiaResult.map(r => ({ fecha: r.fecha, total: Number(r.total) }));
+
+    // Appointments by status
+    const citasPorEstadoResult = await db.select({
+      estado: appointments.status,
+      total: sql<number>`count(*)`
+    }).from(appointments)
+      .groupBy(appointments.status);
+    
+    const citasPorEstado = citasPorEstadoResult.map(r => ({ estado: r.estado, total: Number(r.total) }));
+
+    // Patients by month (last 6 months)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const pacientesPorMesResult = await db.select({
+      mes: sql<string>`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`,
+      total: sql<number>`count(*)`
+    }).from(patients)
+      .where(sql`${patients.createdAt} >= ${sixMonthsAgo.toISOString()}`)
+      .groupBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`)
+      .orderBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`);
+    
+    const pacientesPorMes = pacientesPorMesResult.map(r => ({ mes: r.mes, total: Number(r.total) }));
+
+    return {
+      totalPacientes,
+      pacientesActivos,
+      citasHoy,
+      citasPendientes,
+      citasCompletadas,
+      notasMedicasHoy,
+      prescripcionesActivas,
+      citasPorDia,
+      citasPorEstado,
+      pacientesPorMes
+    };
+  }
+
+  // Advanced Patient Search
+  async searchPatientsAdvanced(filters: PatientSearchFilters): Promise<Patient[]> {
+    const conditions = [];
+
+    if (filters.query) {
+      conditions.push(
+        or(
+          ilike(patients.nombre, `%${filters.query}%`),
+          ilike(patients.apellidoPaterno, `%${filters.query}%`),
+          ilike(patients.curp, `%${filters.query}%`),
+          ilike(patients.numeroExpediente, `%${filters.query}%`)
+        )
+      );
+    }
+
+    if (filters.status) {
+      conditions.push(eq(patients.status, filters.status));
+    }
+
+    if (filters.fechaDesde) {
+      conditions.push(sql`${patients.createdAt} >= ${filters.fechaDesde}`);
+    }
+
+    if (filters.fechaHasta) {
+      conditions.push(sql`${patients.createdAt} <= ${filters.fechaHasta}`);
+    }
+
+    // If searching by diagnosis or doctor, we need to join with medical notes
+    if (filters.diagnostico || filters.medicoId) {
+      const subquery = db.select({ patientId: medicalNotes.patientId })
+        .from(medicalNotes)
+        .where(
+          and(
+            filters.diagnostico ? sql`${filters.diagnostico} = ANY(${medicalNotes.diagnosticosCie10})` : undefined,
+            filters.medicoId ? eq(medicalNotes.medicoId, filters.medicoId) : undefined
+          )
+        );
+      
+      conditions.push(sql`${patients.id} IN (${subquery})`);
+    }
+
+    if (conditions.length === 0) {
+      return db.select().from(patients).orderBy(desc(patients.createdAt)).limit(100);
+    }
+
+    return db.select().from(patients)
+      .where(and(...conditions))
+      .orderBy(desc(patients.createdAt))
+      .limit(100);
+  }
+
+  // Patient Timeline
+  async getPatientTimeline(patientId: string): Promise<TimelineEvent[]> {
+    const events: TimelineEvent[] = [];
+
+    // Get medical notes
+    const notes = await db.select({
+      id: medicalNotes.id,
+      fecha: medicalNotes.fecha,
+      tipo: medicalNotes.tipo,
+      motivoConsulta: medicalNotes.motivoConsulta,
+      diagnosticos: medicalNotes.diagnosticos,
+      medicoNombre: users.nombre
+    }).from(medicalNotes)
+      .leftJoin(users, eq(medicalNotes.medicoId, users.id))
+      .where(eq(medicalNotes.patientId, patientId))
+      .orderBy(desc(medicalNotes.fecha));
+
+    for (const note of notes) {
+      events.push({
+        id: note.id,
+        tipo: 'nota_medica',
+        fecha: note.fecha,
+        titulo: `Nota: ${note.tipo.replace('_', ' ')}`,
+        descripcion: note.motivoConsulta || undefined,
+        medicoNombre: note.medicoNombre || undefined,
+        detalles: { diagnosticos: note.diagnosticos }
+      });
+    }
+
+    // Get vitals
+    const vitalsRecords = await db.select({
+      id: vitals.id,
+      fecha: vitals.fecha,
+      presionSistolica: vitals.presionSistolica,
+      presionDiastolica: vitals.presionDiastolica,
+      frecuenciaCardiaca: vitals.frecuenciaCardiaca,
+      temperatura: vitals.temperatura,
+      medicoNombre: users.nombre
+    }).from(vitals)
+      .leftJoin(users, eq(vitals.registradoPorId, users.id))
+      .where(eq(vitals.patientId, patientId))
+      .orderBy(desc(vitals.fecha));
+
+    for (const v of vitalsRecords) {
+      events.push({
+        id: v.id,
+        tipo: 'vitales',
+        fecha: v.fecha,
+        titulo: 'Signos Vitales',
+        descripcion: `PA: ${v.presionSistolica || '-'}/${v.presionDiastolica || '-'}, FC: ${v.frecuenciaCardiaca || '-'}, T: ${v.temperatura || '-'}°C`,
+        medicoNombre: v.medicoNombre || undefined,
+        detalles: { presionSistolica: v.presionSistolica, presionDiastolica: v.presionDiastolica }
+      });
+    }
+
+    // Get prescriptions
+    const prescriptionRecords = await db.select({
+      id: prescriptions.id,
+      createdAt: prescriptions.createdAt,
+      medicamento: prescriptions.medicamento,
+      dosis: prescriptions.dosis,
+      status: prescriptions.status,
+      medicoNombre: users.nombre
+    }).from(prescriptions)
+      .leftJoin(users, eq(prescriptions.medicoId, users.id))
+      .where(eq(prescriptions.patientId, patientId))
+      .orderBy(desc(prescriptions.createdAt));
+
+    for (const p of prescriptionRecords) {
+      events.push({
+        id: p.id,
+        tipo: 'receta',
+        fecha: p.createdAt!,
+        titulo: `Receta: ${p.medicamento}`,
+        descripcion: `${p.dosis || ''} - ${p.status}`,
+        medicoNombre: p.medicoNombre || undefined,
+        detalles: { medicamento: p.medicamento, dosis: p.dosis }
+      });
+    }
+
+    // Get appointments
+    const appointmentRecords = await db.select({
+      id: appointments.id,
+      fecha: appointments.fecha,
+      motivo: appointments.motivo,
+      status: appointments.status,
+      medicoNombre: users.nombre
+    }).from(appointments)
+      .leftJoin(users, eq(appointments.medicoId, users.id))
+      .where(eq(appointments.patientId, patientId))
+      .orderBy(desc(appointments.fecha));
+
+    for (const a of appointmentRecords) {
+      events.push({
+        id: a.id,
+        tipo: 'cita',
+        fecha: new Date(a.fecha),
+        titulo: `Cita: ${a.motivo || 'Consulta'}`,
+        descripcion: a.status,
+        medicoNombre: a.medicoNombre || undefined,
+        detalles: { status: a.status }
+      });
+    }
+
+    // Get lab orders
+    const labOrderRecords = await db.select({
+      id: labOrders.id,
+      createdAt: labOrders.createdAt,
+      estudios: labOrders.estudios,
+      status: labOrders.status,
+      medicoNombre: users.nombre
+    }).from(labOrders)
+      .leftJoin(users, eq(labOrders.medicoId, users.id))
+      .where(eq(labOrders.patientId, patientId))
+      .orderBy(desc(labOrders.createdAt));
+
+    for (const l of labOrderRecords) {
+      events.push({
+        id: l.id,
+        tipo: 'orden_laboratorio',
+        fecha: l.createdAt!,
+        titulo: 'Orden de Laboratorio',
+        descripcion: l.estudios?.join(', ') || '',
+        medicoNombre: l.medicoNombre || undefined,
+        detalles: { estudios: l.estudios, status: l.status }
+      });
+    }
+
+    // Sort all events by date descending
+    events.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+    return events;
   }
 }
 

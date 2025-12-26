@@ -232,6 +232,96 @@ export async function registerRoutes(
     }
   });
 
+  // =====================
+  // Dashboard Metrics
+  // =====================
+  
+  /**
+   * @swagger
+   * /dashboard/metrics:
+   *   get:
+   *     tags: [Dashboard]
+   *     summary: Obtener métricas del dashboard
+   *     description: Retorna estadísticas generales de pacientes, citas, notas médicas
+   *     security:
+   *       - sessionAuth: []
+   *     responses:
+   *       200:
+   *         description: Métricas del sistema
+   */
+  app.get("/api/dashboard/metrics", isAuthenticated, async (req, res) => {
+    try {
+      const metrics = await storage.getDashboardMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Dashboard metrics error:", error);
+      res.status(500).json({ error: "Error obteniendo métricas" });
+    }
+  });
+
+  // =====================
+  // Advanced Patient Search
+  // =====================
+  
+  /**
+   * @swagger
+   * /patients/advanced-search:
+   *   get:
+   *     tags: [Patients]
+   *     summary: Búsqueda avanzada de pacientes
+   *     parameters:
+   *       - in: query
+   *         name: q
+   *         schema:
+   *           type: string
+   *         description: Término de búsqueda
+   *       - in: query
+   *         name: fechaDesde
+   *         schema:
+   *           type: string
+   *         description: Fecha desde (YYYY-MM-DD)
+   *       - in: query
+   *         name: fechaHasta
+   *         schema:
+   *           type: string
+   *         description: Fecha hasta (YYYY-MM-DD)
+   *       - in: query
+   *         name: diagnostico
+   *         schema:
+   *           type: string
+   *         description: Código CIE-10
+   *       - in: query
+   *         name: medicoId
+   *         schema:
+   *           type: string
+   *         description: ID del médico tratante
+   *       - in: query
+   *         name: status
+   *         schema:
+   *           type: string
+   *         description: Estado del paciente
+   *     responses:
+   *       200:
+   *         description: Lista de pacientes filtrados
+   */
+  app.get("/api/patients/advanced-search", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const filters = {
+        query: req.query.q as string | undefined,
+        fechaDesde: req.query.fechaDesde as string | undefined,
+        fechaHasta: req.query.fechaHasta as string | undefined,
+        diagnostico: req.query.diagnostico as string | undefined,
+        medicoId: req.query.medicoId as string | undefined,
+        status: req.query.status as string | undefined,
+      };
+      const patients = await storage.searchPatientsAdvanced(filters);
+      res.json(patients);
+    } catch (error) {
+      console.error("Advanced search error:", error);
+      res.status(500).json({ error: "Error en búsqueda avanzada" });
+    }
+  });
+
   /**
    * @swagger
    * /patients:
@@ -299,6 +389,58 @@ export async function registerRoutes(
       res.json(patient);
     } catch (error) {
       res.status(500).json({ error: "Error fetching patient" });
+    }
+  });
+
+  // =====================
+  // Patient Timeline
+  // =====================
+  
+  /**
+   * @swagger
+   * /patients/{id}/timeline:
+   *   get:
+   *     tags: [Patients]
+   *     summary: Obtener historial clínico completo del paciente
+   *     description: Retorna un timeline con notas médicas, signos vitales, recetas, citas y órdenes de laboratorio
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: ID del paciente
+   *     responses:
+   *       200:
+   *         description: Timeline del paciente
+   *       404:
+   *         description: Paciente no encontrado
+   */
+  app.get("/api/patients/:id/timeline", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const patient = await storage.getPatient(req.params.id);
+      if (!patient) {
+        return res.status(404).json({ error: "Paciente no encontrado" });
+      }
+      
+      const timeline = await storage.getPatientTimeline(req.params.id);
+      
+      // Audit log for accessing patient timeline (NOM-024)
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "patient_timeline",
+        entidadId: req.params.id,
+        detalles: JSON.stringify({ eventos: timeline.length }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      
+      res.json(timeline);
+    } catch (error) {
+      console.error("Timeline error:", error);
+      res.status(500).json({ error: "Error obteniendo timeline" });
     }
   });
 

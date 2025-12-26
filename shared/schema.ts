@@ -312,3 +312,38 @@ export type LabOrderWithDetails = LabOrder & {
   patientApellido: string;
   medicoNombre: string;
 };
+
+// Dashboard metrics types
+export type DashboardMetrics = {
+  totalPacientes: number;
+  pacientesActivos: number;
+  citasHoy: number;
+  citasPendientes: number;
+  citasCompletadas: number;
+  notasMedicasHoy: number;
+  prescripcionesActivas: number;
+  citasPorDia: { fecha: string; total: number }[];
+  citasPorEstado: { estado: string; total: number }[];
+  pacientesPorMes: { mes: string; total: number }[];
+};
+
+// Advanced search filter types
+export type PatientSearchFilters = {
+  query?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  diagnostico?: string;
+  medicoId?: string;
+  status?: string;
+};
+
+// Patient timeline event type
+export type TimelineEvent = {
+  id: string;
+  tipo: 'nota_medica' | 'vitales' | 'receta' | 'cita' | 'orden_laboratorio';
+  fecha: Date;
+  titulo: string;
+  descripcion?: string;
+  medicoNombre?: string;
+  detalles: Record<string, unknown>;
+};
