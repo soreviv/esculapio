@@ -1,0 +1,26 @@
+# Salud Digital - Expediente Clínico Electrónico
+# Robots.txt para control de indexación
+
+# Permitir a todos los bots acceder al sitio
+User-agent: *
+Allow: /
+
+# Bloquear indexación de rutas sensibles y dinámicas
+Disallow: /api/
+Disallow: /pacientes/*/
+Disallow: /configuracion
+
+# Sitemap
+Sitemap: https://salud-digital.com/sitemap.xml
+
+# Rastreo optimizado
+Crawl-delay: 10
+
+# Bots específicos
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 5
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 5

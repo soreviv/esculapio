@@ -94,6 +94,15 @@ La plataforma ha sido desarrollada teniendo en cuenta los estrictos requisitos d
 
 - **LFPDPPP**: Se gestiona el consentimiento del paciente para el tratamiento de sus datos personales y del expediente clínico a través de registros de consentimiento.
 
+## 🗺️ SEO y Optimización
+
+El proyecto incluye configuración optimizada para motores de búsqueda:
+
+- **sitemap.xml**: Mapa del sitio con todas las rutas públicas de la aplicación (`client/public/sitemap.xml`)
+- **robots.txt**: Control de indexación y directrices para web crawlers (`client/public/robots.txt`)
+- **Meta tags**: Configuración de metadatos para redes sociales y SEO
+- **URLs semánticas**: Rutas descriptivas y amigables para usuarios y buscadores
+
 ## 📄 API Endpoints
 
 El servidor expone una API REST para interactuar con los datos. Todos los endpoints requieren autenticación.
@@ -137,6 +146,7 @@ El proyecto **Salud Digital** se encuentra en una etapa de **desarrollo avanzado
 - ✅ **Gestión de consentimiento informado** del paciente (LFPDPPP)
 - ✅ **Inmutabilidad de registros** firmados (las notas firmadas no pueden modificarse)
 - ✅ **Registro de IP y User-Agent** en bitácora de auditoría
+- ✅ **Auditoría de seguridad de dependencias** actualizada (0 vulnerabilidades críticas en producción)
 
 #### 3. **Funcionalidades Implementadas**
 - **Gestión Completa de Pacientes**: Registro, búsqueda, actualización y eliminación con validaciones
@@ -198,6 +208,7 @@ El proyecto ha evolucionado significativamente con las siguientes actualizacione
 - ✅ **Control de acceso mejorado** con registros de seguridad
 - ✅ **Autenticación robusta** con validaciones exhaustivas
 - ✅ **Gestión de sesiones** segura con express-session
+- ✅ **Resolución de vulnerabilidades de seguridad** (4 vulnerabilidades críticas y bajas eliminadas)
 
 ### 🚀 Estado de Producción
 
