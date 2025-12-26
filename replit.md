@@ -28,10 +28,27 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Express sessions with connect-pg-simple for PostgreSQL session storage
 
 ### Data Storage
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL with optimized connection pooling
 - **Schema Location**: `shared/schema.ts` - shared between frontend and backend
 - **Migrations**: Drizzle Kit manages database migrations in `/migrations` directory
 - **Key Tables**: users, patients, medical_notes, vitals, prescriptions, appointments
+- **Connection Pooling**: Configured in `server/db.ts` with max 20 connections, min 2 idle, 30s idle timeout
+
+### Database Optimization
+- **Indexes**: Foreign key and frequently queried columns indexed (see `migrations/0002_add_indexes.sql`)
+  - Medical notes: patient_id, medico_id, fecha, tipo
+  - Vitals: patient_id, fecha, registrado_por_id
+  - Prescriptions: patient_id, medico_id, status
+  - Appointments: patient_id, medico_id, fecha, status, composite (fecha, medico_id)
+  - Audit logs: user_id, entidad, fecha, entidad_id
+  - Patient search: nombre, apellido_paterno, status
+- **Connection Pool Settings**: Configurable via DB_POOL_MAX and DB_POOL_MIN environment variables
+
+### API Documentation
+- **OpenAPI 3.0**: Full API specification at `/api-docs.json`
+- **Swagger UI**: Interactive documentation at `/api-docs`
+- **Auto-generation**: JSDoc annotations in `server/routes.ts`
+- **Config**: `server/swagger.ts` contains schema definitions and metadata
 
 ### Project Structure
 ```

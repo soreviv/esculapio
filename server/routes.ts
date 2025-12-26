@@ -19,7 +19,39 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Authentication endpoints
+  /**
+   * @swagger
+   * /login:
+   *   post:
+   *     tags: [Auth]
+   *     summary: Iniciar sesión
+   *     description: Autentica un usuario con nombre de usuario y contraseña
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [username, password]
+   *             properties:
+   *               username:
+   *                 type: string
+   *               password:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Autenticación exitosa
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/User'
+   *       401:
+   *         description: Credenciales inválidas
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Error'
+   */
   app.post("/api/login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -87,6 +119,16 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * @swagger
+   * /logout:
+   *   post:
+   *     tags: [Auth]
+   *     summary: Cerrar sesión
+   *     responses:
+   *       200:
+   *         description: Sesión cerrada exitosamente
+   */
   app.post("/api/logout", (req, res) => {
     const userId = req.session?.userId;
     req.session.destroy((err) => {
@@ -109,6 +151,18 @@ export async function registerRoutes(
     });
   });
 
+  /**
+   * @swagger
+   * /auth/me:
+   *   get:
+   *     tags: [Auth]
+   *     summary: Obtener usuario actual
+   *     responses:
+   *       200:
+   *         description: Usuario autenticado
+   *       401:
+   *         description: No autenticado
+   */
   app.get("/api/auth/me", (req, res) => {
     if (req.session?.userId) {
       res.json({
@@ -178,7 +232,29 @@ export async function registerRoutes(
     }
   });
 
-  // Patients (Protected - requires medical/nursing staff)
+  /**
+   * @swagger
+   * /patients:
+   *   get:
+   *     tags: [Patients]
+   *     summary: Listar todos los pacientes
+   *     description: Obtiene lista de pacientes. Requiere rol medico o enfermeria.
+   *     security:
+   *       - sessionAuth: []
+   *     responses:
+   *       200:
+   *         description: Lista de pacientes
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: array
+   *               items:
+   *                 $ref: '#/components/schemas/Patient'
+   *       401:
+   *         description: No autenticado
+   *       403:
+   *         description: Sin permisos suficientes
+   */
   app.get("/api/patients", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const patients = await storage.getPatients();
@@ -188,6 +264,22 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * @swagger
+   * /patients/search:
+   *   get:
+   *     tags: [Patients]
+   *     summary: Buscar pacientes
+   *     parameters:
+   *       - in: query
+   *         name: q
+   *         schema:
+   *           type: string
+   *         description: Término de búsqueda (nombre, CURP, expediente)
+   *     responses:
+   *       200:
+   *         description: Resultados de búsqueda
+   */
   app.get("/api/patients/search", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const query = req.query.q as string || "";
@@ -210,6 +302,25 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * @swagger
+   * /patients:
+   *   post:
+   *     tags: [Patients]
+   *     summary: Crear nuevo paciente
+   *     description: Crea un paciente con todos los campos requeridos por NOM-004. Si no se proporciona numeroExpediente, se genera automáticamente.
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/Patient'
+   *     responses:
+   *       201:
+   *         description: Paciente creado exitosamente
+   *       400:
+   *         description: Datos inválidos
+   */
   app.post("/api/patients", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       // Auto-generate numeroExpediente if not provided (NOM-004 compliance)

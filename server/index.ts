@@ -5,6 +5,8 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
 import pinoHttp from "pino-http";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./swagger";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -135,6 +137,18 @@ app.use(
 export function log(message: string, source = "express") {
   logger.info({ source }, message);
 }
+
+// Swagger API Documentation (no auth required for docs)
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: ".swagger-ui .topbar { display: none }",
+  customSiteTitle: "MediRecord API Documentation",
+}));
+
+// JSON endpoint for OpenAPI spec
+app.get("/api-docs.json", (_req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
 
 const SENSITIVE_PATHS = [
   "/api/patients",
