@@ -126,7 +126,7 @@ El proyecto **Salud Digital** se encuentra en una etapa de **desarrollo avanzado
 - Stack tecnológico moderno (React + TypeScript + Node.js + Express)
 - Separación clara de responsabilidades (Cliente, Servidor, Compartido)
 - Uso de ORM (Drizzle) para operaciones de base de datos seguras y tipadas
-- TanStack Query para gestión eficiente de estado asíncrono y caching
+- TanStack Query para gestión eficiente de estado asíncrono y almacenamiento en caché
 
 #### 2. **Seguridad y Cumplimiento Normativo (NOM-024)**
 - ✅ **Sistema de autenticación robusto** con roles diferenciados (admin, médico, enfermería)
