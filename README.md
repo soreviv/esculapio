@@ -195,7 +195,7 @@ El proyecto ha evolucionado significativamente con las siguientes actualizacione
 
 - ✅ Componente **PatientCard** para visualización mejorada de datos del paciente
 - ✅ Sistema de **eliminación de pacientes** con diálogo de confirmación
-- ✅ **Control de acceso mejorado** con logging de seguridad
+- ✅ **Control de acceso mejorado** con registros de seguridad
 - ✅ **Autenticación robusta** con validaciones exhaustivas
 - ✅ **Gestión de sesiones** segura con express-session
 
