@@ -118,7 +118,7 @@ El servidor expone una API REST para interactuar con los datos. Todos los endpoi
 
 ### Estado Actual del Desarrollo
 
-El proyecto **Salud Digital** se encuentra en una etapa de **desarrollo avanzado** con todas las funcionalidades core completamente implementadas y operativas. El sistema es funcional, seguro y cumple con los estándares normativos mexicanos.
+El proyecto **Salud Digital** se encuentra en una etapa de **desarrollo avanzado** con todas las funcionalidades clave completamente implementadas y operativas. El sistema es funcional, seguro y cumple con los estándares normativos mexicanos.
 
 ### ⭐ Fortalezas del Proyecto
 
