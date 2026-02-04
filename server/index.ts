@@ -5,6 +5,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
 import pinoHttp from "pino-http";
+import compression from "compression";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./swagger";
 import { registerRoutes } from "./routes";
@@ -92,6 +93,9 @@ app.use(pinoHttp({
   },
   redact: ["req.headers.cookie", "req.headers.authorization"],
 }));
+
+// Enable Gzip/Brotli compression
+app.use(compression());
 
 declare module "http" {
   interface IncomingMessage {

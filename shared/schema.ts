@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, real, date, time } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, real, date, time, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -96,7 +96,9 @@ export const medicalNotes = pgTable("medical_notes", {
   fechaFirma: timestamp("fecha_firma"), // Timestamp when signed
   firmaUserId: varchar("firma_user_id").references(() => users.id), // Who signed
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  patientIdIdx: index("medical_notes_patient_id_idx").on(table.patientId),
+}));
 
 // Vitals
 export const vitals = pgTable("vitals", {
@@ -114,7 +116,9 @@ export const vitals = pgTable("vitals", {
   talla: integer("talla"),
   glucosa: integer("glucosa"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  patientIdIdx: index("vitals_patient_id_idx").on(table.patientId),
+}));
 
 // Prescriptions
 export const prescriptions = pgTable("prescriptions", {
@@ -130,7 +134,9 @@ export const prescriptions = pgTable("prescriptions", {
   indicaciones: text("indicaciones"),
   status: text("status").notNull().default("activa"), // activa, completada, cancelada
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  patientIdIdx: index("prescriptions_patient_id_idx").on(table.patientId),
+}));
 
 // Audit Logs (NOM-024-SSA3-2012 compliance - trazabilidad)
 export const auditLogs = pgTable("audit_logs", {
@@ -176,7 +182,9 @@ export const patientConsents = pgTable("patient_consents", {
   lugarFirma: text("lugar_firma"), // NOM-004: Lugar de firma
   ipAddress: text("ip_address"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  patientIdIdx: index("patient_consents_patient_id_idx").on(table.patientId),
+}));
 
 // Appointments
 export const appointments = pgTable("appointments", {
@@ -189,7 +197,9 @@ export const appointments = pgTable("appointments", {
   motivo: text("motivo"),
   status: text("status").notNull().default("pendiente"), // pendiente, en_curso, completada, no_asistio
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  patientIdIdx: index("appointments_patient_id_idx").on(table.patientId),
+}));
 
 // Lab Orders (Órdenes de Laboratorio)
 export const labOrders = pgTable("lab_orders", {
@@ -205,7 +215,9 @@ export const labOrders = pgTable("lab_orders", {
   resultados: text("resultados"),
   fechaResultados: timestamp("fecha_resultados"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  patientIdIdx: index("lab_orders_patient_id_idx").on(table.patientId),
+}));
 
 // Nursing Notes (NOM-004-SSA3-2012 - Hojas de Enfermería)
 export const nursingNotes = pgTable("nursing_notes", {
@@ -225,7 +237,9 @@ export const nursingNotes = pgTable("nursing_notes", {
   firmada: boolean("firmada").notNull().default(false),
   fechaFirma: timestamp("fecha_firma"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  patientIdIdx: index("nursing_notes_patient_id_idx").on(table.patientId),
+}));
 
 // Establishment Configuration (NOM-004-SSA3-2012 - Datos del establecimiento)
 export const establishmentConfig = pgTable("establishment_config", {
