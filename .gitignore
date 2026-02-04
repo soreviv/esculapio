@@ -4,4 +4,7 @@ coverage
 .DS_Store
 server/public
 vite.config.ts.*
-*.tar.gz
+*.tar.gz-e 
+# Environment files
+*.env
+*.env.*
