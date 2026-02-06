@@ -203,8 +203,10 @@ export default function PatientDetail() {
             onSave={(data) => createVitalsMutation.mutate(data)}
           />
           <NewNoteDialog
-            pacienteNombre={fullName}
-            onSave={(data) => createNoteMutation.mutate(data)}
+            patientId={patient.id}
+            patientNombre={fullName}
+            medicoId="system"
+            onSuccess={handleNoteSuccess}
           />
         </div>
       </div>
