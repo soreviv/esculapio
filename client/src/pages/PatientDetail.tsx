@@ -31,7 +31,7 @@ import {
   XCircle,
   Clock,
 } from "lucide-react";
-import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertMedicalNote, type InsertVitals, type PatientConsent } from "@shared/schema";
+import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertVitals, type PatientConsent } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
