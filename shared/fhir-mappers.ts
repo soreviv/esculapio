@@ -524,7 +524,7 @@ export function vitalsToObservations(
       baseDate,
       "8310-5",
       "Body temperature",
-      parseFloat(vitals.temperatura),
+      vitals.temperatura,
       "°C",
       "Cel"
     );
@@ -540,7 +540,7 @@ export function vitalsToObservations(
       baseDate,
       "59408-5",
       "Oxygen saturation",
-      parseFloat(vitals.saturacionOxigeno),
+      vitals.saturacionOxigeno,
       "%",
       "%"
     );
@@ -556,7 +556,7 @@ export function vitalsToObservations(
       baseDate,
       "29463-7",
       "Body weight",
-      parseFloat(vitals.peso),
+      vitals.peso,
       "kg",
       "kg"
     );
@@ -572,7 +572,7 @@ export function vitalsToObservations(
       baseDate,
       "8302-2",
       "Body height",
-      parseFloat(vitals.talla),
+      vitals.talla,
       "cm",
       "cm"
     );
@@ -588,7 +588,7 @@ export function vitalsToObservations(
       baseDate,
       "2339-0",
       "Glucose [Mass/volume] in Blood",
-      parseFloat(vitals.glucosa),
+      vitals.glucosa,
       "mg/dL",
       "mg/dL"
     );
