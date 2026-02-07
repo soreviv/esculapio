@@ -92,6 +92,7 @@ export async function registerRoutes(
 
       req.session.regenerate((err) => {
         if (err) {
+          console.error("Error regenerating session:", err);
           return res.status(500).json({ error: "Error al iniciar sesión" });
         }
 
@@ -101,6 +102,7 @@ export async function registerRoutes(
 
         req.session.save(async (err) => {
           if (err) {
+            console.error("Error saving session:", err);
             return res.status(500).json({ error: "Error al guardar la sesión" });
           }
 
