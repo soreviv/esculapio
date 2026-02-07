@@ -171,6 +171,10 @@ export class DatabaseStorage implements IStorage {
     return note;
   }
 
+  async getNote(id: string): Promise<MedicalNote | undefined> {
+    return this.getMedicalNote(id);
+  }
+
   async createMedicalNote(note: InsertMedicalNote): Promise<MedicalNote> {
     const [newNote] = await db.insert(medicalNotes).values(note).returning();
     return newNote;
