@@ -98,6 +98,7 @@ export const medicalNotes = pgTable("medical_notes", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   patientIdIdx: index("medical_notes_patient_id_idx").on(table.patientId),
+  fechaIdx: index("idx_medical_notes_fecha").on(table.fecha.desc()),
 }));
 
 // Vitals
@@ -118,6 +119,7 @@ export const vitals = pgTable("vitals", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   patientIdIdx: index("vitals_patient_id_idx").on(table.patientId),
+  fechaIdx: index("idx_vitals_fecha").on(table.fecha.desc()),
 }));
 
 // Prescriptions
@@ -149,7 +151,9 @@ export const auditLogs = pgTable("audit_logs", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   fecha: timestamp("fecha").notNull().defaultNow(),
-});
+}, (table) => ({
+  fechaIdx: index("idx_audit_logs_fecha").on(table.fecha.desc()),
+}));
 
 // CIE-10 Catalog (NOM-024-SSA3-2012 compliance - diagnósticos estandarizados)
 export const cie10Catalog = pgTable("cie10_catalog", {
@@ -239,6 +243,7 @@ export const nursingNotes = pgTable("nursing_notes", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   patientIdIdx: index("nursing_notes_patient_id_idx").on(table.patientId),
+  fechaIdx: index("idx_nursing_notes_fecha").on(table.fecha.desc()),
 }));
 
 // Establishment Configuration (NOM-004-SSA3-2012 - Datos del establecimiento)
