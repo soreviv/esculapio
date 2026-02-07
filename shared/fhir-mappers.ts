@@ -452,7 +452,7 @@ export function vitalsToObservations(
           ],
         },
         valueQuantity: {
-          value: parseFloat(vitals.presionSistolica),
+          value: vitals.presionSistolica,
           unit: "mmHg",
           system: "http://unitsofmeasure.org",
           code: "mm[Hg]",
@@ -472,7 +472,7 @@ export function vitalsToObservations(
           ],
         },
         valueQuantity: {
-          value: parseFloat(vitals.presionDiastolica),
+          value: vitals.presionDiastolica,
           unit: "mmHg",
           system: "http://unitsofmeasure.org",
           code: "mm[Hg]",
