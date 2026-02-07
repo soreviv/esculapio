@@ -395,7 +395,7 @@ fhirRouter.get("/Observation/:id", async (req: Request, res: Response) => {
   try {
     // Extract vitals ID from observation ID (format: vitalsId or vitalsId-component)
     const baseId = req.params.id.split("-")[0];
-    const vitals = await storage.getVitals(baseId);
+    const vitals = await storage.getVitalsById(baseId);
     
     if (!vitals) {
       return res.status(404).json(
