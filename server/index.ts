@@ -11,6 +11,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import "./auth";
+import fhirRouter from "./fhir-routes";
 
 // Structured logging with Pino
 const logger = pino({
