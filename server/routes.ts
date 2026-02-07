@@ -92,8 +92,12 @@ export async function registerRoutes(
       
       await new Promise<void>((resolve, reject) => {
         req.session.regenerate((err) => {
-          if (err) reject(err);
-          else resolve();
+          if (err) {
+            console.error("Error regenerating session:", err);
+            reject(err);
+          } else {
+            resolve();
+          }
         });
       });
 
@@ -103,8 +107,12 @@ export async function registerRoutes(
 
       await new Promise<void>((resolve, reject) => {
         req.session.save((err) => {
-          if (err) reject(err);
-          else resolve();
+          if (err) {
+            console.error("Error saving session:", err);
+            reject(err);
+          } else {
+            resolve();
+          }
         });
       });
 
