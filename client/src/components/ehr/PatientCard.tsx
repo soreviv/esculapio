@@ -2,6 +2,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { FileText, Calendar, AlertTriangle, Trash2 } from "lucide-react";
 
 export interface PatientCardProps {
@@ -109,22 +114,39 @@ export function PatientCard({
             <FileText className="h-4 w-4 mr-2" />
             Expediente
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onSchedule}
-            data-testid="button-schedule"
-          >
-            <Calendar className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDelete}
-            data-testid="button-delete"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onSchedule}
+                data-testid="button-schedule"
+                aria-label="Agendar cita"
+              >
+                <Calendar className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Agendar cita</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onDelete}
+                data-testid="button-delete"
+                aria-label="Eliminar paciente"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Eliminar paciente</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </CardContent>
     </Card>

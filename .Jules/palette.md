@@ -1,5 +1,3 @@
-# Palette Journal
-
-## 2025-02-12 - CSS Layout Conflict in Buttons
-**Learning:** The `hover-elevate` utility class (applied by default to Buttons in this repo) sets `position: relative`. This unexpectedly overrides `absolute` positioning because custom utilities in `@layer utilities` can take precedence over standard utilities depending on definition order.
-**Action:** Use `!absolute` when positioning Buttons absolutely to force the positioning behavior.
+## 2026-02-05 - Icon-only buttons pattern
+**Learning:** Icon-only buttons (like delete/schedule actions) are consistently missing `aria-label` and tooltips, making them inaccessible to screen readers and potentially confusing for all users.
+**Action:** When creating or modifying components with icon-only buttons, always enforce: 1) `aria-label` for screen readers, 2) `Tooltip` for visual clarity.
