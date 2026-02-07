@@ -886,13 +886,12 @@ export function consentToFhir(
 
 export function auditLogToAuditEvent(auditLog: AuditLog): FhirAuditEvent {
   const actionMap: Record<string, "C" | "R" | "U" | "D" | "E"> = {
-    create: "C",
-    read: "R",
-    update: "U",
-    delete: "D",
-    login: "E",
-    logout: "E",
-    sign: "U",
+    crear: "C",
+    leer: "R",
+    actualizar: "U",
+    eliminar: "D",
+    acceso: "E",
+    firmar: "U",
   };
 
   return {
@@ -906,12 +905,12 @@ export function auditLogToAuditEvent(auditLog: AuditLog): FhirAuditEvent {
     subtype: [
       {
         system: `${SYSTEM_LOCAL}/audit-action`,
-        code: auditLog.action,
-        display: auditLog.action,
+        code: auditLog.accion,
+        display: auditLog.accion,
       },
     ],
-    action: actionMap[auditLog.action] || "E",
-    recorded: auditLog.timestamp.toISOString(),
+    action: actionMap[auditLog.accion] || "E",
+    recorded: auditLog.fecha.toISOString(),
     outcome: "0",
     agent: [
       {
@@ -933,11 +932,11 @@ export function auditLogToAuditEvent(auditLog: AuditLog): FhirAuditEvent {
         display: "Sistema de Expediente Clínico Electrónico",
       },
     },
-    entity: auditLog.resourceId
+    entity: auditLog.entidadId
       ? [
           {
             what: {
-              reference: `${auditLog.resourceType}/${auditLog.resourceId}`,
+              reference: `${auditLog.entidad}/${auditLog.entidadId}`,
             },
             type: {
               system: "http://terminology.hl7.org/CodeSystem/audit-entity-type",
