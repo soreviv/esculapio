@@ -204,6 +204,11 @@ export class DatabaseStorage implements IStorage {
     return latest;
   }
 
+  async getVitalsById(id: string): Promise<Vitals | undefined> {
+    const [result] = await db.select().from(vitals).where(eq(vitals.id, id));
+    return result;
+  }
+
   async createVitals(vitalsData: InsertVitals): Promise<Vitals> {
     const [newVitals] = await db.insert(vitals).values(vitalsData).returning();
     return newVitals;
