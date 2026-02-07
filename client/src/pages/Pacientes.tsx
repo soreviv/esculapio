@@ -21,11 +21,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 /**
- * Página que muestra y gestiona el listado de pacientes.
+ * Componente de página que gestiona y muestra la lista de pacientes, incluyendo búsqueda, filtrado, ordenación, creación y eliminación.
  *
- * Permite buscar, filtrar y ordenar pacientes; crear nuevos registros; eliminar pacientes tras confirmación; y navegar a expedientes o a la pantalla de citas.
+ * Renderiza la interfaz de gestión de pacientes: cabecera, controles de búsqueda/filtrado/orden, lista (o estado de carga/vacío), diálogo para crear pacientes y confirmación para eliminar.
  *
- * @returns El elemento React que representa la interfaz de gestión de pacientes.
+ * @returns El elemento JSX de la página de pacientes.
  */
 export default function Pacientes() {
   const [, setLocation] = useLocation();
