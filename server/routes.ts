@@ -90,10 +90,24 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Credenciales inválidas" });
       }
       
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
       req.session.userId = user.id;
       req.session.role = user.role;
       req.session.nombre = user.nombre;
-      
+
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
       await storage.createAuditLog({
         userId: user.id,
         accion: "login",
@@ -104,11 +118,11 @@ export async function registerRoutes(
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
       });
-      
-      res.json({ 
-        id: user.id, 
-        username: user.username, 
-        role: user.role, 
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
         nombre: user.nombre,
         especialidad: user.especialidad,
         cedula: user.cedula
