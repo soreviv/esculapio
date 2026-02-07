@@ -774,6 +774,25 @@ export class DatabaseStorage implements IStorage {
 
     return events;
   }
+
+  // FHIR Compatibility Alias Methods
+  async getPatientNotes(patientId: string): Promise<MedicalNote[]> {
+    return this.getMedicalNotes(patientId);
+  }
+
+  async getPatientVitals(patientId: string): Promise<Vitals[]> {
+    return db.select().from(vitals)
+      .where(eq(vitals.patientId, patientId))
+      .orderBy(desc(vitals.fecha));
+  }
+
+  async getPatientPrescriptions(patientId: string): Promise<Prescription[]> {
+    return this.getPrescriptions(patientId);
+  }
+
+  async getPatientLabOrders(patientId: string): Promise<LabOrder[]> {
+    return this.getLabOrders(patientId);
+  }
 }
 
 export const storage = new DatabaseStorage();
