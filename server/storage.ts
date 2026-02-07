@@ -37,16 +37,19 @@ export interface IStorage {
   getMedicalNote(id: string): Promise<MedicalNote | undefined>;
   createMedicalNote(note: InsertMedicalNote): Promise<MedicalNote>;
   updateMedicalNote(id: string, note: Partial<InsertMedicalNote>): Promise<MedicalNote | undefined>;
+  getNote(id: string): Promise<MedicalNote | undefined>;
   
   // Vitals
   getAllVitals(): Promise<Vitals[]>;
   getVitals(patientId: string): Promise<Vitals[]>;
+  getVitalsById(id: string): Promise<Vitals | undefined>;
   getLatestVitals(patientId: string): Promise<Vitals | undefined>;
   createVitals(vitalsData: InsertVitals): Promise<Vitals>;
   
   // Prescriptions
   getAllPrescriptions(): Promise<Prescription[]>;
   getPrescriptions(patientId: string): Promise<Prescription[]>;
+  getPrescription(id: string): Promise<Prescription | undefined>;
   createPrescription(prescription: InsertPrescription): Promise<Prescription>;
   updatePrescription(id: string, prescription: Partial<InsertPrescription>): Promise<Prescription | undefined>;
   
@@ -98,6 +101,12 @@ export interface IStorage {
   
   // Patient Timeline
   getPatientTimeline(patientId: string): Promise<TimelineEvent[]>;
+
+  // FHIR Compatibility Aliases
+  getPatientNotes(patientId: string): Promise<MedicalNote[]>;
+  getPatientVitals(patientId: string): Promise<Vitals[]>;
+  getPatientPrescriptions(patientId: string): Promise<Prescription[]>;
+  getPatientLabOrders(patientId: string): Promise<LabOrder[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -168,6 +177,10 @@ export class DatabaseStorage implements IStorage {
     return note;
   }
 
+  async getNote(id: string): Promise<MedicalNote | undefined> {
+    return this.getMedicalNote(id);
+  }
+
   async createMedicalNote(note: InsertMedicalNote): Promise<MedicalNote> {
     const [newNote] = await db.insert(medicalNotes).values(note).returning();
     return newNote;
@@ -197,6 +210,11 @@ export class DatabaseStorage implements IStorage {
     return latest;
   }
 
+  async getVitalsById(id: string): Promise<Vitals | undefined> {
+    const [result] = await db.select().from(vitals).where(eq(vitals.id, id));
+    return result;
+  }
+
   async createVitals(vitalsData: InsertVitals): Promise<Vitals> {
     const [newVitals] = await db.insert(vitals).values(vitalsData).returning();
     return newVitals;
@@ -211,6 +229,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(prescriptions)
       .where(eq(prescriptions.patientId, patientId))
       .orderBy(desc(prescriptions.createdAt));
+  }
+
+  async getPrescription(id: string): Promise<Prescription | undefined> {
+    const [result] = await db.select().from(prescriptions).where(eq(prescriptions.id, id));
+    return result;
   }
 
   async createPrescription(prescription: InsertPrescription): Promise<Prescription> {
@@ -749,6 +772,25 @@ export class DatabaseStorage implements IStorage {
     events.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
     return events;
+  }
+
+  // FHIR Compatibility Alias Methods
+  async getPatientNotes(patientId: string): Promise<MedicalNote[]> {
+    return this.getMedicalNotes(patientId);
+  }
+
+  async getPatientVitals(patientId: string): Promise<Vitals[]> {
+    return db.select().from(vitals)
+      .where(eq(vitals.patientId, patientId))
+      .orderBy(desc(vitals.fecha));
+  }
+
+  async getPatientPrescriptions(patientId: string): Promise<Prescription[]> {
+    return this.getPrescriptions(patientId);
+  }
+
+  async getPatientLabOrders(patientId: string): Promise<LabOrder[]> {
+    return this.getLabOrders(patientId);
   }
 }
 
