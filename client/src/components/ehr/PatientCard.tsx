@@ -46,6 +46,18 @@ function getStatusBadge(status: PatientCardProps["status"]) {
   }
 }
 
+/**
+ * Renderiza una tarjeta con la información y acciones principales de un paciente.
+ *
+ * Muestra avatar con iniciales, nombre completo, edad calculada desde `fechaNacimiento`, sexo, CURP,
+ * un distintivo de estado y, si existen, las alergias. Incluye botones para ver expediente, agendar cita y eliminar al paciente.
+ *
+ * @param alergias - Lista de alergias del paciente; si tiene elementos se muestran con un icono de alerta.
+ * @param onViewRecord - Callback invocado cuando se pulsa el botón "Expediente".
+ * @param onSchedule - Callback invocado cuando se pulsa el botón de agendar cita (también tiene tooltip y aria-label).
+ * @param onDelete - Callback invocado cuando se pulsa el botón de eliminar paciente (también tiene tooltip y aria-label).
+ * @returns El elemento JSX que representa la tarjeta del paciente.
+ */
 export function PatientCard({
   nombre,
   apellidoPaterno,
