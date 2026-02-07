@@ -14,6 +14,17 @@ import {
 import { createHash } from "crypto";
 import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isEnfermeria, isMedicoOrEnfermeria } from "./auth";
 
+/**
+ * Registra y configura todos los endpoints REST bajo /api en la aplicación Express proporcionada.
+ *
+ * Registra rutas de autenticación, gestión de usuarios, pacientes, notas médicas, signos vitales,
+ * recetas, citas, órdenes de laboratorio, registros de auditoría y catálogos, además de los
+ * middleware de control de acceso necesarios (p. ej. isAuthenticated, isAdmin, isMedico).
+ *
+ * @param httpServer - Instancia del servidor HTTP que se devuelve tras agregar las rutas
+ * @param app - Instancia de Express sobre la que se montan los endpoints y middleware
+ * @returns El mismo objeto `Server` pasado como `httpServer`
+ */
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -89,14 +100,21 @@ export async function registerRoutes(
         });
         return res.status(401).json({ error: "Credenciales inválidas" });
       }
-      
-      await new Promise<void>((resolve, reject) => {
-        req.session.regenerate((err) => {
+
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Error regenerating session:", err);
+          return res.status(500).json({ error: "Error al iniciar sesión" });
+        }
+
+        req.session.userId = user.id;
+        req.session.role = user.role;
+        req.session.nombre = user.nombre;
+
+        req.session.save(async (err) => {
           if (err) {
-            console.error("Error regenerating session:", err);
-            reject(err);
-          } else {
-            resolve();
+            console.error("Error saving session:", err);
+            return res.status(500).json({ error: "Error al guardar la sesión" });
           }
         });
       });
