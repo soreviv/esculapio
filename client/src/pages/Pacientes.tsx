@@ -20,6 +20,13 @@ import { type Patient, type InsertPatient } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+/**
+ * Página que muestra y gestiona el listado de pacientes.
+ *
+ * Permite buscar, filtrar y ordenar pacientes; crear nuevos registros; eliminar pacientes tras confirmación; y navegar a expedientes o a la pantalla de citas.
+ *
+ * @returns El elemento React que representa la interfaz de gestión de pacientes.
+ */
 export default function Pacientes() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
