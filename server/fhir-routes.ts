@@ -575,7 +575,7 @@ fhirRouter.get("/AuditEvent", async (req: Request, res: Response) => {
     if (date) {
       const searchDate = new Date(date as string).toISOString().split("T")[0];
       auditLogs = auditLogs.filter(
-        (log) => log.timestamp.toISOString().split("T")[0] === searchDate
+        (log) => log.fecha.toISOString().split("T")[0] === searchDate
       );
     }
 
