@@ -662,7 +662,7 @@ export function prescriptionToMedicationRequest(
     resourceType: "MedicationRequest",
     id: prescription.id,
     meta: {
-      lastUpdated: prescription.updatedAt?.toISOString() || new Date().toISOString(),
+      lastUpdated: prescription.createdAt?.toISOString() || new Date().toISOString(),
     },
     identifier: [
       {
