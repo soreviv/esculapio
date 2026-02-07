@@ -66,7 +66,7 @@ export function patientToFhir(patient: Patient): FhirPatient {
     resourceType: "Patient",
     id: patient.id,
     meta: {
-      lastUpdated: patient.updatedAt?.toISOString() || new Date().toISOString(),
+      lastUpdated: patient.createdAt?.toISOString() || new Date().toISOString(),
       profile: ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"],
     },
     identifier: identifiers,
