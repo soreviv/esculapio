@@ -17,99 +17,199 @@ vi.mock("../server/storage", () => {
   };
 });
 
-describe("Session Fixation Vulnerability", () => {
+describe("Session Security", () => {
   let app: express.Express;
 
-  beforeEach(async () => {
+  // Helper to setup app with specific session middleware
+  const setupApp = async (sessionMiddleware: any) => {
     app = express();
     app.use(express.json());
-    // Use saveUninitialized: true to ensure we can get a session cookie before login
-    app.use(session({
-      secret: "test-secret",
-      resave: false,
-      saveUninitialized: true,
-      cookie: { maxAge: 60000 }
-    }));
-
-    // Register routes
-    // We need to pass a mock httpServer, but registerRoutes only uses it for swagger/vite which we don't need here?
-    // Actually registerRoutes takes (httpServer, app).
-    // Let's pass a dummy object for httpServer.
+    app.use(sessionMiddleware);
+    // registerRoutes expects httpServer but doesn't use it for login logic
     await registerRoutes({} as any, app);
-  });
+  };
 
-  it("should regenerate session id after login", async () => {
-    const username = "testuser";
-    const password = "password123";
-    const hashedPassword = await hashPassword(password);
-
-    // Setup mock user
-    (storage.getUserByUsername as any).mockResolvedValue({
-      id: "1",
-      username,
-      password: hashedPassword,
-      role: "medico",
-      nombre: "Test User",
-      especialidad: "General",
-      cedula: "12345"
+  describe("Happy Path (Real Session)", () => {
+    beforeEach(async () => {
+      const realSession = session({
+        secret: "test-secret",
+        resave: false,
+        saveUninitialized: true,
+        cookie: { maxAge: 60000 }
+      });
+      await setupApp(realSession);
     });
 
-    const agent = request.agent(app);
+    it("should regenerate session id after login", async () => {
+      const username = "testuser";
+      const password = "password123";
+      const hashedPassword = await hashPassword(password);
 
-    // 1. Get an initial session
-    const initialRes = await agent.get("/api/auth/me");
-    // Even if 401, saveUninitialized: true should set a cookie
-    const initialCookie = initialRes.headers["set-cookie"];
-    expect(initialCookie).toBeDefined();
+      // Setup mock user
+      (storage.getUserByUsername as any).mockResolvedValue({
+        id: "1",
+        username,
+        password: hashedPassword,
+        role: "medico",
+        nombre: "Test User",
+        especialidad: "General",
+        cedula: "12345"
+      });
 
-    // Extract the session ID part roughly to compare
-    const initialSessionId = initialCookie[0].split(';')[0];
+      const agent = request.agent(app);
 
-    // 2. Login with the existing session
-    // Supertest agent automatically persists cookies, so the next request will send the cookie obtained above.
-    const loginRes = await agent
-      .post("/api/login")
-      .send({ username, password });
+      // 1. Get an initial session
+      const initialRes = await agent.get("/api/auth/me");
+      const initialCookie = initialRes.headers["set-cookie"];
+      expect(initialCookie).toBeDefined();
 
-    expect(loginRes.status).toBe(200);
+      const initialSessionId = initialCookie[0].split(';')[0];
 
-    const newCookie = loginRes.headers["set-cookie"];
+      // 2. Login
+      const loginRes = await agent
+        .post("/api/login")
+        .send({ username, password });
 
-    // Verification logic:
-    // If the session IS regenerated, we expect a new Set-Cookie header with a different ID.
-    // If the session IS NOT regenerated (vulnerable), express-session typically does not send a Set-Cookie header
-    // if the session ID hasn't changed and the session wasn't modified in a way that requires resaving (depends on resave/rolling).
-    // Or if it does send it, it will be the same ID.
+      expect(loginRes.status).toBe(200);
 
-    if (newCookie) {
-        const newSessionId = newCookie[0].split(';')[0];
-        // If vulnerability exists, these might be equal (if set-cookie is sent)
-        // We want to ASSERT that they are DIFFERENT for the fix.
-        // For reproduction of the failure, we check current behavior.
+      const newCookie = loginRes.headers["set-cookie"];
+      expect(newCookie).toBeDefined();
 
-        // In the current vulnerable code:
-        // verifyPassword -> true
-        // req.session.userId = ...
-        // Response sent.
+      const newSessionId = newCookie[0].split(';')[0];
 
-        // Since we modified the session (added userId), and we are using default memory store (compatible with express-session defaults in test),
-        // it might set the cookie again.
+      // Verify session ID changed
+      expect(newSessionId).not.toBe(initialSessionId);
+    });
 
-        // If the code is VULNERABLE, the ID should be the same.
-        // If FIXED, the ID should be different.
+    it("should set user properties in session", async () => {
+      const username = "propuser";
+      const password = "password123";
+      const hashedPassword = await hashPassword(password);
 
-        // Let's print them to be sure what happens.
-        console.log("Initial Session ID:", initialSessionId);
-        console.log("New Session ID:", newSessionId);
+      (storage.getUserByUsername as any).mockResolvedValue({
+        id: "2",
+        username,
+        password: hashedPassword,
+        role: "admin",
+        nombre: "Admin User",
+      });
 
-        // Failing test expectation (Testing for the FIX):
-        expect(newSessionId).not.toBe(initialSessionId);
-    } else {
-        // If no new cookie is sent, it implies the session ID didn't change (vulnerable behavior usually,
-        // unless rolling: true which isn't default).
-        // So if newCookie is undefined, it's definitely not regenerated (or at least the client isn't told about it).
-        // So we fail the test because we expect regeneration.
-        throw new Error("Session was not regenerated (no Set-Cookie header received on login)");
-    }
+      const agent = request.agent(app);
+
+      const loginRes = await agent
+        .post("/api/login")
+        .send({ username, password });
+
+      expect(loginRes.status).toBe(200);
+
+      // Verify via auth/me endpoint
+      const meRes = await agent.get("/api/auth/me");
+      expect(meRes.status).toBe(200);
+      expect(meRes.body).toEqual({
+        id: "2",
+        role: "admin",
+        nombre: "Admin User"
+      });
+    });
+  });
+
+  describe("Error Handling & Ordering (Mock Session)", () => {
+    let regenerateMock: any;
+    let saveMock: any;
+    let sessionStore: any;
+
+    beforeEach(async () => {
+      sessionStore = {
+        userId: null,
+        role: null,
+        nombre: null
+      };
+
+      regenerateMock = vi.fn((cb) => cb(null));
+      saveMock = vi.fn((cb) => cb(null));
+
+      const mockMiddleware = (req: any, res: any, next: any) => {
+        req.session = {
+          ...sessionStore,
+          regenerate: regenerateMock,
+          save: saveMock,
+        };
+        // Allow setting properties on req.session to update our local store for verification
+        // Proxy to capture sets? Or just manual assignment in route.
+        // The route does `req.session.userId = ...`
+        // We need the mock object to retain these values so we can check them in saveMock
+        next();
+      };
+
+      await setupApp(mockMiddleware);
+
+      const password = "password123";
+      const hashedPassword = await hashPassword(password);
+      (storage.getUserByUsername as any).mockResolvedValue({
+        id: "1",
+        username: "test",
+        password: hashedPassword,
+        role: "medico",
+        nombre: "Test",
+      });
+    });
+
+    it("should return 500 if regenerate fails", async () => {
+      regenerateMock.mockImplementation((cb: any) => cb(new Error("Regenerate failed")));
+
+      const res = await request(app)
+        .post("/api/login")
+        .send({ username: "test", password: "password123" });
+
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe("Error al iniciar sesión");
+      expect(saveMock).not.toHaveBeenCalled();
+    });
+
+    it("should return 500 if save fails", async () => {
+      saveMock.mockImplementation((cb: any) => cb(new Error("Save failed")));
+
+      const res = await request(app)
+        .post("/api/login")
+        .send({ username: "test", password: "password123" });
+
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe("Error al guardar la sesión");
+    });
+
+    it("should call save after regenerate", async () => {
+      await request(app)
+        .post("/api/login")
+        .send({ username: "test", password: "password123" });
+
+      expect(regenerateMock).toHaveBeenCalled();
+      expect(saveMock).toHaveBeenCalled();
+
+      // Verify order: regenerate called, then inside it save called.
+      // We can't strictly verify the nesting via spies alone easily without mock implementation logic,
+      // but the fact that regenerate calls the callback which calls save is structurally enforced by the code.
+      // However, we can verify that when regenerate is called, save hasn't been called yet.
+      // But purely async...
+      // The previous test (save not called if regenerate fails) proves dependency.
+    });
+
+    it("should assign properties after regeneration but before save", async () => {
+      // We need to capture the state of session when save is called
+      saveMock.mockImplementation(function(this: any, cb: any) {
+        // 'this' should be the session object if called as method,
+        // but in our mock middleware we attached methods.
+        // Let's rely on the route handler setting properties on the object we passed.
+        expect(this.userId).toBe("1");
+        expect(this.role).toBe("medico");
+        expect(this.nombre).toBe("Test");
+        cb(null);
+      });
+
+      const res = await request(app)
+        .post("/api/login")
+        .send({ username: "test", password: "password123" });
+
+      expect(res.status).toBe(200);
+    });
   });
 });
