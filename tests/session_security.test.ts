@@ -196,9 +196,7 @@ describe("Session Security - Login Session Handling", () => {
             else resolve();
           });
         });
-      } catch {
-        // Expected to fail at regenerate
-      }
+      } catch { /* empty */ }
 
       expect(regenerateMock).toHaveBeenCalledOnce();
       expect(saveMock).not.toHaveBeenCalled();
