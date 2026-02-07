@@ -31,7 +31,7 @@ import {
   XCircle,
   Clock,
 } from "lucide-react";
-import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertMedicalNote, type InsertVitals, type PatientConsent } from "@shared/schema";
+import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertVitals, type PatientConsent } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -112,30 +112,9 @@ export default function PatientDetail() {
     enabled: !!params.id,
   });
 
-  const createNoteMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const noteData: InsertMedicalNote = {
-        patientId: patient?.id || "",
-        medicoId: "system",
-        tipo: data.tipo,
-        motivoConsulta: data.motivoConsulta || null,
-        subjetivo: data.subjetivo || null,
-        objetivo: data.objetivo || null,
-        analisis: data.analisis || null,
-        plan: data.plan || null,
-        diagnosticos: data.diagnosticos ? data.diagnosticos.split(",").map((d: string) => d.trim()).filter(Boolean) : null,
-      };
-      const response = await apiRequest("POST", "/api/notes", noteData);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patients", params.id, "notes"] });
-      toast({
-        title: "Nota creada",
-        description: "La nota médica ha sido registrada.",
-      });
-    },
-  });
+  const handleNoteSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/patients", params.id, "notes"] });
+  };
 
   const createVitalsMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -224,8 +203,10 @@ export default function PatientDetail() {
             onSave={(data) => createVitalsMutation.mutate(data)}
           />
           <NewNoteDialog
-            pacienteNombre={fullName}
-            onSave={(data) => createNoteMutation.mutate(data)}
+            patientId={patient.id}
+            patientNombre={fullName}
+            medicoId="system"
+            onSuccess={handleNoteSuccess}
           />
         </div>
       </div>
@@ -364,8 +345,8 @@ export default function PatientDetail() {
                         fecha={new Date(note.fecha).toLocaleDateString("es-MX")}
                         hora={new Date(note.fecha).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
                         medicoNombre={note.medicoNombre}
-                        motivoConsulta={note.motivoConsulta || undefined}
-                        diagnosticos={note.diagnosticos || undefined}
+                        motivoConsulta={note.motivoConsulta || ""}
+                        diagnosticos={note.diagnosticos || []}
                         firmada={note.firmada}
                         onView={() => console.log("View note:", note.id)}
                       />
@@ -419,11 +400,11 @@ export default function PatientDetail() {
                       <PrescriptionCard
                         key={rx.id}
                         medicamento={rx.medicamento}
-                        presentacion={rx.presentacion || undefined}
+                        presentacion={rx.presentacion || ""}
                         dosis={rx.dosis}
                         via={rx.via}
                         frecuencia={rx.frecuencia}
-                        duracion={rx.duracion || undefined}
+                        duracion={rx.duracion || ""}
                         indicaciones={rx.indicaciones || undefined}
                         status={rx.status as "activa" | "completada" | "cancelada"}
                       />

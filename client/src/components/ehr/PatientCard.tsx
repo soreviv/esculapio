@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { FileText, Calendar, AlertTriangle, Trash2 } from "lucide-react";
 
 export interface PatientCardProps {
@@ -45,6 +46,18 @@ function getStatusBadge(status: PatientCardProps["status"]) {
   }
 }
 
+/**
+ * Renderiza una tarjeta con la información y acciones principales de un paciente.
+ *
+ * Muestra avatar con iniciales, nombre completo, edad calculada desde `fechaNacimiento`, sexo, CURP,
+ * un distintivo de estado y, si existen, las alergias. Incluye botones para ver expediente, agendar cita y eliminar al paciente.
+ *
+ * @param alergias - Lista de alergias del paciente; si tiene elementos se muestran con un icono de alerta.
+ * @param onViewRecord - Callback invocado cuando se pulsa el botón "Expediente".
+ * @param onSchedule - Callback invocado cuando se pulsa el botón de agendar cita (también tiene tooltip y aria-label).
+ * @param onDelete - Callback invocado cuando se pulsa el botón de eliminar paciente (también tiene tooltip y aria-label).
+ * @returns El elemento JSX que representa la tarjeta del paciente.
+ */
 export function PatientCard({
   nombre,
   apellidoPaterno,
@@ -109,22 +122,39 @@ export function PatientCard({
             <FileText className="h-4 w-4 mr-2" />
             Expediente
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onSchedule}
-            data-testid="button-schedule"
-          >
-            <Calendar className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDelete}
-            data-testid="button-delete"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onSchedule}
+                data-testid="button-schedule"
+                aria-label="Agendar cita"
+              >
+                <Calendar className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Agendar cita</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onDelete}
+                data-testid="button-delete"
+                aria-label="Eliminar paciente"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Eliminar paciente</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </CardContent>
     </Card>

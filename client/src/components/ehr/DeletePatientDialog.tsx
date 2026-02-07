@@ -15,6 +15,14 @@ interface DeletePatientDialogProps {
   onConfirm: () => void;
 }
 
+/**
+ * Renderiza un diálogo de confirmación para eliminar un paciente.
+ *
+ * @param isOpen - Indica si el diálogo está abierto
+ * @param onClose - Función que se llama para cerrar el diálogo
+ * @param onConfirm - Función que se llama para confirmar la eliminación
+ * @returns El elemento JSX del diálogo de confirmación
+ */
 export function DeletePatientDialog({ isOpen, onClose, onConfirm }: DeletePatientDialogProps) {
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
@@ -27,7 +35,12 @@ export function DeletePatientDialog({ isOpen, onClose, onConfirm }: DeletePatien
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onClose}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Eliminar</AlertDialogAction>
+          <AlertDialogAction
+            onClick={onConfirm}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Eliminar
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

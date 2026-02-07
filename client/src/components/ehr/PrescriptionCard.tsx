@@ -4,11 +4,11 @@ import { Pill, Clock, Calendar } from "lucide-react";
 
 export interface PrescriptionCardProps {
   medicamento: string;
-  presentacion: string;
+  presentacion?: string;
   dosis: string;
   via: string;
   frecuencia: string;
-  duracion: string;
+  duracion?: string;
   indicaciones?: string;
   status: "activa" | "completada" | "cancelada";
 }

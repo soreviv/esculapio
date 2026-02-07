@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, User, ShieldCheck, AlertCircle } from "lucide-react";
+import { Lock, User, ShieldCheck, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 const loginSchema = z.object({
@@ -36,6 +36,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showError, setShowError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -142,12 +143,26 @@ export default function Login({ onLogin }: LoginProps) {
                           <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
                             {...field}
-                            type="password"
+                            type={showPassword ? "text" : "password"}
                             placeholder="Ingrese su contraseña"
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             data-testid="input-password"
                             autoComplete="current-password"
                           />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="!absolute right-2 top-1/2 transform -translate-y-1/2 h-9 w-9 text-muted-foreground hover:bg-transparent z-10"
+                            onClick={() => setShowPassword(!showPassword)}
+                            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
                       </FormControl>
                       <FormMessage />

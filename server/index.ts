@@ -5,12 +5,14 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
 import pinoHttp from "pino-http";
+import compression from "compression";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./swagger";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import "./auth";
+import fhirRouter from "./fhir-routes";
 
 // Structured logging with Pino
 const logger = pino({
@@ -93,6 +95,9 @@ app.use(pinoHttp({
   redact: ["req.headers.cookie", "req.headers.authorization"],
 }));
 
+// Enable Gzip/Brotli compression
+app.use(compression());
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
@@ -150,6 +155,9 @@ app.get("/api-docs.json", (_req, res) => {
   res.send(swaggerSpec);
 });
 
+// HL7 FHIR R4 API Routes
+app.use("/fhir", fhirRouter);
+
 const SENSITIVE_PATHS = [
   "/api/patients",
   "/api/notes",
@@ -159,6 +167,7 @@ const SENSITIVE_PATHS = [
   "/api/consents",
   "/api/appointments",
   "/api/audit-logs",
+  "/fhir",
 ];
 
 function isSensitivePath(path: string): boolean {
