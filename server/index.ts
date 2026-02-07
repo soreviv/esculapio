@@ -11,6 +11,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import "./auth";
+import fhirRouter from "./fhir-routes";
 
 // Structured logging with Pino
 const logger = pino({
@@ -150,6 +151,9 @@ app.get("/api-docs.json", (_req, res) => {
   res.send(swaggerSpec);
 });
 
+// HL7 FHIR R4 API Routes
+app.use("/fhir", fhirRouter);
+
 const SENSITIVE_PATHS = [
   "/api/patients",
   "/api/notes",
@@ -159,6 +163,7 @@ const SENSITIVE_PATHS = [
   "/api/consents",
   "/api/appointments",
   "/api/audit-logs",
+  "/fhir",
 ];
 
 function isSensitivePath(path: string): boolean {

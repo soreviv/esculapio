@@ -123,6 +123,63 @@ El servidor expone una API REST para interactuar con los datos. Todos los endpoi
 
 *Esta es una lista parcial. Consulta `server/routes.ts` para ver todos los endpoints disponibles.*
 
+## 🔗 API HL7 FHIR R4
+
+El sistema implementa **HL7 FHIR R4** para interoperabilidad con otros sistemas de salud, conforme a la reforma de ley que requiere que todos los EHR sean compatibles con este estándar.
+
+### Endpoints FHIR
+
+| Método | Ruta | Descripción |
+| :----- | :--- | :---------- |
+| `GET` | `/fhir/metadata` | CapabilityStatement - Capacidades del servidor |
+| `GET` | `/fhir/Patient` | Búsqueda de pacientes |
+| `GET` | `/fhir/Patient/:id` | Obtener paciente por ID |
+| `GET` | `/fhir/Patient/:id/$everything` | Expediente completo del paciente |
+| `GET` | `/fhir/Practitioner` | Búsqueda de profesionales de salud |
+| `GET` | `/fhir/Practitioner/:id` | Obtener profesional por ID |
+| `GET` | `/fhir/Encounter` | Búsqueda de encuentros/consultas |
+| `GET` | `/fhir/Encounter/:id` | Obtener encuentro por ID |
+| `GET` | `/fhir/Condition` | Búsqueda de diagnósticos |
+| `GET` | `/fhir/Observation` | Búsqueda de observaciones (signos vitales) |
+| `GET` | `/fhir/Observation/:id` | Obtener observación por ID |
+| `GET` | `/fhir/MedicationRequest` | Búsqueda de recetas |
+| `GET` | `/fhir/MedicationRequest/:id` | Obtener receta por ID |
+| `GET` | `/fhir/ServiceRequest` | Búsqueda de órdenes de laboratorio |
+| `GET` | `/fhir/ServiceRequest/:id` | Obtener orden por ID |
+| `GET` | `/fhir/Consent` | Búsqueda de consentimientos |
+| `GET` | `/fhir/AuditEvent` | Eventos de auditoría |
+| `GET` | `/fhir/$export?patient=:id` | Exportar expediente en formato FHIR Bundle |
+
+### Recursos FHIR Soportados
+
+| Recurso FHIR | Recurso Interno | Descripción |
+| :----------- | :-------------- | :---------- |
+| `Patient` | `patients` | Datos demográficos del paciente |
+| `Practitioner` | `users` | Profesionales de salud |
+| `Encounter` | `medical_notes` | Consultas y notas médicas |
+| `Condition` | CIE-10 en notas | Diagnósticos codificados |
+| `Observation` | `vitals` | Signos vitales |
+| `MedicationRequest` | `prescriptions` | Recetas médicas |
+| `ServiceRequest` | `lab_orders` | Órdenes de laboratorio |
+| `Consent` | `patient_consents` | Consentimientos informados |
+| `AuditEvent` | `audit_logs` | Bitácora de auditoría |
+
+### Ejemplo de uso
+
+```bash
+# Obtener capacidades del servidor
+curl https://tu-dominio.com/fhir/metadata
+
+# Buscar paciente por CURP
+curl "https://tu-dominio.com/fhir/Patient?identifier=CURP123456789"
+
+# Obtener expediente completo en formato FHIR
+curl "https://tu-dominio.com/fhir/Patient/uuid-del-paciente/\$everything"
+
+# Exportar expediente para interoperabilidad
+curl "https://tu-dominio.com/fhir/\$export?patient=uuid-del-paciente"
+```
+
 ## 📊 Evaluación General del Proyecto
 
 ### Estado Actual del Desarrollo
