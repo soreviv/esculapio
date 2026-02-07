@@ -233,7 +233,7 @@ export function medicalNoteToEncounter(
     resourceType: "Encounter",
     id: note.id,
     meta: {
-      lastUpdated: note.updatedAt?.toISOString() || new Date().toISOString(),
+      lastUpdated: note.createdAt?.toISOString() || new Date().toISOString(),
     },
     identifier: [
       {
