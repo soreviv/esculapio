@@ -345,8 +345,8 @@ export default function PatientDetail() {
                         fecha={new Date(note.fecha).toLocaleDateString("es-MX")}
                         hora={new Date(note.fecha).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
                         medicoNombre={note.medicoNombre}
-                        motivoConsulta={note.motivoConsulta || undefined}
-                        diagnosticos={note.diagnosticos || undefined}
+                        motivoConsulta={note.motivoConsulta || ""}
+                        diagnosticos={note.diagnosticos || []}
                         firmada={note.firmada}
                         onView={() => console.log("View note:", note.id)}
                       />
@@ -400,11 +400,11 @@ export default function PatientDetail() {
                       <PrescriptionCard
                         key={rx.id}
                         medicamento={rx.medicamento}
-                        presentacion={rx.presentacion || undefined}
+                        presentacion={rx.presentacion || ""}
                         dosis={rx.dosis}
                         via={rx.via}
                         frecuencia={rx.frecuencia}
-                        duracion={rx.duracion || undefined}
+                        duracion={rx.duracion || ""}
                         indicaciones={rx.indicaciones || undefined}
                         status={rx.status as "activa" | "completada" | "cancelada"}
                       />
