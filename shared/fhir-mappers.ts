@@ -191,7 +191,7 @@ export function userToPractitioner(user: User): FhirPractitioner {
       lastUpdated: new Date().toISOString(),
     },
     identifier: [],
-    active: user.activo,
+    active: true,  // Schema doesn't have 'activo' field for users
     name: [
       {
         use: "official",
