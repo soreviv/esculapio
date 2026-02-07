@@ -101,23 +101,19 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Credenciales inválidas" });
       }
 
-      req.session.regenerate((err) => {
-        if (err) {
-          console.error("Error regenerating session:", err);
-          return res.status(500).json({ error: "Error al iniciar sesión" });
-        }
-
-        req.session.userId = user.id;
-        req.session.role = user.role;
-        req.session.nombre = user.nombre;
-
-        req.session.save(async (err) => {
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
           if (err) {
-            console.error("Error saving session:", err);
-            return res.status(500).json({ error: "Error al guardar la sesión" });
+            console.error("Error regenerating session:", err);
+            return reject(err);
           }
+          resolve();
         });
+      }).catch(() => {
+        return res.status(500).json({ error: "Error al iniciar sesión" });
       });
+
+      if (res.headersSent) return;
 
       req.session.userId = user.id;
       req.session.role = user.role;
@@ -127,12 +123,15 @@ export async function registerRoutes(
         req.session.save((err) => {
           if (err) {
             console.error("Error saving session:", err);
-            reject(err);
-          } else {
-            resolve();
+            return reject(err);
           }
+          resolve();
         });
+      }).catch(() => {
+        return res.status(500).json({ error: "Error al guardar la sesión" });
       });
+
+      if (res.headersSent) return;
 
       await storage.createAuditLog({
         userId: user.id,

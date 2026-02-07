@@ -522,7 +522,7 @@ export class DatabaseStorage implements IStorage {
 
     // Pending appointments
     const [citasPendientesResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
-      .where(eq(appointments.status, 'programada'));
+      .where(eq(appointments.status, 'pendiente'));
     const citasPendientes = Number(citasPendientesResult?.count || 0);
 
     // Completed appointments
