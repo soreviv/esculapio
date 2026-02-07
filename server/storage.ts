@@ -101,6 +101,13 @@ export interface IStorage {
   
   // Patient Timeline
   getPatientTimeline(patientId: string): Promise<TimelineEvent[]>;
+
+  // FHIR Compatibility Aliases
+  getPatientNotes(patientId: string): Promise<MedicalNote[]>;
+  getPatientVitals(patientId: string): Promise<Vitals[]>;
+  getPatientPrescriptions(patientId: string): Promise<Prescription[]>;
+  getPatientLabOrders(patientId: string): Promise<LabOrder[]>;
+  getVitals(id: string): Promise<Vitals | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
