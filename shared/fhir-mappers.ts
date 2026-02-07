@@ -737,7 +737,7 @@ export function labOrderToServiceRequest(
     resourceType: "ServiceRequest",
     id: labOrder.id,
     meta: {
-      lastUpdated: labOrder.updatedAt?.toISOString() || new Date().toISOString(),
+      lastUpdated: labOrder.createdAt?.toISOString() || new Date().toISOString(),
     },
     identifier: [
       {
