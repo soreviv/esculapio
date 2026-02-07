@@ -492,7 +492,7 @@ export function vitalsToObservations(
       baseDate,
       "8867-4",
       "Heart rate",
-      parseFloat(vitals.frecuenciaCardiaca),
+      vitals.frecuenciaCardiaca,
       "/min",
       "{beats}/min"
     );
@@ -508,7 +508,7 @@ export function vitalsToObservations(
       baseDate,
       "9279-1",
       "Respiratory rate",
-      parseFloat(vitals.frecuenciaRespiratoria),
+      vitals.frecuenciaRespiratoria,
       "/min",
       "{breaths}/min"
     );
