@@ -175,6 +175,7 @@ export default function Pacientes() {
               size="icon"
               className="h-4 w-4 ml-1 p-0"
               onClick={() => setSearchQuery("")}
+              aria-label="Limpiar búsqueda"
             >
               ×
             </Button>
