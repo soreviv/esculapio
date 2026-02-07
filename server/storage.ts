@@ -225,6 +225,11 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(prescriptions.createdAt));
   }
 
+  async getPrescription(id: string): Promise<Prescription | undefined> {
+    const [result] = await db.select().from(prescriptions).where(eq(prescriptions.id, id));
+    return result;
+  }
+
   async createPrescription(prescription: InsertPrescription): Promise<Prescription> {
     const [newPrescription] = await db.insert(prescriptions).values(prescription).returning();
     return newPrescription;
