@@ -37,16 +37,19 @@ export interface IStorage {
   getMedicalNote(id: string): Promise<MedicalNote | undefined>;
   createMedicalNote(note: InsertMedicalNote): Promise<MedicalNote>;
   updateMedicalNote(id: string, note: Partial<InsertMedicalNote>): Promise<MedicalNote | undefined>;
+  getNote(id: string): Promise<MedicalNote | undefined>;
   
   // Vitals
   getAllVitals(): Promise<Vitals[]>;
   getVitals(patientId: string): Promise<Vitals[]>;
+  getVitalsById(id: string): Promise<Vitals | undefined>;
   getLatestVitals(patientId: string): Promise<Vitals | undefined>;
   createVitals(vitalsData: InsertVitals): Promise<Vitals>;
   
   // Prescriptions
   getAllPrescriptions(): Promise<Prescription[]>;
   getPrescriptions(patientId: string): Promise<Prescription[]>;
+  getPrescription(id: string): Promise<Prescription | undefined>;
   createPrescription(prescription: InsertPrescription): Promise<Prescription>;
   updatePrescription(id: string, prescription: Partial<InsertPrescription>): Promise<Prescription | undefined>;
   
