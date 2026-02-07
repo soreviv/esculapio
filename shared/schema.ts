@@ -103,7 +103,7 @@ export const medicalNotes = pgTable("medical_notes", {
 }, (table) => [
   index("idx_medical_notes_patient_id").on(table.patientId),
   index("idx_medical_notes_medico_id").on(table.medicoId),
-  index("idx_medical_notes_fecha").on(table.fecha),
+  index("idx_medical_notes_fecha").on(table.fecha.desc()),
   index("idx_medical_notes_tipo").on(table.tipo),
 ]);
 
@@ -125,7 +125,7 @@ export const vitals = pgTable("vitals", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_vitals_patient_id").on(table.patientId),
-  index("idx_vitals_fecha").on(table.fecha),
+  index("idx_vitals_fecha").on(table.fecha.desc()),
   index("idx_vitals_registrado_por").on(table.registradoPorId),
 ]);
 
@@ -163,7 +163,7 @@ export const auditLogs = pgTable("audit_logs", {
 }, (table) => [
   index("idx_audit_logs_user_id").on(table.userId),
   index("idx_audit_logs_entidad").on(table.entidad),
-  index("idx_audit_logs_fecha").on(table.fecha),
+  index("idx_audit_logs_fecha").on(table.fecha.desc()),
   index("idx_audit_logs_entidad_id").on(table.entidadId),
 ]);
 
@@ -263,7 +263,7 @@ export const nursingNotes = pgTable("nursing_notes", {
 }, (table) => [
   index("idx_nursing_notes_patient_id").on(table.patientId),
   index("idx_nursing_notes_enfermera_id").on(table.enfermeraId),
-  index("idx_nursing_notes_fecha").on(table.fecha),
+  index("idx_nursing_notes_fecha").on(table.fecha.desc()),
 ]);
 
 // Establishment Configuration (NOM-004-SSA3-2012 - Datos del establecimiento)
