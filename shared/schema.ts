@@ -44,7 +44,11 @@ export const patients = pgTable("patients", {
   telefonoEmergencia: text("telefono_emergencia"),
   status: text("status").notNull().default("activo"), // activo, alta, en_consulta
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_patients_nombre").on(table.nombre),
+  index("idx_patients_apellido_paterno").on(table.apellidoPaterno),
+  index("idx_patients_status").on(table.status),
+]);
 
 // Medical Notes (NOM-004-SSA3-2012 compliant)
 export const medicalNotes = pgTable("medical_notes", {

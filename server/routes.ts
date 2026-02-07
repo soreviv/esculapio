@@ -89,46 +89,51 @@ export async function registerRoutes(
         });
         return res.status(401).json({ error: "Credenciales inválidas" });
       }
-
-      req.session.regenerate((err) => {
-        if (err) {
-          return res.status(500).json({ error: "Error al iniciar sesión" });
-        }
-
-        req.session.userId = user.id;
-        req.session.role = user.role;
-        req.session.nombre = user.nombre;
-
-        req.session.save(async (err) => {
+      
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
           if (err) {
-            return res.status(500).json({ error: "Error al guardar la sesión" });
-          }
-
-          try {
-            await storage.createAuditLog({
-              userId: user.id,
-              accion: "login",
-              entidad: "auth",
-              entidadId: user.id,
-              detalles: JSON.stringify({ role: user.role }),
-              ipAddress: req.ip || req.socket.remoteAddress || null,
-              userAgent: req.get("User-Agent") || null,
-              fecha: new Date(),
-            });
-
-            res.json({
-              id: user.id,
-              username: user.username,
-              role: user.role,
-              nombre: user.nombre,
-              especialidad: user.especialidad,
-              cedula: user.cedula
-            });
-          } catch (error) {
-            console.error("Login audit error:", error);
-            res.status(500).json({ error: "Error al iniciar sesión" });
+            console.error("Error regenerating session:", err);
+            reject(err);
+          } else {
+            resolve();
           }
         });
+      });
+
+      req.session.userId = user.id;
+      req.session.role = user.role;
+      req.session.nombre = user.nombre;
+
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Error saving session:", err);
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      await storage.createAuditLog({
+        userId: user.id,
+        accion: "login",
+        entidad: "auth",
+        entidadId: user.id,
+        detalles: JSON.stringify({ role: user.role }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        nombre: user.nombre,
+        especialidad: user.especialidad,
+        cedula: user.cedula
       });
     } catch (error) {
       console.error("Login error:", error);
