@@ -96,7 +96,7 @@ app.use(pinoHttp({
 }));
 
 // Enable Gzip/Brotli compression
-app.use(compression());
+app.use(compression() as express.RequestHandler);
 
 declare module "http" {
   interface IncomingMessage {
@@ -136,7 +136,7 @@ app.use(
       maxAge: 24 * 60 * 60 * 1000,
       sameSite: "lax",
     },
-  })
+  }) as express.RequestHandler
 );
 
 export function log(message: string, source = "express") {
