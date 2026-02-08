@@ -144,10 +144,10 @@ export function log(message: string, source = "express") {
 }
 
 // Swagger API Documentation (no auth required for docs)
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+app.use("/api-docs", swaggerUi.serve as express.RequestHandler[], swaggerUi.setup(swaggerSpec, {
   customCss: ".swagger-ui .topbar { display: none }",
   customSiteTitle: "MediRecord API Documentation",
-}));
+}) as express.RequestHandler);
 
 // JSON endpoint for OpenAPI spec
 app.get("/api-docs.json", (_req, res) => {
