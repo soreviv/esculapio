@@ -96,7 +96,8 @@ app.use(pinoHttp({
 }));
 
 // Enable Gzip/Brotli compression
-app.use(compression() as express.RequestHandler);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.use(compression() as any);
 
 declare module "http" {
   interface IncomingMessage {
@@ -121,6 +122,7 @@ if (!sessionSecret && process.env.NODE_ENV === "production") {
   throw new Error("SESSION_SECRET environment variable is required in production");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use(
   session({
     store: new PgSession({
@@ -136,7 +138,7 @@ app.use(
       maxAge: 24 * 60 * 60 * 1000,
       sameSite: "lax",
     },
-  }) as express.RequestHandler
+  }) as any
 );
 
 export function log(message: string, source = "express") {
@@ -144,10 +146,11 @@ export function log(message: string, source = "express") {
 }
 
 // Swagger API Documentation (no auth required for docs)
-app.use("/api-docs", swaggerUi.serve as express.RequestHandler[], swaggerUi.setup(swaggerSpec, {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.use("/api-docs", swaggerUi.serve as any, swaggerUi.setup(swaggerSpec, {
   customCss: ".swagger-ui .topbar { display: none }",
   customSiteTitle: "MediRecord API Documentation",
-}) as express.RequestHandler);
+}) as any);
 
 // JSON endpoint for OpenAPI spec
 app.get("/api-docs.json", (_req, res) => {
