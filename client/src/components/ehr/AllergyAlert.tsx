@@ -1,5 +1,6 @@
 import { AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
 
 export interface AllergyAlertProps {
@@ -32,15 +33,23 @@ export function AllergyAlert({ alergias, onDismiss }: AllergyAlertProps) {
           {alergias.join(", ")}
         </p>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 text-destructive hover:text-destructive"
-        onClick={handleDismiss}
-        data-testid="button-dismiss-allergy"
-      >
-        <X className="h-4 w-4" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-destructive hover:text-destructive"
+            onClick={handleDismiss}
+            data-testid="button-dismiss-allergy"
+            aria-label="Ignorar alerta"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Ignorar alerta</p>
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }
