@@ -8,6 +8,15 @@ export interface AllergyAlertProps {
   onDismiss?: () => void;
 }
 
+/**
+ * Muestra una alerta visual con las alergias conocidas y permite descartarla.
+ *
+ * Muestra el título "Alergias conocidas" y la lista de alergias separadas por comas; si se descarta o no hay alergias no renderiza nada.
+ *
+ * @param alergias - Lista de nombres de alergias que se mostrarán en la alerta
+ * @param onDismiss - Callback opcional que se invoca cuando el usuario descarta la alerta
+ * @returns El elemento React del componente de alerta, o `null` si la alerta no debe mostrarse
+ */
 export function AllergyAlert({ alergias, onDismiss }: AllergyAlertProps) {
   const [dismissed, setDismissed] = useState(false);
 
