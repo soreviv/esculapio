@@ -98,8 +98,8 @@ La plataforma ha sido desarrollada teniendo en cuenta los estrictos requisitos d
 
 El proyecto incluye configuración optimizada para motores de búsqueda:
 
-- **sitemap.xml**: Mapa del sitio con todas las rutas públicas de la aplicación (`client/public/sitemap.xml`)
-- **robots.txt**: Control de indexación y directrices para web crawlers (`client/public/robots.txt`)
+- **sitemap.xml**: Mapa del sitio con rutas públicas (`client/public/sitemap.xml`, accesible en `https://www.viveros.click/sitemap.xml`)
+- **robots.txt**: Control de indexación (`client/public/robots.txt`, referencia al sitemap de `https://www.viveros.click/sitemap.xml`)
 - **Meta tags**: Configuración de metadatos para redes sociales y SEO
 - **URLs semánticas**: Rutas descriptivas y amigables para usuarios y buscadores
 
