@@ -79,8 +79,8 @@ Para ejecutar el proyecto en un entorno de desarrollo local, sigue estos pasos:
     ```bash
     npm run dev
     ```
-    - El **frontend** estará disponible en `http://localhost:5173`.
-    - El **backend** estará disponible en `http://localhost:3000`.
+    - La **aplicación** estará disponible en `http://localhost:3000`.
+    - La **API** estará disponible en `http://localhost:3000/api`.
 
 ## 🔐 Seguridad y Cumplimiento Normativo
 
