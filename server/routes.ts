@@ -931,7 +931,7 @@ export async function registerRoutes(
       }
       
       await storage.createAuditLog({
-        userId: req.session.userId || appointment.medicoId,
+        userId: req.session.userId,
         accion: "actualizar",
         entidad: "appointments",
         entidadId: appointment.id,
