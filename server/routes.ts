@@ -918,16 +918,30 @@ export async function registerRoutes(
       }
 
       const appointment = await storage.updateAppointment(req.params.id, req.body);
+      if (req.session.role !== "admin" && existingAppointment.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No autorizado para actualizar esta cita." });
+      }
+
+      const parsed = insertAppointmentSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      if (Object.keys(parsed.data).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+
+      const appointment = await storage.updateAppointment(req.params.id, parsed.data);
       if (!appointment) {
         return res.status(404).json({ error: "Appointment not found" });
       }
       
       await storage.createAuditLog({
-        userId: req.session.userId || req.body.updatedBy || appointment.medicoId,
+        userId: req.session.userId,
         accion: "actualizar",
         entidad: "appointments",
         entidadId: appointment.id,
-        detalles: JSON.stringify({ campos: Object.keys(req.body) }),
+        detalles: JSON.stringify({ campos: Object.keys(parsed.data) }),
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
