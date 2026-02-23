@@ -625,6 +625,28 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * @swagger
+   * /notes:
+   *   get:
+   *     tags: [Medical Notes]
+   *     summary: Listar todas las notas médicas
+   *     description: Obtiene todas las notas médicas con detalles del médico y del paciente.
+   *     security:
+   *       - sessionAuth: []
+   *     responses:
+   *       200:
+   *         description: Lista de notas médicas
+   */
+  app.get("/api/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const notes = await storage.getAllMedicalNotesWithDetails();
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching notes" });
+    }
+  });
+
   app.get("/api/notes/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const note = await storage.getMedicalNote(req.params.id);

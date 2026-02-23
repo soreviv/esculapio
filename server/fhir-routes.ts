@@ -281,7 +281,7 @@ fhirRouter.get("/Encounter", async (req: Request, res: Response) => {
 // GET /fhir/Encounter/:id
 fhirRouter.get("/Encounter/:id", async (req: Request, res: Response) => {
   try {
-    const note = await storage.getNote(req.params.id);
+    const note = await storage.getMedicalNote(req.params.id);
     if (!note) {
       return res.status(404).json(
         createOperationOutcome("error", "not-found", `Encounter/${req.params.id} not found`)
