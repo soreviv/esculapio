@@ -54,6 +54,7 @@ export interface IStorage {
   
   // Appointments
   getAppointments(): Promise<Appointment[]>;
+  getAppointment(id: string): Promise<Appointment | undefined>;
   getAppointmentsByPatient(patientId: string): Promise<Appointment[]>;
   getAppointmentsByDate(fecha: string): Promise<Appointment[]>;
   getAppointmentsWithDetails(): Promise<AppointmentWithDetails[]>;
@@ -245,6 +246,11 @@ export class DatabaseStorage implements IStorage {
   // Appointments
   async getAppointments(): Promise<Appointment[]> {
     return db.select().from(appointments).orderBy(desc(appointments.fecha));
+  }
+
+  async getAppointment(id: string): Promise<Appointment | undefined> {
+    const [result] = await db.select().from(appointments).where(eq(appointments.id, id));
+    return result;
   }
 
   async getAppointmentsByPatient(patientId: string): Promise<Appointment[]> {
