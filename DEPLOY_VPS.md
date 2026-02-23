@@ -134,6 +134,8 @@ set +a
 
 ## 🗄️ Paso 6: Migrar Base de Datos y Crear Admin
 
+Asegúrate de haber cargado las variables del `.env` (paso anterior).
+
 ```bash
 # Ejecutar migraciones de Drizzle
 npm run db:push
