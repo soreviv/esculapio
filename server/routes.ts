@@ -674,6 +674,8 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Note not found" });
       }
 
+      if (existingNote.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No tiene permiso para modificar esta nota médica." });
       // Solo el autor puede modificar la nota
       if (existingNote.medicoId !== req.session.userId) {
         return res.status(403).json({ error: "Solo el autor puede modificar la nota" });
