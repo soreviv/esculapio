@@ -12,7 +12,7 @@ import {
   insertPatientConsentSchema
 } from "@shared/schema";
 import { createHash } from "crypto";
-import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isEnfermeria, isMedicoOrEnfermeria } from "./auth";
+import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isMedicoOrEnfermeria } from "./auth";
 
 /**
  * Registra y configura todos los endpoints REST bajo /api en la aplicación Express proporcionada.
