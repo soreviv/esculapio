@@ -13,6 +13,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import "./auth";
 import fhirRouter from "./fhir-routes";
+import { isSensitivePath, redactSensitiveData } from "./logging-utils";
 
 // Structured logging with Pino
 const logger = pino({
