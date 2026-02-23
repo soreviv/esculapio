@@ -1,41 +1,25 @@
-# MediRecord - Expediente Clínico Electrónico
+# Salud Digital - SEO & Documentación
 
-## Estado: Listo para Despliegue
+## Estado: Actualización de Documentación y SEO
 
 ### Problema Original
-Revisión de preparación para despliegue: vulnerabilidades npm audit, versiones deprecadas, validación funcional.
+Actualiza el README.md y crea/actualiza el sitemap.xml con la URL base de https://www.viveros.click.
 
 ### Arquitectura
-- **Frontend**: React 18.3.1 + TypeScript + Tailwind CSS + Vite
-- **Backend**: Express.js + TypeScript + Drizzle ORM
-- **Base de datos**: PostgreSQL
-- **Autenticación**: Passport.js con sesiones
+- **Frontend**: React + Vite (carpeta /client)
+- **Backend**: Express + TypeScript (carpeta /server)
+- **SEO estático**: sitemap.xml y robots.txt en /client/public
 
-### Implementado (2026-02-08)
-- [x] Corrección de vulnerabilidades esbuild (de 5 a 0 vulnerabilidades)
-- [x] Actualización de paquetes: @types/node@22, vite@6.4.1, esbuild@0.25+
-- [x] Agregado @testing-library/dom (dependencia faltante)
-- [x] Corrección de errores TypeScript en server/index.ts
-- [x] Configuración de yarn resolutions para esbuild seguro
-- [x] Build de producción verificado
-- [x] 56 tests unitarios pasando
+### Implementado
+- README actualizado (imagen corregida, puertos de desarrollo y sección SEO con dominio real)
+- sitemap.xml actualizado con dominio https://www.viveros.click y rutas públicas
+- robots.txt actualizado para apuntar al nuevo sitemap
 
-### Checklist Despliegue
-- [x] 0 vulnerabilidades npm/yarn audit
-- [x] TypeScript compila sin errores
-- [x] Build producción genera dist/index.cjs
-- [x] Servidor arranca en puerto 5000
-- [x] Swagger API docs funcionando (/api-docs)
-- [ ] Configurar DATABASE_URL en producción
-- [ ] Configurar SESSION_SECRET seguro (min 64 chars)
-- [ ] Certificado SSL (Let's Encrypt)
+### Backlog P0
+- Validar si hay rutas públicas adicionales que deban agregarse al sitemap
 
 ### Backlog P1
-- Actualizar date-fns 3.x -> 4.x (breaking change)
-- Actualizar @hookform/resolvers 3.x -> 5.x
-- Evaluar migración a React 19
+- Automatizar la generación del sitemap en build/CI para evitar desactualización de fechas
 
 ### Backlog P2
-- Code splitting para reducir bundle size (>500KB)
-- Actualizar framer-motion a v12
-- Actualizar express 4.x -> 5.x
+- Añadir verificación automatizada de robots.txt y sitemap en pruebas

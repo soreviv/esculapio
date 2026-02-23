@@ -1,6 +1,6 @@
 # Salud Digital - Expediente Clínico Electrónico
 
-![Salud Digital](httpshttps://i.imgur.com/example.png) 
+![Salud Digital](https://i.imgur.com/example.png) 
 
 **Salud Digital** es una plataforma de software como servicio (SaaS) para la gestión de expedientes clínicos electrónicos, diseñada para cumplir con la normativa mexicana **NOM-024-SSA3-2012**. Ofrece una solución integral para profesionales de la salud, permitiendo una administración eficiente, segura y conforme a la ley de la información de los pacientes.
 
@@ -79,8 +79,8 @@ Para ejecutar el proyecto en un entorno de desarrollo local, sigue estos pasos:
     ```bash
     npm run dev
     ```
-    - El **frontend** estará disponible en `http://localhost:5173`.
-    - El **backend** estará disponible en `http://localhost:3000`.
+    - La **aplicación** estará disponible en `http://localhost:3000`.
+    - La **API** estará disponible en `http://localhost:3000/api`.
 
 ## 🔐 Seguridad y Cumplimiento Normativo
 
@@ -98,8 +98,8 @@ La plataforma ha sido desarrollada teniendo en cuenta los estrictos requisitos d
 
 El proyecto incluye configuración optimizada para motores de búsqueda:
 
-- **sitemap.xml**: Mapa del sitio con todas las rutas públicas de la aplicación (`client/public/sitemap.xml`)
-- **robots.txt**: Control de indexación y directrices para web crawlers (`client/public/robots.txt`)
+- **sitemap.xml**: Mapa del sitio con rutas públicas (`client/public/sitemap.xml`, accesible en `https://www.viveros.click/sitemap.xml`)
+- **robots.txt**: Control de indexación (`client/public/robots.txt`, referencia al sitemap de `https://www.viveros.click/sitemap.xml`)
 - **Meta tags**: Configuración de metadatos para redes sociales y SEO
 - **URLs semánticas**: Rutas descriptivas y amigables para usuarios y buscadores
 

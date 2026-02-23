@@ -16,4 +16,7 @@ vite.config.ts.*
 # Environment files
 *.env
 *.env.*
-*.log
+*.log-e 
+# Environment files
+*.env
+*.env.*
