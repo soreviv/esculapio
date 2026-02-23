@@ -616,28 +616,6 @@ export async function registerRoutes(
     }
   });
 
-  /**
-   * @swagger
-   * /notes:
-   *   get:
-   *     tags: [Medical Notes]
-   *     summary: Listar todas las notas médicas
-   *     description: Obtiene todas las notas médicas con detalles del médico y del paciente.
-   *     security:
-   *       - sessionAuth: []
-   *     responses:
-   *       200:
-   *         description: Lista de notas médicas
-   */
-  app.get("/api/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
-    try {
-      const notes = await storage.getAllMedicalNotesWithDetails();
-      res.json(notes);
-    } catch (error) {
-      res.status(500).json({ error: "Error fetching notes" });
-    }
-  });
-
   app.get("/api/notes/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const note = await storage.getMedicalNote(req.params.id);
@@ -754,10 +732,14 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
+
+      // Enforce the current user as the one who registered the vitals
+      parsed.data.registradoPorId = req.session.userId!;
+
       const vitals = await storage.createVitals(parsed.data);
       
       await storage.createAuditLog({
-        userId: req.session.userId || parsed.data.registradoPorId || null,
+        userId: req.session.userId,
         accion: "crear",
         entidad: "vitals",
         entidadId: vitals.id,
@@ -889,7 +871,7 @@ export async function registerRoutes(
       const appointment = await storage.createAppointment(parsed.data);
       
       await storage.createAuditLog({
-        userId: req.session.userId || parsed.data.medicoId,
+        userId: req.session.userId,
         accion: "crear",
         entidad: "appointments",
         entidadId: appointment.id,
@@ -913,7 +895,7 @@ export async function registerRoutes(
       }
       
       await storage.createAuditLog({
-        userId: req.session.userId || req.body.updatedBy || appointment.medicoId,
+        userId: req.session.userId,
         accion: "actualizar",
         entidad: "appointments",
         entidadId: appointment.id,
@@ -1097,10 +1079,32 @@ export async function registerRoutes(
 
   app.patch("/api/lab-orders/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
+      const existingOrder = await storage.getLabOrder(req.params.id);
+      if (!existingOrder) {
+        return res.status(404).json({ error: "Lab order not found" });
+      }
+
+      // Solo el médico que creó la orden puede modificarla
+      if (existingOrder.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "Solo el médico que creó la orden puede modificarla" });
+      }
+
       const order = await storage.updateLabOrder(req.params.id, req.body);
       if (!order) {
         return res.status(404).json({ error: "Lab order not found" });
       }
+
+      await storage.createAuditLog({
+        userId: req.session.userId,
+        accion: "actualizar",
+        entidad: "lab_order",
+        entidadId: order.id,
+        detalles: JSON.stringify({ campos: Object.keys(req.body) }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
       res.json(order);
     } catch (error) {
       res.status(500).json({ error: "Error updating lab order" });

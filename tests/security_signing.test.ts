@@ -143,5 +143,34 @@ describe("Security - Access Control", () => {
         userId: "user-1"
       }));
     });
+
+    it("should use session userId for vitals registration", async () => {
+      (storage.createVitals as any).mockResolvedValue({ id: "v1", patientId: "p1" });
+
+      await request(app)
+        .post("/api/vitals")
+        .send({ registradoPorId: "attacker-id", patientId: "p1", frecuenciaCardiaca: 80 });
+
+      expect(storage.createVitals).toHaveBeenCalledWith(expect.objectContaining({
+        registradoPorId: "user-1"
+      }));
+    });
+  });
+
+  describe("Lab Order Modification", () => {
+    it("should reject if a different doctor tries to update a lab order", async () => {
+      const orderId = "order-123";
+      (storage.getLabOrder as any).mockResolvedValue({
+        id: orderId,
+        medicoId: "user-2"
+      });
+
+      const res = await request(app)
+        .patch(`/api/lab-orders/${orderId}`)
+        .send({ estudios: ["Modified"] });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("médico que creó la orden");
+    });
   });
 });
