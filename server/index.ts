@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import crypto from "crypto";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import helmet from "helmet";
@@ -120,9 +121,17 @@ app.use(express.urlencoded({ extended: false }));
 
 const PgSession = connectPgSimple(session);
 
-const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret && process.env.NODE_ENV === "production") {
-  throw new Error("SESSION_SECRET environment variable is required in production");
+// Determine session secret
+let sessionSecret = process.env.SESSION_SECRET;
+
+if (!sessionSecret) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET environment variable is required in production");
+  } else {
+    // Generate a secure random secret for development
+    sessionSecret = crypto.randomBytes(64).toString("hex");
+    logger.warn("No SESSION_SECRET provided in development. Generated a temporary random secret. Sessions will be invalidated on restart.");
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -132,7 +141,7 @@ app.use(
       conString: process.env.DATABASE_URL,
       createTableIfMissing: true,
     }),
-    secret: sessionSecret || "medirecord-dev-secret-change-in-production",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -274,10 +283,6 @@ app.use((req, res, next) => {
     // Environment validation
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL environment variable is required");
-    }
-
-    if (!process.env.SESSION_SECRET && process.env.NODE_ENV === "production") {
-      throw new Error("SESSION_SECRET environment variable is required in production");
     }
 
     log("Starting server initialization...");
