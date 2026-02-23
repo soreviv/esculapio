@@ -11,7 +11,7 @@ Disallow: /pacientes/*/
 Disallow: /configuracion
 
 # Sitemap
-Sitemap: https://www.viveros.click/sitemap.xml
+Sitemap: https://salud-digital.com/sitemap.xml
 
 # Rastreo optimizado
 Crawl-delay: 10
