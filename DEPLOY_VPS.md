@@ -122,6 +122,14 @@ EOF
 openssl rand -hex 32
 ```
 
+**Importante:** el proyecto no carga `.env` automáticamente. Antes de migrar, crear el admin o iniciar PM2, exporta las variables en tu sesión:
+
+```bash
+set -a
+source .env
+set +a
+```
+
 ---
 
 ## 🗄️ Paso 6: Migrar Base de Datos y Crear Admin
