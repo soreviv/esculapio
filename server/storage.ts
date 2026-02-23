@@ -504,75 +504,77 @@ export class DatabaseStorage implements IStorage {
   async getDashboardMetrics(): Promise<DashboardMetrics> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Total patients
-    const [totalPacientesResult] = await db.select({ count: sql<number>`count(*)` }).from(patients);
-    const totalPacientes = Number(totalPacientesResult?.count || 0);
-
-    // Active patients
-    const [pacientesActivosResult] = await db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo'));
-    const pacientesActivos = Number(pacientesActivosResult?.count || 0);
-
-    // Today's appointments
-    const [citasHoyResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
-      .where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`);
-    const citasHoy = Number(citasHoyResult?.count || 0);
-
-    // Pending appointments
-    const [citasPendientesResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
-      .where(eq(appointments.status, 'pendiente'));
-    const citasPendientes = Number(citasPendientesResult?.count || 0);
-
-    // Completed appointments
-    const [citasCompletadasResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
-      .where(eq(appointments.status, 'completada'));
-    const citasCompletadas = Number(citasCompletadasResult?.count || 0);
-
-    // Today's medical notes
-    const [notasMedicasHoyResult] = await db.select({ count: sql<number>`count(*)` }).from(medicalNotes)
-      .where(sql`DATE(${medicalNotes.fecha}) = DATE(${today.toISOString()})`);
-    const notasMedicasHoy = Number(notasMedicasHoyResult?.count || 0);
-
-    // Active prescriptions
-    const [prescripcionesActivasResult] = await db.select({ count: sql<number>`count(*)` }).from(prescriptions)
-      .where(eq(prescriptions.status, 'activa'));
-    const prescripcionesActivas = Number(prescripcionesActivasResult?.count || 0);
-
-    // Appointments by day (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const citasPorDiaResult = await db.select({
-      fecha: sql<string>`DATE(${appointments.fecha})::text`,
-      total: sql<number>`count(*)`
-    }).from(appointments)
-      .where(sql`${appointments.fecha} >= ${sevenDaysAgo.toISOString()}`)
-      .groupBy(sql`DATE(${appointments.fecha})`)
-      .orderBy(sql`DATE(${appointments.fecha})`);
-    
-    const citasPorDia = citasPorDiaResult.map(r => ({ fecha: r.fecha, total: Number(r.total) }));
 
-    // Appointments by status
-    const citasPorEstadoResult = await db.select({
-      estado: appointments.status,
-      total: sql<number>`count(*)`
-    }).from(appointments)
-      .groupBy(appointments.status);
-    
-    const citasPorEstado = citasPorEstadoResult.map(r => ({ estado: r.estado, total: Number(r.total) }));
-
-    // Patients by month (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const pacientesPorMesResult = await db.select({
-      mes: sql<string>`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`,
-      total: sql<number>`count(*)`
-    }).from(patients)
-      .where(sql`${patients.createdAt} >= ${sixMonthsAgo.toISOString()}`)
-      .groupBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`)
-      .orderBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`);
-    
+
+    const [
+      totalPacientesResult,
+      pacientesActivosResult,
+      citasHoyResult,
+      citasPendientesResult,
+      citasCompletadasResult,
+      notasMedicasHoyResult,
+      prescripcionesActivasResult,
+      citasPorDiaResult,
+      citasPorEstadoResult,
+      pacientesPorMesResult
+    ] = await Promise.all([
+      // Total patients
+      db.select({ count: sql<number>`count(*)` }).from(patients),
+      // Active patients
+      db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo')),
+      // Today's appointments
+      db.select({ count: sql<number>`count(*)` }).from(appointments)
+        .where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`),
+      // Pending appointments
+      db.select({ count: sql<number>`count(*)` }).from(appointments)
+        .where(eq(appointments.status, 'pendiente')),
+      // Completed appointments
+      db.select({ count: sql<number>`count(*)` }).from(appointments)
+        .where(eq(appointments.status, 'completada')),
+      // Today's medical notes
+      db.select({ count: sql<number>`count(*)` }).from(medicalNotes)
+        .where(sql`DATE(${medicalNotes.fecha}) = DATE(${today.toISOString()})`),
+      // Active prescriptions
+      db.select({ count: sql<number>`count(*)` }).from(prescriptions)
+        .where(eq(prescriptions.status, 'activa')),
+      // Appointments by day (last 7 days)
+      db.select({
+        fecha: sql<string>`DATE(${appointments.fecha})::text`,
+        total: sql<number>`count(*)`
+      }).from(appointments)
+        .where(sql`${appointments.fecha} >= ${sevenDaysAgo.toISOString()}`)
+        .groupBy(sql`DATE(${appointments.fecha})`)
+        .orderBy(sql`DATE(${appointments.fecha})`),
+      // Appointments by status
+      db.select({
+        estado: appointments.status,
+        total: sql<number>`count(*)`
+      }).from(appointments)
+        .groupBy(appointments.status),
+      // Patients by month (last 6 months)
+      db.select({
+        mes: sql<string>`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`,
+        total: sql<number>`count(*)`
+      }).from(patients)
+        .where(sql`${patients.createdAt} >= ${sixMonthsAgo.toISOString()}`)
+        .groupBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`)
+        .orderBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`)
+    ]);
+
+    const totalPacientes = Number(totalPacientesResult[0]?.count || 0);
+    const pacientesActivos = Number(pacientesActivosResult[0]?.count || 0);
+    const citasHoy = Number(citasHoyResult[0]?.count || 0);
+    const citasPendientes = Number(citasPendientesResult[0]?.count || 0);
+    const citasCompletadas = Number(citasCompletadasResult[0]?.count || 0);
+    const notasMedicasHoy = Number(notasMedicasHoyResult[0]?.count || 0);
+    const prescripcionesActivas = Number(prescripcionesActivasResult[0]?.count || 0);
+    const citasPorDia = citasPorDiaResult.map(r => ({ fecha: r.fecha, total: Number(r.total) }));
+    const citasPorEstado = citasPorEstadoResult.map(r => ({ estado: r.estado, total: Number(r.total) }));
     const pacientesPorMes = pacientesPorMesResult.map(r => ({ mes: r.mes, total: Number(r.total) }));
 
     return {
