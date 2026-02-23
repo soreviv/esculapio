@@ -70,7 +70,7 @@ script/build.ts      # Custom esbuild + Vite build script
 
 - Session-based auth with express-session (PostgreSQL session store in production)
 - Roles: `medico` (doctor), `enfermeria` (nurse), `admin`
-- Middleware: `isAuthenticated()`, `isAdmin()`, `isMedico()`, `isEnfermeria()`, `isMedicoOrEnfermeria()`
+- Middleware: `isAuthenticated()`, `isAdmin()`, `isMedico()`, `isMedicoOrEnfermeria()`
 - Passwords: bcrypt with 12 salt rounds, zxcvbn strength validation (minimum score 3)
 
 ## API Conventions
