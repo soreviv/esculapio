@@ -55,6 +55,7 @@ export interface IStorage {
   
   // Appointments
   getAppointments(): Promise<Appointment[]>;
+  getAppointment(id: string): Promise<Appointment | undefined>;
   getAppointmentsByPatient(patientId: string): Promise<Appointment[]>;
   getAppointmentsByDate(fecha: string): Promise<Appointment[]>;
   getAppointmentsWithDetails(): Promise<AppointmentWithDetails[]>;
@@ -251,6 +252,16 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(appointments).orderBy(desc(appointments.fecha));
   }
 
+  async getAppointment(id: string): Promise<Appointment | undefined> {
+<<<<<<< fix/appointment-access-control-3466864484586155926
+    const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
+    return appointment;
+=======
+    const [result] = await db.select().from(appointments).where(eq(appointments.id, id));
+    return result;
+>>>>>>> main
+  }
+
   async getAppointmentsByPatient(patientId: string): Promise<Appointment[]> {
     return db.select().from(appointments)
       .where(eq(appointments.patientId, patientId))
@@ -348,6 +359,34 @@ export class DatabaseStorage implements IStorage {
       ...r.medical_notes,
       medicoNombre: r.users?.nombre || "Médico",
       medicoEspecialidad: r.users?.especialidad || null,
+    }));
+  }
+
+  async getAllMedicalNotesWithDetails(): Promise<MedicalNoteWithPatientDetails[]> {
+    const result = await db
+      .select()
+      .select({
+        medical_notes: medicalNotes,
+        medicoNombre: users.nombre,
+        medicoEspecialidad: users.especialidad,
+        patientNombre: patients.nombre,
+        patientApellido: patients.apellidoPaterno,
+      })
+      .from(medicalNotes)
+      .leftJoin(users, eq(medicalNotes.medicoId, users.id))
+      .leftJoin(patients, eq(medicalNotes.patientId, patients.id))
+      .orderBy(desc(medicalNotes.fecha));
+
+    return result.map(r => ({
+      ...r.medical_notes,
+      medicoNombre: r.users?.nombre || "Médico",
+      medicoEspecialidad: r.users?.especialidad || null,
+      patientNombre: r.patients?.nombre || "Paciente",
+      patientApellido: r.patients?.apellidoPaterno || "",
+      medicoNombre: r.medicoNombre || "Médico",
+      medicoEspecialidad: r.medicoEspecialidad || null,
+      patientNombre: r.patientNombre || "Paciente",
+      patientApellido: r.patientApellido || "",
     }));
   }
 

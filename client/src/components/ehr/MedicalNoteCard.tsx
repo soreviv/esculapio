@@ -6,7 +6,7 @@ import { FileText, CheckCircle, Clock, Eye } from "lucide-react";
 
 export interface MedicalNoteCardProps {
   id: string;
-  tipo: "historia_clinica" | "nota_evolucion" | "nota_egreso" | "interconsulta";
+  tipo: string;
   fecha: string;
   hora: string;
   medicoNombre: string;
@@ -17,11 +17,18 @@ export interface MedicalNoteCardProps {
   onView?: () => void;
 }
 
-const tipoLabels = {
+const tipoLabels: Record<string, string> = {
   historia_clinica: "Historia Clínica",
+  nota_inicial: "Nota de Primera Vez",
   nota_evolucion: "Nota de Evolución",
+  nota_interconsulta: "Interconsulta",
+  nota_referencia: "Nota de Referencia",
+  nota_ingreso: "Nota de Ingreso",
+  nota_preoperatoria: "Nota Preoperatoria",
+  nota_postoperatoria: "Nota Postoperatoria",
+  nota_preanestesica: "Nota Preanestésica",
   nota_egreso: "Nota de Egreso",
-  interconsulta: "Interconsulta",
+  interconsulta: "Interconsulta", // Backward compatibility
 };
 
 export function MedicalNoteCard({
@@ -45,7 +52,7 @@ export function MedicalNoteCard({
             </div>
             <div>
               <CardTitle className="text-base font-medium">
-                {tipoLabels[tipo]}
+                {tipoLabels[tipo] || tipo.replace(/_/g, ' ')}
               </CardTitle>
               <p className="text-xs text-muted-foreground">
                 {fecha} - {hora}

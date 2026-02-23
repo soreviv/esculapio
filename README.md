@@ -1,6 +1,6 @@
 # Salud Digital - Expediente Clínico Electrónico
 
-![Salud Digital](httpshttps://i.imgur.com/example.png) 
+![Salud Digital](httpshttps://i.imgur.com/example.png)
 
 **Salud Digital** es una plataforma de software como servicio (SaaS) para la gestión de expedientes clínicos electrónicos, diseñada para cumplir con la normativa mexicana **NOM-024-SSA3-2012**. Ofrece una solución integral para profesionales de la salud, permitiendo una administración eficiente, segura y conforme a la ley de la información de los pacientes.
 
