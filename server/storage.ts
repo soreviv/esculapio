@@ -5,7 +5,7 @@ import {
   type Vitals, type InsertVitals,
   type Prescription, type InsertPrescription,
   type Appointment, type InsertAppointment,
-  type AppointmentWithDetails, type MedicalNoteWithDetails, type PrescriptionWithDetails,
+  type AppointmentWithDetails, type MedicalNoteWithDetails, type MedicalNoteWithPatientDetails, type PrescriptionWithDetails,
   type AuditLog, type InsertAuditLog,
   type Cie10, type InsertCie10,
   type PatientConsent, type InsertPatientConsent,
@@ -64,6 +64,7 @@ export interface IStorage {
   
   // Enriched Medical Notes
   getMedicalNotesWithDetails(patientId: string): Promise<MedicalNoteWithDetails[]>;
+  getAllMedicalNotesWithDetails(): Promise<MedicalNoteWithPatientDetails[]>;
   
   // Enriched Prescriptions
   getPrescriptionsWithDetails(patientId: string): Promise<PrescriptionWithDetails[]>;
@@ -348,6 +349,29 @@ export class DatabaseStorage implements IStorage {
       ...r.medical_notes,
       medicoNombre: r.users?.nombre || "Médico",
       medicoEspecialidad: r.users?.especialidad || null,
+    }));
+  }
+
+  async getAllMedicalNotesWithDetails(): Promise<MedicalNoteWithPatientDetails[]> {
+    const result = await db
+      .select({
+        medical_notes: medicalNotes,
+        medicoNombre: users.nombre,
+        medicoEspecialidad: users.especialidad,
+        patientNombre: patients.nombre,
+        patientApellido: patients.apellidoPaterno,
+      })
+      .from(medicalNotes)
+      .leftJoin(users, eq(medicalNotes.medicoId, users.id))
+      .leftJoin(patients, eq(medicalNotes.patientId, patients.id))
+      .orderBy(desc(medicalNotes.fecha));
+
+    return result.map(r => ({
+      ...r.medical_notes,
+      medicoNombre: r.medicoNombre || "Médico",
+      medicoEspecialidad: r.medicoEspecialidad || null,
+      patientNombre: r.patientNombre || "Paciente",
+      patientApellido: r.patientApellido || "",
     }));
   }
 
