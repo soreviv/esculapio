@@ -1,25 +1,26 @@
-# Salud Digital - SEO & Documentación
+# Salud Digital - Guía de Deploy VPS
 
-## Estado: Actualización de Documentación y SEO
+## Estado: Documentación revisada
 
 ### Problema Original
-Actualiza el README.md y crea/actualiza el sitemap.xml con la URL base de https://www.viveros.click.
+Revisar DEPLOY_VPS.md, corregir errores y asegurar que las instrucciones de despliegue sean adecuadas.
 
 ### Arquitectura
-- **Frontend**: React + Vite (carpeta /client)
-- **Backend**: Express + TypeScript (carpeta /server)
-- **SEO estático**: sitemap.xml y robots.txt en /client/public
+- **App**: Node.js + Express + TypeScript (cliente integrado con Vite build)
+- **DB**: PostgreSQL
+- **Infra**: PM2 + Nginx + Let's Encrypt
+- **Variables**: requeridas vía entorno (no carga automática de .env)
 
 ### Implementado
-- README actualizado (imagen corregida, puertos de desarrollo y sección SEO con dominio real)
-- sitemap.xml actualizado con dominio https://www.viveros.click y rutas públicas
-- robots.txt actualizado para apuntar al nuevo sitemap
+- Aclarado que el proyecto no carga `.env` automáticamente
+- Añadidos pasos para exportar variables antes de migraciones/seed/PM2
+- PM2 inicia con `--update-env` para conservar variables cargadas
 
 ### Backlog P0
-- Validar si hay rutas públicas adicionales que deban agregarse al sitemap
+- Validar si se desea usar `ecosystem.config.cjs` con variables explícitas
 
 ### Backlog P1
-- Automatizar la generación del sitemap en build/CI para evitar desactualización de fechas
+- Agregar nota sobre persistencia de variables al reiniciar el servidor
 
 ### Backlog P2
-- Añadir verificación automatizada de robots.txt y sitemap en pruebas
+- Incluir sección de rotación de logs y backups automatizados
