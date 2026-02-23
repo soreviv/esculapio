@@ -253,13 +253,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAppointment(id: string): Promise<Appointment | undefined> {
-<<<<<<< fix/appointment-access-control-3466864484586155926
     const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
     return appointment;
-=======
     const [result] = await db.select().from(appointments).where(eq(appointments.id, id));
     return result;
->>>>>>> main
   }
 
   async getAppointmentsByPatient(patientId: string): Promise<Appointment[]> {
@@ -543,6 +540,13 @@ export class DatabaseStorage implements IStorage {
   async getDashboardMetrics(): Promise<DashboardMetrics> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -565,6 +569,26 @@ export class DatabaseStorage implements IStorage {
       citasPorEstadoResult,
       pacientesPorMesResult
     ] = await Promise.all([
+      // Total patients
+      db.select({ count: sql<number>`count(*)` }).from(patients),
+      // Active patients
+      db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo')),
+      // Today's appointments
+      db.select({ count: sql<number>`count(*)` }).from(appointments)
+        .where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`),
+      // Pending appointments
+      db.select({ count: sql<number>`count(*)` }).from(appointments)
+        .where(eq(appointments.status, 'pendiente')),
+      // Completed appointments
+      db.select({ count: sql<number>`count(*)` }).from(appointments)
+        .where(eq(appointments.status, 'completada')),
+      // Today's medical notes
+      db.select({ count: sql<number>`count(*)` }).from(medicalNotes)
+        .where(sql`DATE(${medicalNotes.fecha}) = DATE(${today.toISOString()})`),
+      // Active prescriptions
+      db.select({ count: sql<number>`count(*)` }).from(prescriptions)
+        .where(eq(prescriptions.status, 'activa')),
+      // Appointments by day (last 7 days)
       db.select({ count: sql<number>`count(*)` }).from(patients),
       db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo')),
       db.select({ count: sql<number>`count(*)` }).from(appointments).where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`),
@@ -579,11 +603,13 @@ export class DatabaseStorage implements IStorage {
         .where(sql`${appointments.fecha} >= ${sevenDaysAgo.toISOString()}`)
         .groupBy(sql`DATE(${appointments.fecha})`)
         .orderBy(sql`DATE(${appointments.fecha})`),
+      // Appointments by status
       db.select({
         estado: appointments.status,
         total: sql<number>`count(*)`
       }).from(appointments)
         .groupBy(appointments.status),
+      // Patients by month (last 6 months)
       db.select({
         mes: sql<string>`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`,
         total: sql<number>`count(*)`
