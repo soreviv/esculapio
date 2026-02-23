@@ -862,6 +862,16 @@ export async function registerRoutes(
 
   app.patch("/api/appointments/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
+      const existingAppointment = await storage.getAppointment(req.params.id);
+      if (!existingAppointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      // Check permissions: only admin, nurses, or the assigned doctor can update
+      if (req.session.role === "medico" && existingAppointment.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No tiene permiso para modificar esta cita." });
+      }
+
       const appointment = await storage.updateAppointment(req.params.id, req.body);
       if (!appointment) {
         return res.status(404).json({ error: "Appointment not found" });
