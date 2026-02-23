@@ -819,17 +819,31 @@ export async function registerRoutes(
 
   app.patch("/api/prescriptions/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const prescription = await storage.updatePrescription(req.params.id, req.body);
-      if (!prescription) {
+      const existingPrescription = await storage.getPrescription(req.params.id);
+      if (!existingPrescription) {
         return res.status(404).json({ error: "Prescription not found" });
       }
+
+      // NOM-004-SSA3-2012: Solo el autor puede modificar sus notas/recetas
+      if (existingPrescription.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No autorizado. Solo el médico autor puede modificar esta receta (NOM-004-SSA3-2012)." });
+      }
+
+      // Inmutabilidad de campos críticos (medicoId y patientId no deben cambiar)
+      const { medicoId, patientId, id, ...updateData } = req.body;
+
+      const prescription = await storage.updatePrescription(req.params.id, updateData);
       
+      if (!prescription) {
+        return res.status(404).json({ error: "Prescription not found during update" });
+      }
+
       await storage.createAuditLog({
-        userId: req.session.userId || req.body.updatedBy || prescription.medicoId,
+        userId: req.session.userId,
         accion: "actualizar",
         entidad: "prescriptions",
         entidadId: prescription.id,
-        detalles: JSON.stringify({ campos: Object.keys(req.body) }),
+        detalles: JSON.stringify({ campos: Object.keys(updateData) }),
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
