@@ -1052,6 +1052,15 @@ export async function registerRoutes(
 
   app.patch("/api/lab-orders/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
+      const existingOrder = await storage.getLabOrder(req.params.id);
+      if (!existingOrder) {
+        return res.status(404).json({ error: "Lab order not found" });
+      }
+
+      if (existingOrder.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No autorizado. Solo el médico que creó la orden puede modificarla." });
+      }
+
       const order = await storage.updateLabOrder(req.params.id, req.body);
       if (!order) {
         return res.status(404).json({ error: "Lab order not found" });
