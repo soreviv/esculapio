@@ -132,9 +132,18 @@
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
   },
+  "pnpm": {
+    "overrides": {
+      "esbuild": "^0.25.0"
+    }
   "overrides": {
     "@esbuild-kit/core-utils": {
       "esbuild": "$esbuild"
+    }
+  },
+  "pnpm": {
+    "overrides": {
+      "esbuild": "^0.25.0"
     }
     },
     "esbuild": "^0.25.0"

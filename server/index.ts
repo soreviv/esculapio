@@ -13,6 +13,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import "./auth";
 import fhirRouter from "./fhir-routes";
+import { isSensitivePath, redactSensitiveData } from "./logging-utils";
 
 // Structured logging with Pino
 const logger = pino({
@@ -175,7 +176,7 @@ const SENSITIVE_PATHS = [
   "/fhir",
 ];
 
-function isSensitivePath(path: string): boolean {
+export function isSensitivePath(path: string): boolean {
   return SENSITIVE_PATHS.some(p => path.startsWith(p));
 }
 
@@ -210,7 +211,7 @@ function isSensitiveField(fieldName: string): boolean {
   return SENSITIVE_FIELD_PATTERNS.some(pattern => pattern.test(fieldName));
 }
 
-function redactSensitiveData(data: any, depth: number = 0): any {
+export function redactSensitiveData(data: any, depth: number = 0): any {
   if (depth > 10) return "[MAX_DEPTH]";
   if (data === null || data === undefined) return data;
   if (typeof data !== "object") return data;
@@ -251,17 +252,13 @@ app.use((req, res, next) => {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       
       if (capturedJsonResponse) {
-        if (process.env.NODE_ENV === "production") {
-          if (isSensitivePath(path)) {
-            const count = Array.isArray(capturedJsonResponse) 
-              ? capturedJsonResponse.length 
-              : 1;
-            logLine += ` :: [${count} record(s)]`;
-          } else {
-            logLine += ` :: ${JSON.stringify(redactSensitiveData(capturedJsonResponse))}`;
-          }
+        if (process.env.NODE_ENV === "production" && isSensitivePath(path)) {
+          const count = Array.isArray(capturedJsonResponse)
+            ? capturedJsonResponse.length
+            : 1;
+          logLine += ` :: [${count} record(s)]`;
         } else {
-          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+          logLine += ` :: ${JSON.stringify(redactSensitiveData(capturedJsonResponse))}`;
         }
       }
 
