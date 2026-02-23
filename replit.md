@@ -103,7 +103,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Role-Based Access Control (RBAC)
 - **Roles**: admin, medico, enfermeria
-- **Middleware**: `isAuthenticated`, `isAdmin`, `isMedico`, `isEnfermeria`, `isMedicoOrEnfermeria`
+- **Middleware**: `isAuthenticated`, `isAdmin`, `isMedico`, `isMedicoOrEnfermeria`
 - **Route Protection**:
   - Patient CRUD: requires `isMedicoOrEnfermeria`
   - Medical Notes: read requires `isAuthenticated`, create/update requires `isMedico`
