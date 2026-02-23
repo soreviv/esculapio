@@ -134,5 +134,7 @@
     "@esbuild-kit/core-utils": {
       "esbuild": "$esbuild"
     }
+    },
+    "esbuild": "^0.25.0"
   }
 }
