@@ -349,6 +349,7 @@ export class DatabaseStorage implements IStorage {
 
   async getAllMedicalNotesWithDetails(): Promise<MedicalNoteWithPatientDetails[]> {
     const result = await db
+      .select()
       .select({
         medical_notes: medicalNotes,
         medicoNombre: users.nombre,
@@ -363,6 +364,10 @@ export class DatabaseStorage implements IStorage {
 
     return result.map(r => ({
       ...r.medical_notes,
+      medicoNombre: r.users?.nombre || "Médico",
+      medicoEspecialidad: r.users?.especialidad || null,
+      patientNombre: r.patients?.nombre || "Paciente",
+      patientApellido: r.patients?.apellidoPaterno || "",
       medicoNombre: r.medicoNombre || "Médico",
       medicoEspecialidad: r.medicoEspecialidad || null,
       patientNombre: r.patientNombre || "Paciente",

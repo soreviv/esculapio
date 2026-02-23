@@ -607,6 +607,15 @@ export async function registerRoutes(
   });
 
   // Medical Notes (Protected - staff can read, doctors can write)
+  app.get("/api/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const notes = await storage.getAllMedicalNotesWithDetails();
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching notes" });
+    }
+  });
+
   app.get("/api/patients/:patientId/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const notes = await storage.getMedicalNotesWithDetails(req.params.patientId);
