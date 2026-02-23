@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import crypto from "crypto";
 import session from "express-session";
 import crypto from "crypto";
 import connectPgSimple from "connect-pg-simple";
@@ -14,6 +15,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import "./auth";
 import fhirRouter from "./fhir-routes";
+import { isSensitivePath, redactSensitiveData } from "./logging-utils";
 
 // Structured logging with Pino
 const logger = pino({
@@ -45,7 +47,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      scriptSrc: process.env.NODE_ENV === "production"
+        ? ["'self'", "'unsafe-inline'"]
+        : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
@@ -124,6 +128,17 @@ const sessionSecret = process.env.SESSION_SECRET || (process.env.NODE_ENV === "p
 
 if (!sessionSecret && process.env.NODE_ENV === "production") {
   throw new Error("SESSION_SECRET environment variable is required in production");
+// Determine session secret
+let sessionSecret = process.env.SESSION_SECRET;
+
+if (!sessionSecret) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET environment variable is required in production");
+  } else {
+    // Generate a secure random secret for development
+    sessionSecret = crypto.randomBytes(64).toString("hex");
+    logger.warn("No SESSION_SECRET provided in development. Generated a temporary random secret. Sessions will be invalidated on restart.");
+  }
 }
 
 if (!process.env.SESSION_SECRET && process.env.NODE_ENV !== "production") {
@@ -138,6 +153,7 @@ app.use(
       createTableIfMissing: true,
     }),
     secret: sessionSecret!,
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -181,7 +197,7 @@ const SENSITIVE_PATHS = [
   "/fhir",
 ];
 
-function isSensitivePath(path: string): boolean {
+export function isSensitivePath(path: string): boolean {
   return SENSITIVE_PATHS.some(p => path.startsWith(p));
 }
 
@@ -216,7 +232,7 @@ function isSensitiveField(fieldName: string): boolean {
   return SENSITIVE_FIELD_PATTERNS.some(pattern => pattern.test(fieldName));
 }
 
-function redactSensitiveData(data: any, depth: number = 0): any {
+export function redactSensitiveData(data: any, depth: number = 0): any {
   if (depth > 10) return "[MAX_DEPTH]";
   if (data === null || data === undefined) return data;
   if (typeof data !== "object") return data;
@@ -257,17 +273,13 @@ app.use((req, res, next) => {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       
       if (capturedJsonResponse) {
-        if (process.env.NODE_ENV === "production") {
-          if (isSensitivePath(path)) {
-            const count = Array.isArray(capturedJsonResponse) 
-              ? capturedJsonResponse.length 
-              : 1;
-            logLine += ` :: [${count} record(s)]`;
-          } else {
-            logLine += ` :: ${JSON.stringify(redactSensitiveData(capturedJsonResponse))}`;
-          }
+        if (process.env.NODE_ENV === "production" && isSensitivePath(path)) {
+          const count = Array.isArray(capturedJsonResponse)
+            ? capturedJsonResponse.length
+            : 1;
+          logLine += ` :: [${count} record(s)]`;
         } else {
-          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+          logLine += ` :: ${JSON.stringify(redactSensitiveData(capturedJsonResponse))}`;
         }
       }
 

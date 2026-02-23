@@ -68,14 +68,6 @@ export function isMedico(req: Request, res: Response, next: NextFunction) {
   return res.status(403).json({ error: "Acceso denegado. Se requieren permisos de médico." });
 }
 
-export function isEnfermeria(req: Request, res: Response, next: NextFunction) {
-  const role = req.session?.role;
-  if (role === "enfermeria" || role === "medico" || role === "admin") {
-    return next();
-  }
-  return res.status(403).json({ error: "Acceso denegado. Se requieren permisos de personal de salud." });
-}
-
 export function isMedicoOrEnfermeria(req: Request, res: Response, next: NextFunction) {
   const role = req.session?.role;
   if (role === "medico" || role === "enfermeria" || role === "admin") {
