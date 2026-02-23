@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isEnfermeria, isMedicoOrEnfermeria } from "../server/auth";
+import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isMedicoOrEnfermeria } from "../server/auth";
 import type { Request, Response, NextFunction } from "express";
 
 describe("Password Hashing", () => {
