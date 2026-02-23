@@ -13,6 +13,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import "./auth";
 import fhirRouter from "./fhir-routes";
+import { isSensitivePath, redactSensitiveData } from "./logging-utils";
 
 // Structured logging with Pino
 const logger = pino({
@@ -161,77 +162,6 @@ app.get("/api-docs.json", (_req, res) => {
 // HL7 FHIR R4 API Routes
 app.use("/fhir", fhirRouter);
 
-const SENSITIVE_PATHS = [
-  "/api/patients",
-  "/api/notes",
-  "/api/vitals",
-  "/api/prescriptions",
-  "/api/lab-orders",
-  "/api/consents",
-  "/api/appointments",
-  "/api/audit-logs",
-  "/fhir",
-];
-
-function isSensitivePath(path: string): boolean {
-  return SENSITIVE_PATHS.some(p => path.startsWith(p));
-}
-
-const SENSITIVE_FIELD_PATTERNS = [
-  /password/i,
-  /curp/i,
-  /telefono/i,
-  /direccion/i,
-  /email/i,
-  /diagnostico/i,
-  /plan$/i,
-  /subjetivo/i,
-  /objetivo/i,
-  /analisis/i,
-  /medicamento/i,
-  /indicaciones/i,
-  /estudios/i,
-  /observaciones/i,
-  /cedula/i,
-  /nombre/i,
-  /apellido/i,
-  /fechanacimiento/i,
-  /sexo/i,
-  /tiposangre/i,
-  /alergias/i,
-  /antecedentes/i,
-  /contactoemergencia/i,
-  /detalles/i,
-];
-
-function isSensitiveField(fieldName: string): boolean {
-  return SENSITIVE_FIELD_PATTERNS.some(pattern => pattern.test(fieldName));
-}
-
-function redactSensitiveData(data: any, depth: number = 0): any {
-  if (depth > 10) return "[MAX_DEPTH]";
-  if (data === null || data === undefined) return data;
-  if (typeof data !== "object") return data;
-  
-  if (Array.isArray(data)) {
-    return data.map(item => redactSensitiveData(item, depth + 1));
-  }
-  
-  const redacted: Record<string, any> = {};
-  
-  for (const key of Object.keys(data)) {
-    if (isSensitiveField(key)) {
-      redacted[key] = "[REDACTED]";
-    } else if (typeof data[key] === "object" && data[key] !== null) {
-      redacted[key] = redactSensitiveData(data[key], depth + 1);
-    } else {
-      redacted[key] = data[key];
-    }
-  }
-  
-  return redacted;
-}
-
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -249,17 +179,13 @@ app.use((req, res, next) => {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       
       if (capturedJsonResponse) {
-        if (process.env.NODE_ENV === "production") {
-          if (isSensitivePath(path)) {
-            const count = Array.isArray(capturedJsonResponse) 
-              ? capturedJsonResponse.length 
-              : 1;
-            logLine += ` :: [${count} record(s)]`;
-          } else {
-            logLine += ` :: ${JSON.stringify(redactSensitiveData(capturedJsonResponse))}`;
-          }
+        if (process.env.NODE_ENV === "production" && isSensitivePath(path)) {
+          const count = Array.isArray(capturedJsonResponse)
+            ? capturedJsonResponse.length
+            : 1;
+          logLine += ` :: [${count} record(s)]`;
         } else {
-          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+          logLine += ` :: ${JSON.stringify(redactSensitiveData(capturedJsonResponse))}`;
         }
       }
 
