@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import crypto from "crypto";
 import connectPgSimple from "connect-pg-simple";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -117,9 +118,16 @@ app.use(express.urlencoded({ extended: false }));
 
 const PgSession = connectPgSimple(session);
 
-const sessionSecret = process.env.SESSION_SECRET;
+const sessionSecret = process.env.SESSION_SECRET || (process.env.NODE_ENV === "production"
+  ? undefined
+  : crypto.randomBytes(32).toString("hex"));
+
 if (!sessionSecret && process.env.NODE_ENV === "production") {
   throw new Error("SESSION_SECRET environment variable is required in production");
+}
+
+if (!process.env.SESSION_SECRET && process.env.NODE_ENV !== "production") {
+  log("Warning: SESSION_SECRET is not set. Using a temporary secret for development. Sessions will not persist across restarts.");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,7 +137,7 @@ app.use(
       conString: process.env.DATABASE_URL,
       createTableIfMissing: true,
     }),
-    secret: sessionSecret || "medirecord-dev-secret-change-in-production",
+    secret: sessionSecret!,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -277,9 +285,6 @@ app.use((req, res, next) => {
       throw new Error("DATABASE_URL environment variable is required");
     }
 
-    if (!process.env.SESSION_SECRET && process.env.NODE_ENV === "production") {
-      throw new Error("SESSION_SECRET environment variable is required in production");
-    }
 
     log("Starting server initialization...");
 
