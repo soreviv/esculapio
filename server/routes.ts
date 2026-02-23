@@ -607,6 +607,15 @@ export async function registerRoutes(
   });
 
   // Medical Notes (Protected - staff can read, doctors can write)
+  app.get("/api/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const notes = await storage.getAllMedicalNotesWithDetails();
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Error fetching notes" });
+    }
+  });
+
   app.get("/api/patients/:patientId/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const notes = await storage.getMedicalNotesWithDetails(req.params.patientId);
@@ -819,13 +828,27 @@ export async function registerRoutes(
       if (!prescription) {
         return res.status(404).json({ error: "Prescription not found" });
       }
+
+      // NOM-004-SSA3-2012: Solo el autor puede modificar sus notas/recetas
+      if (existingPrescription.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No autorizado. Solo el médico autor puede modificar esta receta (NOM-004-SSA3-2012)." });
+      }
+
+      // Inmutabilidad de campos críticos (medicoId y patientId no deben cambiar)
+      const { medicoId, patientId, id, ...updateData } = req.body;
+
+      const prescription = await storage.updatePrescription(req.params.id, updateData);
       
+      if (!prescription) {
+        return res.status(404).json({ error: "Prescription not found during update" });
+      }
+
       await storage.createAuditLog({
         userId: req.session.userId,
         accion: "actualizar",
         entidad: "prescriptions",
         entidadId: prescription.id,
-        detalles: JSON.stringify({ campos: Object.keys(req.body) }),
+        detalles: JSON.stringify({ campos: Object.keys(updateData) }),
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
@@ -889,7 +912,25 @@ export async function registerRoutes(
 
   app.patch("/api/appointments/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const appointment = await storage.updateAppointment(req.params.id, req.body);
+      const existingAppointment = await storage.getAppointment(req.params.id);
+      if (!existingAppointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      if (req.session.role !== "admin" && existingAppointment.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No autorizado para actualizar esta cita." });
+      }
+
+      const parsed = insertAppointmentSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      if (Object.keys(parsed.data).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+
+      const appointment = await storage.updateAppointment(req.params.id, parsed.data);
       if (!appointment) {
         return res.status(404).json({ error: "Appointment not found" });
       }
@@ -899,7 +940,7 @@ export async function registerRoutes(
         accion: "actualizar",
         entidad: "appointments",
         entidadId: appointment.id,
-        detalles: JSON.stringify({ campos: Object.keys(req.body) }),
+        detalles: JSON.stringify({ campos: Object.keys(parsed.data) }),
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
@@ -1087,6 +1128,8 @@ export async function registerRoutes(
       // Solo el médico que creó la orden puede modificarla
       if (existingOrder.medicoId !== req.session.userId) {
         return res.status(403).json({ error: "Solo el médico que creó la orden puede modificarla" });
+      if (existingOrder.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No autorizado. Solo el médico que creó la orden puede modificarla." });
       }
 
       const order = await storage.updateLabOrder(req.params.id, req.body);
