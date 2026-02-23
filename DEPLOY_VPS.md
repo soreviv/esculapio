@@ -164,8 +164,13 @@ ls -la dist/
 # Instalar PM2 globalmente
 sudo npm install -g pm2
 
-# Iniciar la aplicación
-pm2 start dist/index.cjs --name "salud-digital" --env production
+# Cargar variables .env en esta sesión (si aún no lo hiciste)
+set -a
+source .env
+set +a
+
+# Iniciar la aplicación (PM2 guardará estas variables al hacer pm2 save)
+pm2 start dist/index.cjs --name "salud-digital" --env production --update-env
 
 # Configurar inicio automático
 pm2 startup systemd
