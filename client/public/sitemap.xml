@@ -6,80 +6,80 @@
 
   <!-- Página Principal / Dashboard -->
   <url>
-    <loc>https://www.viveros.click/</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
 
   <!-- Gestión de Pacientes -->
   <url>
-    <loc>https://www.viveros.click/pacientes</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/pacientes</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <!-- Expedientes Clínicos -->
   <url>
-    <loc>https://www.viveros.click/expedientes</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/expedientes</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <!-- Sistema de Citas -->
   <url>
-    <loc>https://www.viveros.click/citas</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/citas</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
 
   <!-- Laboratorio -->
   <url>
-    <loc>https://www.viveros.click/laboratorio</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/laboratorio</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <!-- Recetas Médicas -->
   <url>
-    <loc>https://www.viveros.click/recetas</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/recetas</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
 
   <!-- Signos Vitales -->
   <url>
-    <loc>https://www.viveros.click/signos-vitales</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/signos-vitales</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
 
   <!-- Aviso de Privacidad -->
   <url>
-    <loc>https://www.viveros.click/aviso-privacidad</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/aviso-privacidad</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <!-- Ayuda -->
   <url>
-    <loc>https://www.viveros.click/ayuda</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/ayuda</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <!-- Configuración -->
   <url>
-    <loc>https://www.viveros.click/configuracion</loc>
-    <lastmod>2026-02-08</lastmod>
+    <loc>https://salud-digital.com/configuracion</loc>
+    <lastmod>2025-12-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>

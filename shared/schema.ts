@@ -326,11 +326,6 @@ export type MedicalNoteWithDetails = MedicalNote & {
   medicoEspecialidad?: string | null;
 };
 
-export type MedicalNoteWithPatientDetails = MedicalNoteWithDetails & {
-  patientNombre: string;
-  patientApellido: string;
-};
-
 export type PrescriptionWithDetails = Prescription & {
   medicoNombre: string;
 };

@@ -5,7 +5,7 @@ import {
   type Vitals, type InsertVitals,
   type Prescription, type InsertPrescription,
   type Appointment, type InsertAppointment,
-  type AppointmentWithDetails, type MedicalNoteWithDetails, type MedicalNoteWithPatientDetails, type PrescriptionWithDetails,
+  type AppointmentWithDetails, type MedicalNoteWithDetails, type PrescriptionWithDetails,
   type AuditLog, type InsertAuditLog,
   type Cie10, type InsertCie10,
   type PatientConsent, type InsertPatientConsent,
@@ -37,6 +37,7 @@ export interface IStorage {
   getMedicalNote(id: string): Promise<MedicalNote | undefined>;
   createMedicalNote(note: InsertMedicalNote): Promise<MedicalNote>;
   updateMedicalNote(id: string, note: Partial<InsertMedicalNote>): Promise<MedicalNote | undefined>;
+  getNote(id: string): Promise<MedicalNote | undefined>;
   
   // Vitals
   getAllVitals(): Promise<Vitals[]>;
@@ -64,7 +65,6 @@ export interface IStorage {
   
   // Enriched Medical Notes
   getMedicalNotesWithDetails(patientId: string): Promise<MedicalNoteWithDetails[]>;
-  getAllMedicalNotesWithDetails(): Promise<MedicalNoteWithPatientDetails[]>;
   
   // Enriched Prescriptions
   getPrescriptionsWithDetails(patientId: string): Promise<PrescriptionWithDetails[]>;
@@ -178,6 +178,10 @@ export class DatabaseStorage implements IStorage {
     return note;
   }
 
+  async getNote(id: string): Promise<MedicalNote | undefined> {
+    return this.getMedicalNote(id);
+  }
+
   async createMedicalNote(note: InsertMedicalNote): Promise<MedicalNote> {
     const [newNote] = await db.insert(medicalNotes).values(note).returning();
     return newNote;
@@ -249,6 +253,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAppointment(id: string): Promise<Appointment | undefined> {
+    const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
+    return appointment;
     const [result] = await db.select().from(appointments).where(eq(appointments.id, id));
     return result;
   }
@@ -534,75 +540,95 @@ export class DatabaseStorage implements IStorage {
   async getDashboardMetrics(): Promise<DashboardMetrics> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Total patients
-    const [totalPacientesResult] = await db.select({ count: sql<number>`count(*)` }).from(patients);
-    const totalPacientes = Number(totalPacientesResult?.count || 0);
-
-    // Active patients
-    const [pacientesActivosResult] = await db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo'));
-    const pacientesActivos = Number(pacientesActivosResult?.count || 0);
-
-    // Today's appointments
-    const [citasHoyResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
-      .where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`);
-    const citasHoy = Number(citasHoyResult?.count || 0);
-
-    // Pending appointments
-    const [citasPendientesResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
-      .where(eq(appointments.status, 'pendiente'));
-    const citasPendientes = Number(citasPendientesResult?.count || 0);
-
-    // Completed appointments
-    const [citasCompletadasResult] = await db.select({ count: sql<number>`count(*)` }).from(appointments)
-      .where(eq(appointments.status, 'completada'));
-    const citasCompletadas = Number(citasCompletadasResult?.count || 0);
-
-    // Today's medical notes
-    const [notasMedicasHoyResult] = await db.select({ count: sql<number>`count(*)` }).from(medicalNotes)
-      .where(sql`DATE(${medicalNotes.fecha}) = DATE(${today.toISOString()})`);
-    const notasMedicasHoy = Number(notasMedicasHoyResult?.count || 0);
-
-    // Active prescriptions
-    const [prescripcionesActivasResult] = await db.select({ count: sql<number>`count(*)` }).from(prescriptions)
-      .where(eq(prescriptions.status, 'activa'));
-    const prescripcionesActivas = Number(prescripcionesActivasResult?.count || 0);
-
-    // Appointments by day (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const citasPorDiaResult = await db.select({
-      fecha: sql<string>`DATE(${appointments.fecha})::text`,
-      total: sql<number>`count(*)`
-    }).from(appointments)
-      .where(sql`${appointments.fecha} >= ${sevenDaysAgo.toISOString()}`)
-      .groupBy(sql`DATE(${appointments.fecha})`)
-      .orderBy(sql`DATE(${appointments.fecha})`);
     
-    const citasPorDia = citasPorDiaResult.map(r => ({ fecha: r.fecha, total: Number(r.total) }));
-
-    // Appointments by status
-    const citasPorEstadoResult = await db.select({
-      estado: appointments.status,
-      total: sql<number>`count(*)`
-    }).from(appointments)
-      .groupBy(appointments.status);
-    
-    const citasPorEstado = citasPorEstadoResult.map(r => ({ estado: r.estado, total: Number(r.total) }));
-
-    // Patients by month (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const pacientesPorMesResult = await db.select({
-      mes: sql<string>`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`,
-      total: sql<number>`count(*)`
-    }).from(patients)
-      .where(sql`${patients.createdAt} >= ${sixMonthsAgo.toISOString()}`)
-      .groupBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`)
-      .orderBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`);
+
+    // Fetch all metrics concurrently for better performance
+    const [
+      totalPacientesResult,
+      pacientesActivosResult,
+      citasHoyResult,
+      citasPendientesResult,
+      citasCompletadasResult,
+      notasMedicasHoyResult,
+      prescripcionesActivasResult,
+      citasPorDiaResult,
+      citasPorEstadoResult,
+      pacientesPorMesResult
+    ] = await Promise.all([
+      // Total patients
+      db.select({ count: sql<number>`count(*)` }).from(patients),
+      // Active patients
+      db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo')),
+      // Today's appointments
+      db.select({ count: sql<number>`count(*)` }).from(appointments)
+        .where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`),
+      // Pending appointments
+      db.select({ count: sql<number>`count(*)` }).from(appointments)
+        .where(eq(appointments.status, 'pendiente')),
+      // Completed appointments
+      db.select({ count: sql<number>`count(*)` }).from(appointments)
+        .where(eq(appointments.status, 'completada')),
+      // Today's medical notes
+      db.select({ count: sql<number>`count(*)` }).from(medicalNotes)
+        .where(sql`DATE(${medicalNotes.fecha}) = DATE(${today.toISOString()})`),
+      // Active prescriptions
+      db.select({ count: sql<number>`count(*)` }).from(prescriptions)
+        .where(eq(prescriptions.status, 'activa')),
+      // Appointments by day (last 7 days)
+      db.select({ count: sql<number>`count(*)` }).from(patients),
+      db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo')),
+      db.select({ count: sql<number>`count(*)` }).from(appointments).where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`),
+      db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.status, 'pendiente')),
+      db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.status, 'completada')),
+      db.select({ count: sql<number>`count(*)` }).from(medicalNotes).where(sql`DATE(${medicalNotes.fecha}) = DATE(${today.toISOString()})`),
+      db.select({ count: sql<number>`count(*)` }).from(prescriptions).where(eq(prescriptions.status, 'activa')),
+      db.select({
+        fecha: sql<string>`DATE(${appointments.fecha})::text`,
+        total: sql<number>`count(*)`
+      }).from(appointments)
+        .where(sql`${appointments.fecha} >= ${sevenDaysAgo.toISOString()}`)
+        .groupBy(sql`DATE(${appointments.fecha})`)
+        .orderBy(sql`DATE(${appointments.fecha})`),
+      // Appointments by status
+      db.select({
+        estado: appointments.status,
+        total: sql<number>`count(*)`
+      }).from(appointments)
+        .groupBy(appointments.status),
+      // Patients by month (last 6 months)
+      db.select({
+        mes: sql<string>`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`,
+        total: sql<number>`count(*)`
+      }).from(patients)
+        .where(sql`${patients.createdAt} >= ${sixMonthsAgo.toISOString()}`)
+        .groupBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`)
+        .orderBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`)
+    ]);
+
+    const totalPacientes = Number(totalPacientesResult[0]?.count || 0);
+    const pacientesActivos = Number(pacientesActivosResult[0]?.count || 0);
+    const citasHoy = Number(citasHoyResult[0]?.count || 0);
+    const citasPendientes = Number(citasPendientesResult[0]?.count || 0);
+    const citasCompletadas = Number(citasCompletadasResult[0]?.count || 0);
+    const notasMedicasHoy = Number(notasMedicasHoyResult[0]?.count || 0);
+    const prescripcionesActivas = Number(prescripcionesActivasResult[0]?.count || 0);
     
+    const citasPorDia = citasPorDiaResult.map(r => ({ fecha: r.fecha, total: Number(r.total) }));
+    const citasPorEstado = citasPorEstadoResult.map(r => ({ estado: r.estado, total: Number(r.total) }));
     const pacientesPorMes = pacientesPorMesResult.map(r => ({ mes: r.mes, total: Number(r.total) }));
 
     return {
@@ -674,18 +700,73 @@ export class DatabaseStorage implements IStorage {
   async getPatientTimeline(patientId: string): Promise<TimelineEvent[]> {
     const events: TimelineEvent[] = [];
 
-    // Get medical notes
-    const notes = await db.select({
-      id: medicalNotes.id,
-      fecha: medicalNotes.fecha,
-      tipo: medicalNotes.tipo,
-      motivoConsulta: medicalNotes.motivoConsulta,
-      diagnosticos: medicalNotes.diagnosticos,
-      medicoNombre: users.nombre
-    }).from(medicalNotes)
-      .leftJoin(users, eq(medicalNotes.medicoId, users.id))
-      .where(eq(medicalNotes.patientId, patientId))
-      .orderBy(desc(medicalNotes.fecha));
+    // Get all data sources concurrently for better performance
+    const [
+      notes,
+      vitalsRecords,
+      prescriptionRecords,
+      appointmentRecords,
+      labOrderRecords
+    ] = await Promise.all([
+      db.select({
+        id: medicalNotes.id,
+        fecha: medicalNotes.fecha,
+        tipo: medicalNotes.tipo,
+        motivoConsulta: medicalNotes.motivoConsulta,
+        diagnosticos: medicalNotes.diagnosticos,
+        medicoNombre: users.nombre
+      }).from(medicalNotes)
+        .leftJoin(users, eq(medicalNotes.medicoId, users.id))
+        .where(eq(medicalNotes.patientId, patientId))
+        .orderBy(desc(medicalNotes.fecha)),
+
+      db.select({
+        id: vitals.id,
+        fecha: vitals.fecha,
+        presionSistolica: vitals.presionSistolica,
+        presionDiastolica: vitals.presionDiastolica,
+        frecuenciaCardiaca: vitals.frecuenciaCardiaca,
+        temperatura: vitals.temperatura,
+        medicoNombre: users.nombre
+      }).from(vitals)
+        .leftJoin(users, eq(vitals.registradoPorId, users.id))
+        .where(eq(vitals.patientId, patientId))
+        .orderBy(desc(vitals.fecha)),
+
+      db.select({
+        id: prescriptions.id,
+        createdAt: prescriptions.createdAt,
+        medicamento: prescriptions.medicamento,
+        dosis: prescriptions.dosis,
+        status: prescriptions.status,
+        medicoNombre: users.nombre
+      }).from(prescriptions)
+        .leftJoin(users, eq(prescriptions.medicoId, users.id))
+        .where(eq(prescriptions.patientId, patientId))
+        .orderBy(desc(prescriptions.createdAt)),
+
+      db.select({
+        id: appointments.id,
+        fecha: appointments.fecha,
+        motivo: appointments.motivo,
+        status: appointments.status,
+        medicoNombre: users.nombre
+      }).from(appointments)
+        .leftJoin(users, eq(appointments.medicoId, users.id))
+        .where(eq(appointments.patientId, patientId))
+        .orderBy(desc(appointments.fecha)),
+
+      db.select({
+        id: labOrders.id,
+        createdAt: labOrders.createdAt,
+        estudios: labOrders.estudios,
+        status: labOrders.status,
+        medicoNombre: users.nombre
+      }).from(labOrders)
+        .leftJoin(users, eq(labOrders.medicoId, users.id))
+        .where(eq(labOrders.patientId, patientId))
+        .orderBy(desc(labOrders.createdAt))
+    ]);
 
     for (const note of notes) {
       events.push({
@@ -699,20 +780,6 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Get vitals
-    const vitalsRecords = await db.select({
-      id: vitals.id,
-      fecha: vitals.fecha,
-      presionSistolica: vitals.presionSistolica,
-      presionDiastolica: vitals.presionDiastolica,
-      frecuenciaCardiaca: vitals.frecuenciaCardiaca,
-      temperatura: vitals.temperatura,
-      medicoNombre: users.nombre
-    }).from(vitals)
-      .leftJoin(users, eq(vitals.registradoPorId, users.id))
-      .where(eq(vitals.patientId, patientId))
-      .orderBy(desc(vitals.fecha));
-
     for (const v of vitalsRecords) {
       events.push({
         id: v.id,
@@ -724,19 +791,6 @@ export class DatabaseStorage implements IStorage {
         detalles: { presionSistolica: v.presionSistolica, presionDiastolica: v.presionDiastolica }
       });
     }
-
-    // Get prescriptions
-    const prescriptionRecords = await db.select({
-      id: prescriptions.id,
-      createdAt: prescriptions.createdAt,
-      medicamento: prescriptions.medicamento,
-      dosis: prescriptions.dosis,
-      status: prescriptions.status,
-      medicoNombre: users.nombre
-    }).from(prescriptions)
-      .leftJoin(users, eq(prescriptions.medicoId, users.id))
-      .where(eq(prescriptions.patientId, patientId))
-      .orderBy(desc(prescriptions.createdAt));
 
     for (const p of prescriptionRecords) {
       events.push({
@@ -750,18 +804,6 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Get appointments
-    const appointmentRecords = await db.select({
-      id: appointments.id,
-      fecha: appointments.fecha,
-      motivo: appointments.motivo,
-      status: appointments.status,
-      medicoNombre: users.nombre
-    }).from(appointments)
-      .leftJoin(users, eq(appointments.medicoId, users.id))
-      .where(eq(appointments.patientId, patientId))
-      .orderBy(desc(appointments.fecha));
-
     for (const a of appointmentRecords) {
       events.push({
         id: a.id,
@@ -773,18 +815,6 @@ export class DatabaseStorage implements IStorage {
         detalles: { status: a.status }
       });
     }
-
-    // Get lab orders
-    const labOrderRecords = await db.select({
-      id: labOrders.id,
-      createdAt: labOrders.createdAt,
-      estudios: labOrders.estudios,
-      status: labOrders.status,
-      medicoNombre: users.nombre
-    }).from(labOrders)
-      .leftJoin(users, eq(labOrders.medicoId, users.id))
-      .where(eq(labOrders.patientId, patientId))
-      .orderBy(desc(labOrders.createdAt));
 
     for (const l of labOrderRecords) {
       events.push({

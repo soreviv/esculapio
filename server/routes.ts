@@ -12,7 +12,7 @@ import {
   insertPatientConsentSchema
 } from "@shared/schema";
 import { createHash } from "crypto";
-import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isEnfermeria, isMedicoOrEnfermeria } from "./auth";
+import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isMedicoOrEnfermeria } from "./auth";
 
 /**
  * Registra y configura todos los endpoints REST bajo /api en la aplicación Express proporcionada.
@@ -520,7 +520,7 @@ export async function registerRoutes(
       
       // Create audit log for patient creation (NOM-024 compliance)
       await storage.createAuditLog({
-        userId: req.body.createdBy || null,
+        userId: req.session.userId,
         accion: "crear",
         entidad: "patients",
         entidadId: patient.id,
@@ -566,7 +566,7 @@ export async function registerRoutes(
       }
       
       await storage.createAuditLog({
-        userId: req.session.userId || req.body.updatedBy || null,
+        userId: req.session.userId,
         accion: "actualizar",
         entidad: "patients",
         entidadId: patient.id,
@@ -625,28 +625,6 @@ export async function registerRoutes(
     }
   });
 
-  /**
-   * @swagger
-   * /notes:
-   *   get:
-   *     tags: [Medical Notes]
-   *     summary: Listar todas las notas médicas
-   *     description: Obtiene todas las notas médicas con detalles del médico y del paciente.
-   *     security:
-   *       - sessionAuth: []
-   *     responses:
-   *       200:
-   *         description: Lista de notas médicas
-   */
-  app.get("/api/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
-    try {
-      const notes = await storage.getAllMedicalNotesWithDetails();
-      res.json(notes);
-    } catch (error) {
-      res.status(500).json({ error: "Error fetching notes" });
-    }
-  });
-
   app.get("/api/notes/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const note = await storage.getMedicalNote(req.params.id);
@@ -665,11 +643,15 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
+
+      // Enforce the current user as the author
+      parsed.data.medicoId = req.session.userId!;
+
       const note = await storage.createMedicalNote(parsed.data);
       
       // Create audit log for note creation (NOM-024 compliance)
       await storage.createAuditLog({
-        userId: parsed.data.medicoId,
+        userId: req.session.userId,
         accion: "crear",
         entidad: "medical_notes",
         entidadId: note.id,
@@ -691,6 +673,13 @@ export async function registerRoutes(
       if (!existingNote) {
         return res.status(404).json({ error: "Note not found" });
       }
+
+      if (existingNote.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No tiene permiso para modificar esta nota médica." });
+      // Solo el autor puede modificar la nota
+      if (existingNote.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "Solo el autor puede modificar la nota" });
+      }
       
       if (existingNote.firmada && !req.body.firmada) {
         return res.status(403).json({ 
@@ -704,7 +693,7 @@ export async function registerRoutes(
       }
       
       await storage.createAuditLog({
-        userId: req.session.userId || req.body.updatedBy || note.medicoId,
+        userId: req.session.userId,
         accion: req.body.firmada ? "firmar" : "actualizar",
         entidad: "medical_notes",
         entidadId: note.id,
@@ -754,10 +743,14 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
+
+      // Enforce the current user as the one who registered the vitals
+      parsed.data.registradoPorId = req.session.userId!;
+
       const vitals = await storage.createVitals(parsed.data);
       
       await storage.createAuditLog({
-        userId: req.session.userId || parsed.data.registradoPorId || null,
+        userId: req.session.userId,
         accion: "crear",
         entidad: "vitals",
         entidadId: vitals.id,
@@ -798,10 +791,14 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
+
+      // Enforce the current user as the author
+      parsed.data.medicoId = req.session.userId!;
+
       const prescription = await storage.createPrescription(parsed.data);
       
       await storage.createAuditLog({
-        userId: req.session.userId || parsed.data.medicoId,
+        userId: req.session.userId,
         accion: "crear",
         entidad: "prescriptions",
         entidadId: prescription.id,
@@ -821,6 +818,16 @@ export async function registerRoutes(
     try {
       const existingPrescription = await storage.getPrescription(req.params.id);
       if (!existingPrescription) {
+        return res.status(404).json({ error: "Prescription not found" });
+      }
+
+      // Solo el médico autor puede modificar la receta
+      if (existingPrescription.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "Solo el médico autor puede modificar la receta" });
+      }
+
+      const prescription = await storage.updatePrescription(req.params.id, req.body);
+      if (!prescription) {
         return res.status(404).json({ error: "Prescription not found" });
       }
 
@@ -889,7 +896,7 @@ export async function registerRoutes(
       const appointment = await storage.createAppointment(parsed.data);
       
       await storage.createAuditLog({
-        userId: req.session.userId || parsed.data.medicoId,
+        userId: req.session.userId,
         accion: "crear",
         entidad: "appointments",
         entidadId: appointment.id,
@@ -912,6 +919,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Appointment not found" });
       }
 
+      // Check permissions: only admin, nurses, or the assigned doctor can update
+      if (req.session.role === "medico" && existingAppointment.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No tiene permiso para modificar esta cita." });
+      }
+
+      const appointment = await storage.updateAppointment(req.params.id, req.body);
       if (req.session.role !== "admin" && existingAppointment.medicoId !== req.session.userId) {
         return res.status(403).json({ error: "No autorizado para actualizar esta cita." });
       }
@@ -1095,10 +1108,10 @@ export async function registerRoutes(
 
   app.post("/api/lab-orders", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const order = await storage.createLabOrder(req.body);
+      const order = await storage.createLabOrder({ ...req.body, medicoId: req.session.userId });
       
       await storage.createAuditLog({
-        userId: req.session.userId || req.body.medicoId,
+        userId: req.session.userId,
         accion: "crear",
         entidad: "lab_order",
         entidadId: order.id,
@@ -1116,10 +1129,34 @@ export async function registerRoutes(
 
   app.patch("/api/lab-orders/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
+      const existingOrder = await storage.getLabOrder(req.params.id);
+      if (!existingOrder) {
+        return res.status(404).json({ error: "Lab order not found" });
+      }
+
+      // Solo el médico que creó la orden puede modificarla
+      if (existingOrder.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "Solo el médico que creó la orden puede modificarla" });
+      if (existingOrder.medicoId !== req.session.userId) {
+        return res.status(403).json({ error: "No autorizado. Solo el médico que creó la orden puede modificarla." });
+      }
+
       const order = await storage.updateLabOrder(req.params.id, req.body);
       if (!order) {
         return res.status(404).json({ error: "Lab order not found" });
       }
+
+      await storage.createAuditLog({
+        userId: req.session.userId,
+        accion: "actualizar",
+        entidad: "lab_order",
+        entidadId: order.id,
+        detalles: JSON.stringify({ campos: Object.keys(req.body) }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
       res.json(order);
     } catch (error) {
       res.status(500).json({ error: "Error updating lab order" });
@@ -1129,14 +1166,19 @@ export async function registerRoutes(
   // Sign Medical Note (NOM-024-SSA3-2012 - Firma electrónica) - Protected
   app.post("/api/notes/:id/sign", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const userId = req.session.userId || req.body.userId;
+      const userId = req.session.userId;
       if (!userId) {
-        return res.status(400).json({ error: "userId is required" });
+        return res.status(401).json({ error: "No autenticado" });
       }
       
       const note = await storage.getMedicalNote(req.params.id);
       if (!note) {
         return res.status(404).json({ error: "Note not found" });
+      }
+
+      // NOM-024-SSA3-2012: Solo el autor de la nota puede firmarla
+      if (note.medicoId !== userId) {
+        return res.status(403).json({ error: "Solo el autor de la nota puede firmarla" });
       }
       
       if (note.firmada) {
