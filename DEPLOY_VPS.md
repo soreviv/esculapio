@@ -122,9 +122,19 @@ EOF
 openssl rand -hex 32
 ```
 
+**Importante:** el proyecto no carga `.env` automáticamente. Antes de migrar, crear el admin o iniciar PM2, exporta las variables en tu sesión:
+
+```bash
+set -a
+source .env
+set +a
+```
+
 ---
 
 ## 🗄️ Paso 6: Migrar Base de Datos y Crear Admin
+
+Asegúrate de haber cargado las variables del `.env` (paso anterior).
 
 ```bash
 # Ejecutar migraciones de Drizzle
@@ -154,8 +164,13 @@ ls -la dist/
 # Instalar PM2 globalmente
 sudo npm install -g pm2
 
-# Iniciar la aplicación
-pm2 start dist/index.cjs --name "salud-digital" --env production
+# Cargar variables .env en esta sesión (si aún no lo hiciste)
+set -a
+source .env
+set +a
+
+# Iniciar la aplicación (PM2 guardará estas variables al hacer pm2 save)
+pm2 start dist/index.cjs --name "salud-digital" --env production --update-env
 
 # Configurar inicio automático
 pm2 startup systemd
