@@ -140,7 +140,7 @@ describe("Prescription Security", () => {
 
     const updateArg = mockStorage.updatePrescription.mock.calls[0][1];
     expect(updateArg.medicamento).toBe("New Med");
-    expect(updateArg.medicoId).toBeUndefined(); // Should be stripped
-    expect(updateArg.patientId).toBeUndefined(); // Should be stripped
+    expect(updateArg.medicoId).toBeUndefined(); 
+    expect(updateArg.patientId).toBeUndefined();
   });
 });

@@ -955,7 +955,7 @@ export function auditLogToAuditEvent(auditLog: AuditLog): FhirAuditEvent {
 
 export function createPatientBundle(
   patient: Patient,
-  notes: MedicalNote[],
+  notes: (MedicalNote & { diagnosticos?: { codigo: string; descripcion: string }[] })[],
   vitals: Vitals[],
   prescriptions: Prescription[],
   labOrders: LabOrder[],
@@ -976,15 +976,14 @@ export function createPatientBundle(
       resource: medicalNoteToEncounter(note, patient),
     });
 
-    // Diagnósticos
-    if (note.diagnosticosCie10 && note.diagnosticos) {
-      note.diagnosticosCie10.forEach((codigo, index) => {
-        const descripcion = note.diagnosticos?.[index] || codigo;
+    // Diagnósticos relacionales
+    if (note.diagnosticos && note.diagnosticos.length > 0) {
+      note.diagnosticos.forEach((dx) => {
         entries.push({
-          fullUrl: `Condition/${note.id}-${codigo}`,
+          fullUrl: `Condition/${note.id}-${dx.codigo}`,
           resource: diagnosisToCondition(
-            codigo,
-            descripcion,
+            dx.codigo,
+            dx.descripcion,
             patient.id,
             note.id,
             new Date(note.fecha)

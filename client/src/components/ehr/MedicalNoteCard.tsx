@@ -12,7 +12,7 @@ export interface MedicalNoteCardProps {
   medicoNombre: string;
   especialidad?: string;
   motivoConsulta?: string;
-  diagnosticos?: string[];
+  diagnosticos?: (string | { codigo: string; descripcion: string })[];
   firmada: boolean;
   onView?: () => void;
 }
@@ -42,6 +42,11 @@ export function MedicalNoteCard({
   firmada,
   onView,
 }: MedicalNoteCardProps) {
+  const renderDiagnosis = (dx: string | { codigo: string; descripcion: string }) => {
+    if (typeof dx === 'string') return dx;
+    return `${dx.codigo} ${dx.descripcion}`;
+  };
+
   return (
     <Card className="hover-elevate">
       <CardHeader className="pb-3">
@@ -102,7 +107,7 @@ export function MedicalNoteCard({
             <div className="flex flex-wrap gap-1 mt-1">
               {diagnosticos.map((dx, i) => (
                 <Badge key={i} variant="secondary" className="text-xs">
-                  {dx}
+                  {renderDiagnosis(dx)}
                 </Badge>
               ))}
             </div>

@@ -2,6 +2,8 @@ import {
   type User, type InsertUser, 
   type Patient, type InsertPatient,
   type MedicalNote, type InsertMedicalNote,
+  type MedicalNoteAddendum, type InsertMedicalNoteAddendum,
+  type MedicalNoteDiagnosis, type InsertMedicalNoteDiagnosis,
   type Vitals, type InsertVitals,
   type Prescription, type InsertPrescription,
   type Appointment, type InsertAppointment,
@@ -11,11 +13,13 @@ import {
   type PatientConsent, type InsertPatientConsent,
   type LabOrder, type InsertLabOrder, type LabOrderWithDetails,
   type DashboardMetrics, type PatientSearchFilters, type TimelineEvent,
-  users, patients, medicalNotes, vitals, prescriptions, appointments,
+  users, patients, medicalNotes, medicalNoteAddendums, medicalNoteDiagnoses, 
+  vitals, prescriptions, appointments,
   auditLogs, cie10Catalog, patientConsents, labOrders
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, ilike, or, sql } from "drizzle-orm";
+import { encrypt, decrypt } from "./crypto";
 
 export interface IStorage {
   // Users
@@ -35,9 +39,16 @@ export interface IStorage {
   // Medical Notes
   getMedicalNotes(patientId: string): Promise<MedicalNote[]>;
   getMedicalNote(id: string): Promise<MedicalNote | undefined>;
-  createMedicalNote(note: InsertMedicalNote): Promise<MedicalNote>;
+  createMedicalNote(note: InsertMedicalNote, diagnoses?: { codigo: string; tipo: string }[]): Promise<MedicalNote>;
   updateMedicalNote(id: string, note: Partial<InsertMedicalNote>): Promise<MedicalNote | undefined>;
   getNote(id: string): Promise<MedicalNote | undefined>;
+  
+  // Medical Note Addendums (Anexos)
+  createAddendum(addendum: InsertMedicalNoteAddendum): Promise<MedicalNoteAddendum>;
+  getAddendums(noteId: string): Promise<MedicalNoteAddendum[]>;
+  
+  // Medical Note Diagnoses
+  getNoteDiagnoses(noteId: string): Promise<(MedicalNoteDiagnosis & { cie10: Cie10 })[]>;
   
   // Vitals
   getAllVitals(): Promise<Vitals[]>;
@@ -132,38 +143,65 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Patients
+  private encryptPatient(patient: Partial<InsertPatient>) {
+    const p = { ...patient };
+    if (p.curp) p.curp = encrypt(p.curp);
+    if (p.telefono) p.telefono = encrypt(p.telefono);
+    if (p.email) p.email = encrypt(p.email);
+    if (p.direccion) p.direccion = encrypt(p.direccion);
+    if (p.contactoEmergencia) p.contactoEmergencia = encrypt(p.contactoEmergencia);
+    if (p.telefonoEmergencia) p.telefonoEmergencia = encrypt(p.telefonoEmergencia);
+    return p;
+  }
+
+  private decryptPatient(patient: Patient): Patient {
+    return {
+      ...patient,
+      curp: decrypt(patient.curp),
+      telefono: patient.telefono ? decrypt(patient.telefono) : null,
+      email: patient.email ? decrypt(patient.email) : null,
+      direccion: patient.direccion ? decrypt(patient.direccion) : null,
+      contactoEmergencia: patient.contactoEmergencia ? decrypt(patient.contactoEmergencia) : null,
+      telefonoEmergencia: patient.telefonoEmergencia ? decrypt(patient.telefonoEmergencia) : null,
+    };
+  }
+
   async getPatients(): Promise<Patient[]> {
-    return db.select().from(patients).orderBy(desc(patients.createdAt));
+    const results = await db.select().from(patients).orderBy(desc(patients.createdAt));
+    return results.map(p => this.decryptPatient(p));
   }
 
   async getPatient(id: string): Promise<Patient | undefined> {
     const [patient] = await db.select().from(patients).where(eq(patients.id, id));
-    return patient;
+    return patient ? this.decryptPatient(patient) : undefined;
   }
 
   async createPatient(patient: InsertPatient): Promise<Patient> {
-    const [newPatient] = await db.insert(patients).values(patient).returning();
-    return newPatient;
+    const encrypted = this.encryptPatient(patient) as InsertPatient;
+    const [newPatient] = await db.insert(patients).values(encrypted).returning();
+    return this.decryptPatient(newPatient);
   }
 
   async updatePatient(id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined> {
-    const [updated] = await db.update(patients).set(patient).where(eq(patients.id, id)).returning();
-    return updated;
+    const encrypted = this.encryptPatient(patient);
+    const [updated] = await db.update(patients).set(encrypted).where(eq(patients.id, id)).returning();
+    return updated ? this.decryptPatient(updated) : undefined;
   }
 
   async deletePatient(id: string): Promise<Patient | undefined> {
     const [deleted] = await db.delete(patients).where(eq(patients.id, id)).returning();
-    return deleted;
+    return deleted ? this.decryptPatient(deleted) : undefined;
   }
 
   async searchPatients(query: string): Promise<Patient[]> {
-    return db.select().from(patients).where(
+    const results = await db.select().from(patients).where(
       or(
         ilike(patients.nombre, `%${query}%`),
         ilike(patients.apellidoPaterno, `%${query}%`),
-        ilike(patients.curp, `%${query}%`)
+        ilike(patients.numeroExpediente, `%${query}%`)
       )
     );
+    return results.map(p => this.decryptPatient(p));
   }
 
   // Medical Notes
@@ -182,14 +220,57 @@ export class DatabaseStorage implements IStorage {
     return this.getMedicalNote(id);
   }
 
-  async createMedicalNote(note: InsertMedicalNote): Promise<MedicalNote> {
-    const [newNote] = await db.insert(medicalNotes).values(note).returning();
-    return newNote;
+  async createMedicalNote(note: InsertMedicalNote, diagnoses?: { codigo: string; tipo: string }[]): Promise<MedicalNote> {
+    return await db.transaction(async (tx) => {
+      const [newNote] = await tx.insert(medicalNotes).values(note).returning();
+      
+      if (diagnoses && diagnoses.length > 0) {
+        await tx.insert(medicalNoteDiagnoses).values(
+          diagnoses.map(d => ({
+            noteId: newNote.id,
+            cie10Codigo: d.codigo,
+            tipoDiagnostico: d.tipo
+          }))
+        );
+      }
+      
+      return newNote;
+    });
   }
 
   async updateMedicalNote(id: string, note: Partial<InsertMedicalNote>): Promise<MedicalNote | undefined> {
+    // Note: Signed notes should not be editable, but this method exists for draft updates
     const [updated] = await db.update(medicalNotes).set(note).where(eq(medicalNotes.id, id)).returning();
     return updated;
+  }
+
+  // Medical Note Addendums (Anexos)
+  async createAddendum(addendum: InsertMedicalNoteAddendum): Promise<MedicalNoteAddendum> {
+    const [newAddendum] = await db.insert(medicalNoteAddendums).values(addendum).returning();
+    return newAddendum;
+  }
+
+  async getAddendums(noteId: string): Promise<MedicalNoteAddendum[]> {
+    return db.select().from(medicalNoteAddendums)
+      .where(eq(medicalNoteAddendums.originalNoteId, noteId))
+      .orderBy(desc(medicalNoteAddendums.fecha));
+  }
+
+  // Medical Note Diagnoses
+  async getNoteDiagnoses(noteId: string): Promise<(MedicalNoteDiagnosis & { cie10: Cie10 })[]> {
+    const results = await db
+      .select({
+        diagnosis: medicalNoteDiagnoses,
+        cie10: cie10Catalog
+      })
+      .from(medicalNoteDiagnoses)
+      .innerJoin(cie10Catalog, eq(medicalNoteDiagnoses.cie10Codigo, cie10Catalog.codigo))
+      .where(eq(medicalNoteDiagnoses.noteId, noteId));
+    
+    return results.map(r => ({
+      ...r.diagnosis,
+      cie10: r.cie10
+    }));
   }
 
   // Vitals
@@ -345,25 +426,39 @@ export class DatabaseStorage implements IStorage {
 
   // Enriched medical notes with medico details
   async getMedicalNotesWithDetails(patientId: string): Promise<MedicalNoteWithDetails[]> {
-    const result = await db
+    const notesResults = await db
       .select()
       .from(medicalNotes)
       .leftJoin(users, eq(medicalNotes.medicoId, users.id))
       .where(eq(medicalNotes.patientId, patientId))
       .orderBy(desc(medicalNotes.fecha));
     
-    return result.map(r => ({
-      ...r.medical_notes,
-      medicoNombre: r.users?.nombre || "Médico",
-      medicoEspecialidad: r.users?.especialidad || null,
+    return Promise.all(notesResults.map(async (r) => {
+      const noteId = r.medical_notes.id;
+      
+      const [diagnoses, addendums] = await Promise.all([
+        this.getNoteDiagnoses(noteId),
+        this.getAddendums(noteId)
+      ]);
+
+      return {
+        ...r.medical_notes,
+        medicoNombre: r.users?.nombre || "Médico",
+        medicoEspecialidad: r.users?.especialidad || null,
+        diagnosticos: diagnoses.map(d => ({
+          codigo: d.cie10Codigo,
+          descripcion: d.cie10.descripcion,
+          tipo: d.tipoDiagnostico || "presuntivo"
+        })),
+        anexos: addendums
+      };
     }));
   }
 
-  async getAllMedicalNotesWithDetails(): Promise<MedicalNoteWithPatientDetails[]> {
+  async getAllMedicalNotesWithDetails(): Promise<MedicalNoteWithDetails[]> {
     const result = await db
-      .select()
       .select({
-        medical_notes: medicalNotes,
+        medical_note: medicalNotes,
         medicoNombre: users.nombre,
         medicoEspecialidad: users.especialidad,
         patientNombre: patients.nombre,
@@ -374,16 +469,26 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(patients, eq(medicalNotes.patientId, patients.id))
       .orderBy(desc(medicalNotes.fecha));
 
-    return result.map(r => ({
-      ...r.medical_notes,
-      medicoNombre: r.users?.nombre || "Médico",
-      medicoEspecialidad: r.users?.especialidad || null,
-      patientNombre: r.patients?.nombre || "Paciente",
-      patientApellido: r.patients?.apellidoPaterno || "",
-      medicoNombre: r.medicoNombre || "Médico",
-      medicoEspecialidad: r.medicoEspecialidad || null,
-      patientNombre: r.patientNombre || "Paciente",
-      patientApellido: r.patientApellido || "",
+    return Promise.all(result.map(async (r) => {
+      const noteId = r.medical_note.id;
+      const [diagnoses, addendums] = await Promise.all([
+        this.getNoteDiagnoses(noteId),
+        this.getAddendums(noteId)
+      ]);
+
+      return {
+        ...r.medical_note,
+        medicoNombre: r.medicoNombre || "Médico",
+        medicoEspecialidad: r.medicoEspecialidad || null,
+        patientNombre: r.patientNombre || "Paciente",
+        patientApellido: r.patientApellido || "",
+        diagnosticos: diagnoses.map(d => ({
+          codigo: d.cie10Codigo,
+          descripcion: d.cie10.descripcion,
+          tipo: d.tipoDiagnostico || "presuntivo"
+        })),
+        anexos: addendums
+      };
     }));
   }
 
@@ -547,15 +652,6 @@ export class DatabaseStorage implements IStorage {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
     // Fetch all metrics concurrently for better performance
     const [
       totalPacientesResult,
@@ -569,26 +665,6 @@ export class DatabaseStorage implements IStorage {
       citasPorEstadoResult,
       pacientesPorMesResult
     ] = await Promise.all([
-      // Total patients
-      db.select({ count: sql<number>`count(*)` }).from(patients),
-      // Active patients
-      db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo')),
-      // Today's appointments
-      db.select({ count: sql<number>`count(*)` }).from(appointments)
-        .where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`),
-      // Pending appointments
-      db.select({ count: sql<number>`count(*)` }).from(appointments)
-        .where(eq(appointments.status, 'pendiente')),
-      // Completed appointments
-      db.select({ count: sql<number>`count(*)` }).from(appointments)
-        .where(eq(appointments.status, 'completada')),
-      // Today's medical notes
-      db.select({ count: sql<number>`count(*)` }).from(medicalNotes)
-        .where(sql`DATE(${medicalNotes.fecha}) = DATE(${today.toISOString()})`),
-      // Active prescriptions
-      db.select({ count: sql<number>`count(*)` }).from(prescriptions)
-        .where(eq(prescriptions.status, 'activa')),
-      // Appointments by day (last 7 days)
       db.select({ count: sql<number>`count(*)` }).from(patients),
       db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.status, 'activo')),
       db.select({ count: sql<number>`count(*)` }).from(appointments).where(sql`DATE(${appointments.fecha}) = DATE(${today.toISOString()})`),
@@ -603,13 +679,11 @@ export class DatabaseStorage implements IStorage {
         .where(sql`${appointments.fecha} >= ${sevenDaysAgo.toISOString()}`)
         .groupBy(sql`DATE(${appointments.fecha})`)
         .orderBy(sql`DATE(${appointments.fecha})`),
-      // Appointments by status
       db.select({
         estado: appointments.status,
         total: sql<number>`count(*)`
       }).from(appointments)
         .groupBy(appointments.status),
-      // Patients by month (last 6 months)
       db.select({
         mes: sql<string>`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`,
         total: sql<number>`count(*)`
@@ -619,29 +693,17 @@ export class DatabaseStorage implements IStorage {
         .orderBy(sql`TO_CHAR(${patients.createdAt}, 'YYYY-MM')`)
     ]);
 
-    const totalPacientes = Number(totalPacientesResult[0]?.count || 0);
-    const pacientesActivos = Number(pacientesActivosResult[0]?.count || 0);
-    const citasHoy = Number(citasHoyResult[0]?.count || 0);
-    const citasPendientes = Number(citasPendientesResult[0]?.count || 0);
-    const citasCompletadas = Number(citasCompletadasResult[0]?.count || 0);
-    const notasMedicasHoy = Number(notasMedicasHoyResult[0]?.count || 0);
-    const prescripcionesActivas = Number(prescripcionesActivasResult[0]?.count || 0);
-    
-    const citasPorDia = citasPorDiaResult.map(r => ({ fecha: r.fecha, total: Number(r.total) }));
-    const citasPorEstado = citasPorEstadoResult.map(r => ({ estado: r.estado, total: Number(r.total) }));
-    const pacientesPorMes = pacientesPorMesResult.map(r => ({ mes: r.mes, total: Number(r.total) }));
-
     return {
-      totalPacientes,
-      pacientesActivos,
-      citasHoy,
-      citasPendientes,
-      citasCompletadas,
-      notasMedicasHoy,
-      prescripcionesActivas,
-      citasPorDia,
-      citasPorEstado,
-      pacientesPorMes
+      totalPacientes: Number(totalPacientesResult[0]?.count || 0),
+      pacientesActivos: Number(pacientesActivosResult[0]?.count || 0),
+      citasHoy: Number(citasHoyResult[0]?.count || 0),
+      citasPendientes: Number(citasPendientesResult[0]?.count || 0),
+      citasCompletadas: Number(citasCompletadasResult[0]?.count || 0),
+      notasMedicasHoy: Number(notasMedicasHoyResult[0]?.count || 0),
+      prescripcionesActivas: Number(prescripcionesActivasResult[0]?.count || 0),
+      citasPorDia: citasPorDiaResult.map(r => ({ fecha: r.fecha, total: Number(r.total) })),
+      citasPorEstado: citasPorEstadoResult.map(r => ({ estado: r.estado || 'desconocido', total: Number(r.total) })),
+      pacientesPorMes: pacientesPorMesResult.map(r => ({ mes: r.mes, total: Number(r.total) }))
     };
   }
 
@@ -654,7 +716,6 @@ export class DatabaseStorage implements IStorage {
         or(
           ilike(patients.nombre, `%${filters.query}%`),
           ilike(patients.apellidoPaterno, `%${filters.query}%`),
-          ilike(patients.curp, `%${filters.query}%`),
           ilike(patients.numeroExpediente, `%${filters.query}%`)
         )
       );
@@ -672,28 +733,38 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${patients.createdAt} <= ${filters.fechaHasta}`);
     }
 
-    // If searching by diagnosis or doctor, we need to join with medical notes
-    if (filters.diagnostico || filters.medicoId) {
-      const subquery = db.select({ patientId: medicalNotes.patientId })
-        .from(medicalNotes)
-        .where(
-          and(
-            filters.diagnostico ? sql`${filters.diagnostico} = ANY(${medicalNotes.diagnosticosCie10})` : undefined,
-            filters.medicoId ? eq(medicalNotes.medicoId, filters.medicoId) : undefined
-          )
-        );
+    // If searching by diagnosis
+    if (filters.diagnostico) {
+      const diagnosisSubquery = db.select({ noteId: medicalNoteDiagnoses.noteId })
+        .from(medicalNoteDiagnoses)
+        .where(eq(medicalNoteDiagnoses.cie10Codigo, filters.diagnostico));
       
-      conditions.push(sql`${patients.id} IN (${subquery})`);
+      const patientSubquery = db.select({ patientId: medicalNotes.patientId })
+        .from(medicalNotes)
+        .where(sql`${medicalNotes.id} IN (${diagnosisSubquery})`);
+        
+      conditions.push(sql`${patients.id} IN (${patientSubquery})`);
     }
 
+    if (filters.medicoId) {
+      const medicoSubquery = db.select({ patientId: medicalNotes.patientId })
+        .from(medicalNotes)
+        .where(eq(medicalNotes.medicoId, filters.medicoId));
+        
+      conditions.push(sql`${patients.id} IN (${medicoSubquery})`);
+    }
+
+    let results;
     if (conditions.length === 0) {
-      return db.select().from(patients).orderBy(desc(patients.createdAt)).limit(100);
+      results = await db.select().from(patients).orderBy(desc(patients.createdAt)).limit(100);
+    } else {
+      results = await db.select().from(patients)
+        .where(and(...conditions))
+        .orderBy(desc(patients.createdAt))
+        .limit(100);
     }
 
-    return db.select().from(patients)
-      .where(and(...conditions))
-      .orderBy(desc(patients.createdAt))
-      .limit(100);
+    return results.map(p => this.decryptPatient(p));
   }
 
   // Patient Timeline
@@ -713,7 +784,6 @@ export class DatabaseStorage implements IStorage {
         fecha: medicalNotes.fecha,
         tipo: medicalNotes.tipo,
         motivoConsulta: medicalNotes.motivoConsulta,
-        diagnosticos: medicalNotes.diagnosticos,
         medicoNombre: users.nombre
       }).from(medicalNotes)
         .leftJoin(users, eq(medicalNotes.medicoId, users.id))
@@ -776,7 +846,7 @@ export class DatabaseStorage implements IStorage {
         titulo: `Nota: ${note.tipo.replace('_', ' ')}`,
         descripcion: note.motivoConsulta || undefined,
         medicoNombre: note.medicoNombre || undefined,
-        detalles: { diagnosticos: note.diagnosticos }
+        detalles: { tipo: note.tipo }
       });
     }
 

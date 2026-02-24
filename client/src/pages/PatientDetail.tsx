@@ -341,9 +341,9 @@ export default function PatientDetail() {
                       <MedicalNoteCard
                         key={note.id}
                         id={note.id}
-                        tipo={note.tipo as "historia_clinica" | "nota_evolucion" | "nota_egreso" | "interconsulta"}
+                        tipo={note.tipo}
                         fecha={new Date(note.fecha).toLocaleDateString("es-MX")}
-                        hora={new Date(note.fecha).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                        hora={note.hora ? note.hora.substring(0, 5) : new Date(note.fecha).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
                         medicoNombre={note.medicoNombre}
                         motivoConsulta={note.motivoConsulta || ""}
                         diagnosticos={note.diagnosticos || []}

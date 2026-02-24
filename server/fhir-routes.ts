@@ -318,23 +318,22 @@ fhirRouter.get("/Condition", async (req: Request, res: Response) => {
     }
 
     const patientId = (patient as string).replace("Patient/", "");
-    const notes = await storage.getPatientNotes(patientId);
+    const notes = await storage.getMedicalNotesWithDetails(patientId);
 
     const conditions: FhirResource[] = [];
 
     notes.forEach((note) => {
-      if (note.diagnosticosCie10 && note.diagnosticos) {
-        note.diagnosticosCie10.forEach((codigo, index) => {
+      if (note.diagnosticos && note.diagnosticos.length > 0) {
+        note.diagnosticos.forEach((dx) => {
           // Filter by code if provided
-          if (code && !codigo.includes(code as string)) {
+          if (code && !dx.codigo.includes(code as string)) {
             return;
           }
 
-          const descripcion = note.diagnosticos?.[index] || codigo;
           conditions.push(
             diagnosisToCondition(
-              codigo,
-              descripcion,
+              dx.codigo,
+              dx.descripcion,
               patientId,
               note.id,
               new Date(note.fecha)
@@ -617,7 +616,7 @@ fhirRouter.get("/\\$export", async (req: Request, res: Response) => {
     }
 
     const [notes, vitals, prescriptions, labOrders, consents] = await Promise.all([
-      storage.getPatientNotes(patientId),
+      storage.getMedicalNotesWithDetails(patientId),
       storage.getPatientVitals(patientId),
       storage.getPatientPrescriptions(patientId),
       storage.getPatientLabOrders(patientId),

@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { 
   insertPatientSchema, 
   insertMedicalNoteSchema, 
+  insertMedicalNoteAddendumSchema,
   insertVitalsSchema, 
   insertPrescriptionSchema, 
   insertAppointmentSchema,
@@ -425,11 +426,25 @@ export async function registerRoutes(
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
+
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "patients",
+        entidadId: patient.id,
+        detalles: JSON.stringify({ curp: patient.curp }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
       res.json(patient);
     } catch (error) {
       res.status(500).json({ error: "Error fetching patient" });
     }
   });
+
+  // ... (Patient Timeline route follows) ...
 
   // =====================
   // Patient Timeline
@@ -631,15 +646,66 @@ export async function registerRoutes(
       if (!note) {
         return res.status(404).json({ error: "Note not found" });
       }
+
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "medical_notes",
+        entidadId: note.id,
+        detalles: JSON.stringify({ tipo: note.tipo }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
       res.json(note);
     } catch (error) {
       res.status(500).json({ error: "Error fetching note" });
     }
   });
 
+  app.post("/api/notes/:id/addendums", isAuthenticated, isMedico, async (req, res) => {
+    try {
+      const note = await storage.getMedicalNote(req.params.id);
+      if (!note) {
+        return res.status(404).json({ error: "Nota médica no encontrada" });
+      }
+
+      const addendumData = {
+        ...req.body,
+        originalNoteId: req.params.id,
+        medicoId: req.session.userId,
+      };
+
+      const parsed = insertMedicalNoteAddendumSchema.safeParse(addendumData);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      const addendum = await storage.createAddendum(parsed.data);
+
+      await storage.createAuditLog({
+        userId: req.session.userId,
+        accion: "crear",
+        entidad: "medical_note_addendums",
+        entidadId: addendum.id,
+        detalles: JSON.stringify({ originalNoteId: req.params.id }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
+      res.status(201).json(addendum);
+    } catch (error) {
+      console.error("Error creating addendum:", error);
+      res.status(500).json({ error: "Error al crear anexo" });
+    }
+  });
+
   app.post("/api/notes", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const parsed = insertMedicalNoteSchema.safeParse(req.body);
+      const { diagnoses, ...noteData } = req.body;
+      const parsed = insertMedicalNoteSchema.safeParse(noteData);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
@@ -647,7 +713,7 @@ export async function registerRoutes(
       // Enforce the current user as the author
       parsed.data.medicoId = req.session.userId!;
 
-      const note = await storage.createMedicalNote(parsed.data);
+      const note = await storage.createMedicalNote(parsed.data, diagnoses);
       
       // Create audit log for note creation (NOM-024 compliance)
       await storage.createAuditLog({
@@ -655,7 +721,7 @@ export async function registerRoutes(
         accion: "crear",
         entidad: "medical_notes",
         entidadId: note.id,
-        detalles: JSON.stringify({ tipo: note.tipo, patientId: note.patientId }),
+        detalles: JSON.stringify({ tipo: note.tipo, patientId: note.patientId, diagnosesCount: diagnoses?.length || 0 }),
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
@@ -663,6 +729,7 @@ export async function registerRoutes(
       
       res.status(201).json(note);
     } catch (error) {
+      console.error("Error creating note:", error);
       res.status(500).json({ error: "Error creating note" });
     }
   });
@@ -674,14 +741,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Note not found" });
       }
 
-      if (existingNote.medicoId !== req.session.userId) {
-        return res.status(403).json({ error: "No tiene permiso para modificar esta nota médica." });
       // Solo el autor puede modificar la nota
       if (existingNote.medicoId !== req.session.userId) {
         return res.status(403).json({ error: "Solo el autor puede modificar la nota" });
       }
       
-      if (existingNote.firmada && !req.body.firmada) {
+      if (existingNote.firmada) {
         return res.status(403).json({ 
           error: "La nota ya está firmada y no puede ser modificada. Las notas firmadas son inmutables según la NOM-024-SSA3-2012." 
         });
@@ -694,7 +759,7 @@ export async function registerRoutes(
       
       await storage.createAuditLog({
         userId: req.session.userId,
-        accion: req.body.firmada ? "firmar" : "actualizar",
+        accion: "actualizar",
         entidad: "medical_notes",
         entidadId: note.id,
         detalles: JSON.stringify({ campos: Object.keys(req.body) }),
@@ -839,9 +904,9 @@ export async function registerRoutes(
       // Inmutabilidad de campos críticos (medicoId y patientId no deben cambiar)
       const { medicoId, patientId, id, ...updateData } = req.body;
 
-      const prescription = await storage.updatePrescription(req.params.id, updateData);
+      const updatedPrescription = await storage.updatePrescription(req.params.id, updateData);
       
-      if (!prescription) {
+      if (!updatedPrescription) {
         return res.status(404).json({ error: "Prescription not found during update" });
       }
 
@@ -849,14 +914,14 @@ export async function registerRoutes(
         userId: req.session.userId,
         accion: "actualizar",
         entidad: "prescriptions",
-        entidadId: prescription.id,
+        entidadId: updatedPrescription.id,
         detalles: JSON.stringify({ campos: Object.keys(updateData) }),
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
       });
       
-      res.json(prescription);
+      res.json(updatedPrescription);
     } catch (error) {
       res.status(500).json({ error: "Error updating prescription" });
     }
@@ -919,14 +984,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Appointment not found" });
       }
 
-      // Check permissions: only admin, nurses, or the assigned doctor can update
-      if (req.session.role === "medico" && existingAppointment.medicoId !== req.session.userId) {
-        return res.status(403).json({ error: "No tiene permiso para modificar esta cita." });
-      }
+      // Check permissions: admin and nurses can update any. Doctors only their own.
+      const isOwner = existingAppointment.medicoId === req.session.userId;
+      const canUpdate = req.session.role === "admin" || req.session.role === "enfermeria" || isOwner;
 
-      const appointment = await storage.updateAppointment(req.params.id, req.body);
-      if (req.session.role !== "admin" && existingAppointment.medicoId !== req.session.userId) {
-        return res.status(403).json({ error: "No autorizado para actualizar esta cita." });
+      if (!canUpdate) {
+        return res.status(403).json({ error: "No tiene permiso para modificar esta cita." });
       }
 
       const parsed = insertAppointmentSchema.partial().safeParse(req.body);
@@ -938,24 +1001,23 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No valid fields to update" });
       }
 
-      // Defensa contra eliminación concurrente: la cita pudo borrarse entre getAppointment y updateAppointment.
-      const appointment = await storage.updateAppointment(req.params.id, parsed.data);
-      if (!appointment) {
-        return res.status(404).json({ error: "Appointment not found" });
+      const updatedAppointment = await storage.updateAppointment(req.params.id, parsed.data);
+      if (!updatedAppointment) {
+        return res.status(404).json({ error: "Appointment not found during update" });
       }
       
       await storage.createAuditLog({
         userId: req.session.userId,
         accion: "actualizar",
         entidad: "appointments",
-        entidadId: appointment.id,
+        entidadId: updatedAppointment.id,
         detalles: JSON.stringify({ campos: Object.keys(parsed.data) }),
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
       });
       
-      res.json(appointment);
+      res.json(updatedAppointment);
     } catch (error) {
       res.status(500).json({ error: "Error updating appointment" });
     }
@@ -1028,6 +1090,18 @@ export async function registerRoutes(
       if (!code) {
         return res.status(404).json({ error: "CIE-10 code not found" });
       }
+
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "cie10_catalog",
+        entidadId: code.codigo,
+        detalles: JSON.stringify({ descripcion: code.descripcion }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
       res.json(code);
     } catch (error) {
       res.status(500).json({ error: "Error fetching CIE-10 code" });
@@ -1136,8 +1210,6 @@ export async function registerRoutes(
 
       // Solo el médico que creó la orden puede modificarla
       if (existingOrder.medicoId !== req.session.userId) {
-        return res.status(403).json({ error: "Solo el médico que creó la orden puede modificarla" });
-      if (existingOrder.medicoId !== req.session.userId) {
         return res.status(403).json({ error: "No autorizado. Solo el médico que creó la orden puede modificarla." });
       }
 
@@ -1163,48 +1235,46 @@ export async function registerRoutes(
     }
   });
 
+  // Helper function to generate canonical content for signing/verification
+  async function getNoteCanonicalContent(id: string) {
+    const note = await storage.getMedicalNote(id);
+    if (!note) return null;
+    
+    const diagnoses = await storage.getNoteDiagnoses(id);
+    
+    return JSON.stringify({
+      id: note.id,
+      patientId: note.patientId,
+      medicoId: note.medicoId,
+      tipo: note.tipo,
+      fecha: note.fecha,
+      motivoConsulta: note.motivoConsulta,
+      subjetivo: note.subjetivo,
+      objetivo: note.objetivo,
+      analisis: note.analisis,
+      plan: note.plan,
+      diagnosticos: diagnoses.map(d => ({ codigo: d.cie10Codigo, tipo: d.tipoDiagnostico })),
+    });
+  }
+
   // Sign Medical Note (NOM-024-SSA3-2012 - Firma electrónica) - Protected
   app.post("/api/notes/:id/sign", isAuthenticated, isMedico, async (req, res) => {
     try {
       const userId = req.session.userId;
-      if (!userId) {
-        return res.status(401).json({ error: "No autenticado" });
-      }
-      
       const note = await storage.getMedicalNote(req.params.id);
-      if (!note) {
-        return res.status(404).json({ error: "Note not found" });
-      }
-
-      // NOM-024-SSA3-2012: Solo el autor de la nota puede firmarla
-      if (note.medicoId !== userId) {
-        return res.status(403).json({ error: "Solo el autor de la nota puede firmarla" });
-      }
       
-      if (note.firmada) {
-        return res.status(400).json({ error: "Note already signed" });
-      }
+      if (!note) return res.status(404).json({ error: "Note not found" });
+      if (note.medicoId !== userId) return res.status(403).json({ error: "Solo el autor de la nota puede firmarla" });
+      if (note.firmada) return res.status(400).json({ error: "Note already signed" });
       
-      const contentToSign = JSON.stringify({
-        id: note.id,
-        patientId: note.patientId,
-        medicoId: note.medicoId,
-        tipo: note.tipo,
-        fecha: note.fecha,
-        motivoConsulta: note.motivoConsulta,
-        subjetivo: note.subjetivo,
-        objetivo: note.objetivo,
-        analisis: note.analisis,
-        plan: note.plan,
-        diagnosticos: note.diagnosticos,
-      });
+      const contentToSign = await getNoteCanonicalContent(req.params.id);
+      if (!contentToSign) return res.status(404).json({ error: "Error al reconstruir contenido" });
       
       const hash = createHash("sha256").update(contentToSign).digest("hex");
-      
-      const signedNote = await storage.signMedicalNote(req.params.id, userId, hash);
+      const signedNote = await storage.signMedicalNote(req.params.id, userId!, hash);
       
       await storage.createAuditLog({
-        userId,
+        userId: userId!,
         accion: "firmar",
         entidad: "medical_notes",
         entidadId: req.params.id,
@@ -1217,6 +1287,46 @@ export async function registerRoutes(
       res.json(signedNote);
     } catch (error) {
       res.status(500).json({ error: "Error signing note" });
+    }
+  });
+
+  // Integrity Verification - Admin Only
+  app.post("/api/notes/:id/verify", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const note = await storage.getMedicalNote(req.params.id);
+      if (!note) return res.status(404).json({ error: "Nota no encontrada" });
+      if (!note.firmada || !note.firmaHash) {
+        return res.status(400).json({ error: "La nota no ha sido firmada aún" });
+      }
+
+      const currentContent = await getNoteCanonicalContent(req.params.id);
+      if (!currentContent) return res.status(500).json({ error: "Error al leer contenido" });
+
+      const currentHash = createHash("sha256").update(currentContent).digest("hex");
+      const isIntegrityValid = currentHash === note.firmaHash;
+
+      await storage.createAuditLog({
+        userId: req.session.userId!,
+        accion: "verificar_integridad",
+        entidad: "medical_notes",
+        entidadId: note.id,
+        detalles: JSON.stringify({ valid: isIntegrityValid, originalHash: note.firmaHash, currentHash }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
+      res.json({
+        id: note.id,
+        firmada: true,
+        fechaFirma: note.fechaFirma,
+        integridadValida: isIntegrityValid,
+        originalHash: note.firmaHash,
+        currentHash: currentHash
+      });
+    } catch (error) {
+      console.error("Integrity check error:", error);
+      res.status(500).json({ error: "Error en la verificación de integridad" });
     }
   });
 

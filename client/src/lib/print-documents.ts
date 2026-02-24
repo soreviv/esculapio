@@ -644,7 +644,12 @@ export function printClinicalHistory({ patient, medico, latestVitals }: Clinical
 // =====================
 
 export interface MedicalNoteData {
-  note: MedicalNote & { medicoNombre?: string; medicoEspecialidad?: string; medicoCedula?: string };
+  note: MedicalNote & { 
+    medicoNombre?: string; 
+    medicoEspecialidad?: string; 
+    medicoCedula?: string;
+    diagnosticos?: { codigo: string; descripcion: string; tipo: string }[];
+  };
   patient: Patient;
   vitals?: Vitals | null;
 }
@@ -797,18 +802,14 @@ export function printMedicalNote({ note, patient, vitals }: MedicalNoteData): vo
         </div>
       </div>
 
-      ${(note.diagnosticos && note.diagnosticos.length > 0) || (note.diagnosticosCie10 && note.diagnosticosCie10.length > 0) ? `
+      ${note.diagnosticos && note.diagnosticos.length > 0 ? `
       <div class="section">
         <div class="section-header">Diagnósticos</div>
         <div class="section-content">
-          ${note.diagnosticosCie10?.map((dx, i) => `
+          ${note.diagnosticos.map((dx) => `
             <div class="diagnosis-item">
-              <span class="diagnosis-code">${dx}</span>
-              <span class="diagnosis-desc">${note.diagnosticos?.[i] || ''}</span>
-            </div>
-          `).join('') || note.diagnosticos?.map(dx => `
-            <div class="diagnosis-item">
-              <span class="diagnosis-desc">${dx}</span>
+              <span class="diagnosis-code">${dx.codigo}</span>
+              <span class="diagnosis-desc">${dx.descripcion}</span>
             </div>
           `).join('')}
         </div>

@@ -25,7 +25,7 @@ describe("Session Config Environment Validation", () => {
       } catch (error: any) {
         // It will likely fail later due to database connection, but we want to see the warning
         const output = error.stdout?.toString() || "";
-        expect(output).toContain("Using a temporary secret for development");
+        expect(output).toContain("No SESSION_SECRET provided in development");
       }
   });
 });

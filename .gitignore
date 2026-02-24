@@ -1,31 +1,43 @@
-node_modules
-dist
-coverage
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz-e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
-*.log-e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Compilación y Salida
+dist/
+build/
+server/public/
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Entorno (Secretos)
+.env
+.env.*
+!.env.example
+
+# Pruebas y Cobertura
+coverage/
+.vitest/
+test-reports/
+
+# Sistema y Editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporales
+tmp/
+.temp/
+*.tar.gz
+
+# Drizzle y DB locales
+.drizzle/
+*.sqlite
+*.db
