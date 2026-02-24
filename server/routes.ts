@@ -938,6 +938,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No valid fields to update" });
       }
 
+      // Defensa contra eliminación concurrente: la cita pudo borrarse entre getAppointment y updateAppointment.
       const appointment = await storage.updateAppointment(req.params.id, parsed.data);
       if (!appointment) {
         return res.status(404).json({ error: "Appointment not found" });
