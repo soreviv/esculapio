@@ -3,7 +3,7 @@
 ## Estado: Documentación revisada
 
 ### Problema Original
-Revisar DEPLOY_VPS.md, corregir errores y asegurar que las instrucciones de despliegue sean adecuadas.
+Revisar instrucciones de despliegue (ver MANUAL_DESPLIEGUE.md), corregir errores y asegurar que sean adecuadas.
 
 ### Arquitectura
 - **App**: Node.js + Express + TypeScript (cliente integrado con Vite build)
@@ -39,7 +39,9 @@ Revisión de preparación para despliegue: vulnerabilidades npm audit, versiones
 
 ### Implementado (2026-02-08)
 - [x] Corrección de vulnerabilidades esbuild (de 5 a 0 vulnerabilidades)
+- [x] Corrección de vulnerabilidades minimatch y rollup (2026-02-27)
 - [x] Actualización de paquetes: @types/node@22, vite@6.4.1, esbuild@0.25+
+- [x] Unificación de versiones Tailwind CSS (v4) y limpieza de dependencias (2026-02-27)
 - [x] Agregado @testing-library/dom (dependencia faltante)
 - [x] Corrección de errores TypeScript en server/index.ts
 - [x] Configuración de yarn resolutions para esbuild seguro
