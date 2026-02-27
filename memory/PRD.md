@@ -42,6 +42,7 @@ Revisión de preparación para despliegue: vulnerabilidades npm audit, versiones
 - [x] Corrección de vulnerabilidades minimatch y rollup (2026-02-27)
 - [x] Actualización de paquetes: @types/node@22, vite@6.4.1, esbuild@0.25+
 - [x] Unificación de versiones Tailwind CSS (v4) y limpieza de dependencias (2026-02-27)
+- [x] Eliminación de autoprefixer redundante para corregir warning de PostCSS (2026-02-27)
 - [x] Agregado @testing-library/dom (dependencia faltante)
 - [x] Corrección de errores TypeScript en server/index.ts
 - [x] Configuración de yarn resolutions para esbuild seguro
