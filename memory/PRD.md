@@ -46,7 +46,7 @@ Revisión de preparación para despliegue: vulnerabilidades npm audit, versiones
 - [x] Agregado @testing-library/dom (dependencia faltante)
 - [x] Corrección de errores TypeScript en server/index.ts
 - [x] Configuración de yarn resolutions para esbuild seguro
-- [x] Build de producción verificado
+- [x] Build de producción verificado (sin warnings de PostCSS)
 - [x] 56 tests unitarios pasando
 
 ### Checklist Despliegue
