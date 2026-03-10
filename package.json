@@ -134,5 +134,11 @@
     "minimatch": "^10.2.3",
     "rollup": "^4.59.0",
     "glob": "^10.5.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "minimatch": "^10.2.3",
+      "glob": "^10.5.0"
+    }
   }
 }
