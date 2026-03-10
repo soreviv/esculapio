@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { redactSensitiveData, isSensitivePath } from "../server/index";
+import { redactSensitiveData, isSensitivePath } from "../server/logging-utils";
 
 describe("Logging Redaction", () => {
   describe("isSensitivePath", () => {

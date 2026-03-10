@@ -18,13 +18,15 @@ describe("Session Config Environment Validation", () => {
 
   it("should show warning in development if SESSION_SECRET is missing", () => {
       try {
-        execSync("NODE_ENV=development DATABASE_URL=postgres://localhost:5432/db SESSION_SECRET= npx tsx server/index.ts", {
+        execSync("NODE_ENV=development DATABASE_URL=postgres://localhost:5432/db SESSION_SECRET= PORT=19999 npx tsx server/index.ts", {
           stdio: "pipe",
-          timeout: 15000
+          timeout: 5000
         });
       } catch (error: any) {
-        // It will likely fail later due to database connection, but we want to see the warning
-        const output = error.stdout?.toString() || "";
+        // It will fail due to timeout or port conflict; capture combined output
+        const stdout = error.stdout?.toString() || "";
+        const stderr = error.stderr?.toString() || "";
+        const output = stdout + stderr;
         expect(output).toContain("No SESSION_SECRET provided in development");
       }
   });

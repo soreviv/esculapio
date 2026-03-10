@@ -886,17 +886,7 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Prescription not found" });
       }
 
-      // Solo el médico autor puede modificar la receta
-      if (existingPrescription.medicoId !== req.session.userId) {
-        return res.status(403).json({ error: "Solo el médico autor puede modificar la receta" });
-      }
-
-      const prescription = await storage.updatePrescription(req.params.id, req.body);
-      if (!prescription) {
-        return res.status(404).json({ error: "Prescription not found" });
-      }
-
-      // NOM-004-SSA3-2012: Solo el autor puede modificar sus notas/recetas
+      // NOM-004-SSA3-2012: Solo el médico autor puede modificar la receta
       if (existingPrescription.medicoId !== req.session.userId) {
         return res.status(403).json({ error: "No autorizado. Solo el médico autor puede modificar esta receta (NOM-004-SSA3-2012)." });
       }
@@ -905,9 +895,9 @@ export async function registerRoutes(
       const { medicoId, patientId, id, ...updateData } = req.body;
 
       const updatedPrescription = await storage.updatePrescription(req.params.id, updateData);
-      
+
       if (!updatedPrescription) {
-        return res.status(404).json({ error: "Prescription not found during update" });
+        return res.status(404).json({ error: "Prescription not found" });
       }
 
       await storage.createAuditLog({
