@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,10 +11,12 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { AuditLog } from "@shared/schema";
+import type { AuditLog, User as UserRecord } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Settings,
   Building2,
@@ -47,6 +49,40 @@ import {
 export default function Configuracion() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("establecimiento");
+  const [isNewUserDialogOpen, setIsNewUserDialogOpen] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    username: "",
+    password: "",
+    nombre: "",
+    role: "medico",
+    especialidad: "",
+    cedula: "",
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery<UserRecord[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: async (data: typeof newUserForm) => {
+      const res = await apiRequest("POST", "/api/register", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setIsNewUserDialogOpen(false);
+      setNewUserForm({ username: "", password: "", nombre: "", role: "medico", especialidad: "", cedula: "" });
+      toast({ title: "Usuario creado", description: "El usuario fue registrado exitosamente." });
+    },
+    onError: (err: Error) => {
+      let message = "Error al crear el usuario";
+      try {
+        const body = JSON.parse(err.message.replace(/^\d+: /, ""));
+        message = body.error || message;
+      } catch {}
+      toast({ title: "Error", description: message, variant: "destructive" });
+    },
+  });
 
   const handleSave = (section: string) => {
     toast({
@@ -224,7 +260,7 @@ export default function Configuracion() {
                     Administra médicos, enfermeras y personal administrativo
                   </CardDescription>
                 </div>
-                <Button data-testid="button-new-user">
+                <Button data-testid="button-new-user" onClick={() => setIsNewUserDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Usuario
                 </Button>
@@ -232,62 +268,39 @@ export default function Configuracion() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-4 p-4 rounded-md border" data-testid="user-item-1">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">DM</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">Dr. Miguel Ángel Hernández</p>
-                      <p className="text-sm text-muted-foreground">Cédula: 12345678</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">Médico</Badge>
-                    <Badge variant="outline">Activo</Badge>
-                    <Button size="icon" variant="ghost" data-testid="button-edit-user-1">
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 p-4 rounded-md border" data-testid="user-item-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">EL</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">Enf. Laura García</p>
-                      <p className="text-sm text-muted-foreground">Cédula: 87654321</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">Enfermería</Badge>
-                    <Badge variant="outline">Activo</Badge>
-                    <Button size="icon" variant="ghost" data-testid="button-edit-user-2">
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 p-4 rounded-md border" data-testid="user-item-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">AR</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">Ana Rodríguez</p>
-                      <p className="text-sm text-muted-foreground">Administración</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">Administrador</Badge>
-                    <Badge variant="outline">Activo</Badge>
-                    <Button size="icon" variant="ghost" data-testid="button-edit-user-3">
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                {usersLoading ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Cargando usuarios...</p>
+                ) : users.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No hay usuarios registrados.</p>
+                ) : (
+                  users.map((u, idx) => {
+                    const initials = u.nombre
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase();
+                    const roleLabel = u.role === "medico" ? "Médico" : u.role === "enfermeria" ? "Enfermería" : "Administrador";
+                    return (
+                      <div key={u.id} className="flex items-center justify-between gap-4 p-4 rounded-md border" data-testid={`user-item-${idx + 1}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-sm font-medium text-primary">{initials}</span>
+                          </div>
+                          <div>
+                            <p className="font-medium">{u.nombre}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {u.cedula ? `Cédula: ${u.cedula}` : u.especialidad || u.username}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{roleLabel}</Badge>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               <Separator />
@@ -317,6 +330,92 @@ export default function Configuracion() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Dialog: Nuevo Usuario */}
+          <Dialog open={isNewUserDialogOpen} onOpenChange={setIsNewUserDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nuevo Usuario</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-1">
+                  <Label htmlFor="new-nombre">Nombre completo *</Label>
+                  <Input
+                    id="new-nombre"
+                    value={newUserForm.nombre}
+                    onChange={(e) => setNewUserForm((f) => ({ ...f, nombre: e.target.value }))}
+                    placeholder="Ej. Dr. Juan Pérez"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="new-username">Nombre de usuario *</Label>
+                  <Input
+                    id="new-username"
+                    value={newUserForm.username}
+                    onChange={(e) => setNewUserForm((f) => ({ ...f, username: e.target.value }))}
+                    placeholder="Ej. jperez"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="new-password">Contraseña *</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newUserForm.password}
+                    onChange={(e) => setNewUserForm((f) => ({ ...f, password: e.target.value }))}
+                    placeholder="Mínimo score 3/4 en seguridad"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="new-role">Rol *</Label>
+                  <Select
+                    value={newUserForm.role}
+                    onValueChange={(val) => setNewUserForm((f) => ({ ...f, role: val }))}
+                  >
+                    <SelectTrigger id="new-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="medico">Médico</SelectItem>
+                      <SelectItem value="enfermeria">Enfermería</SelectItem>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="new-especialidad">Especialidad</Label>
+                  <Input
+                    id="new-especialidad"
+                    value={newUserForm.especialidad}
+                    onChange={(e) => setNewUserForm((f) => ({ ...f, especialidad: e.target.value }))}
+                    placeholder="Ej. Medicina General"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="new-cedula">Cédula Profesional</Label>
+                  <Input
+                    id="new-cedula"
+                    value={newUserForm.cedula}
+                    onChange={(e) => setNewUserForm((f) => ({ ...f, cedula: e.target.value }))}
+                    placeholder="Ej. 12345678"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsNewUserDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => createUserMutation.mutate(newUserForm)}
+                  disabled={createUserMutation.isPending || !newUserForm.username || !newUserForm.password || !newUserForm.nombre}
+                >
+                  {createUserMutation.isPending ? "Creando..." : "Crear Usuario"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="horarios" className="space-y-4 mt-0">
