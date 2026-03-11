@@ -102,6 +102,7 @@ if (!sessionSecret) {
     throw new Error("SESSION_SECRET environment variable is required in production");
   } else {
     sessionSecret = crypto.randomBytes(64).toString("hex");
+    process.stderr.write("WARN: No SESSION_SECRET provided in development. Generated a temporary random secret.\n");
     logger.warn("No SESSION_SECRET provided in development. Generated a temporary random secret.");
   }
 }
@@ -200,6 +201,10 @@ app.use((req, res, next) => {
     }
 
     const port = parseInt(process.env.PORT || "5000", 10);
+    httpServer.on("error", (err: NodeJS.ErrnoException) => {
+      logger.fatal({ err }, "HTTP server failed to start");
+      process.exit(1);
+    });
     httpServer.listen({ port, host: "0.0.0.0" }, () => {
       log(`Server listening on port ${port} in ${process.env.NODE_ENV || 'development'} mode`);
     });
