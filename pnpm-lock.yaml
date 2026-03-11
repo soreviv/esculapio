@@ -206,7 +206,7 @@ importers:
         specifier: ^1.0.0
         version: 1.0.0
       pg:
-        specifier: ^8.16.3
+        specifier: ^8.20.0
         version: 8.20.0
       pino:
         specifier: ^10.1.0
