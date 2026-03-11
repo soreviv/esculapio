@@ -336,7 +336,7 @@ importers:
         specifier: ^28.1.0
         version: 28.1.0(@noble/hashes@1.8.0)
       postcss:
-        specifier: ^8.4.47
+        specifier: ^8.5.8
         version: 8.5.8
       tailwindcss:
         specifier: ^3.4.17
