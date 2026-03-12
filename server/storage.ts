@@ -1,5 +1,5 @@
-import { 
-  type User, type InsertUser, 
+import {
+  type User, type InsertUser,
   type Patient, type InsertPatient,
   type MedicalNote, type InsertMedicalNote,
   type MedicalNoteAddendum, type InsertMedicalNoteAddendum,
@@ -13,9 +13,10 @@ import {
   type PatientConsent, type InsertPatientConsent,
   type LabOrder, type InsertLabOrder, type LabOrderWithDetails,
   type DashboardMetrics, type PatientSearchFilters, type TimelineEvent,
-  users, patients, medicalNotes, medicalNoteAddendums, medicalNoteDiagnoses, 
+  type ClinicHoursDay, DEFAULT_CLINIC_HOURS,
+  users, patients, medicalNotes, medicalNoteAddendums, medicalNoteDiagnoses,
   vitals, prescriptions, appointments,
-  auditLogs, cie10Catalog, patientConsents, labOrders
+  auditLogs, cie10Catalog, patientConsents, labOrders, establishmentConfig
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, ilike, or, sql } from "drizzle-orm";
@@ -119,6 +120,10 @@ export interface IStorage {
   getPatientVitals(patientId: string): Promise<Vitals[]>;
   getPatientPrescriptions(patientId: string): Promise<Prescription[]>;
   getPatientLabOrders(patientId: string): Promise<LabOrder[]>;
+
+  // Clinic Hours
+  getClinicHours(): Promise<ClinicHoursDay[]>;
+  updateClinicHours(hours: ClinicHoursDay[]): Promise<ClinicHoursDay[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -921,6 +926,41 @@ export class DatabaseStorage implements IStorage {
 
   async getPatientLabOrders(patientId: string): Promise<LabOrder[]> {
     return this.getLabOrders(patientId);
+  }
+
+  async getClinicHours(): Promise<ClinicHoursDay[]> {
+    const [config] = await db.select({ horarios: establishmentConfig.horarios })
+      .from(establishmentConfig)
+      .where(eq(establishmentConfig.activo, true))
+      .limit(1);
+    if (config?.horarios) {
+      return config.horarios as ClinicHoursDay[];
+    }
+    return DEFAULT_CLINIC_HOURS;
+  }
+
+  async updateClinicHours(hours: ClinicHoursDay[]): Promise<ClinicHoursDay[]> {
+    const [existing] = await db.select({ id: establishmentConfig.id })
+      .from(establishmentConfig)
+      .where(eq(establishmentConfig.activo, true))
+      .limit(1);
+
+    if (existing) {
+      await db.update(establishmentConfig)
+        .set({ horarios: hours, updatedAt: new Date() })
+        .where(eq(establishmentConfig.id, existing.id));
+    } else {
+      await db.insert(establishmentConfig).values({
+        tipoEstablecimiento: "Consultorio",
+        nombreEstablecimiento: "Salud Digital",
+        domicilio: "",
+        ciudad: "",
+        estado: "",
+        horarios: hours,
+        activo: true,
+      });
+    }
+    return hours;
   }
 }
 
