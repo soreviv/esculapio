@@ -50,6 +50,15 @@ import {
 export default function Configuracion() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("establecimiento");
+  const [horarios, setHorarios] = useState([
+    { dia: "Lunes",     inicio: "08:00", fin: "20:00", activo: true  },
+    { dia: "Martes",    inicio: "08:00", fin: "20:00", activo: true  },
+    { dia: "Miércoles", inicio: "08:00", fin: "20:00", activo: true  },
+    { dia: "Jueves",    inicio: "08:00", fin: "20:00", activo: true  },
+    { dia: "Viernes",   inicio: "08:00", fin: "20:00", activo: true  },
+    { dia: "Sábado",    inicio: "09:00", fin: "14:00", activo: true  },
+    { dia: "Domingo",   inicio: "",      fin: "",      activo: false },
+  ]);
   const [horarios, setHorarios] = useState<ClinicHoursDay[]>(DEFAULT_CLINIC_HOURS);
   const [isNewUserDialogOpen, setIsNewUserDialogOpen] = useState(false);
   const [newUserForm, setNewUserForm] = useState({
@@ -463,6 +472,14 @@ export default function Configuracion() {
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 {horarios.map((horario, index) => (
+                  <div key={index} className="flex items-center gap-4 p-3 rounded-md border" data-testid={`horario-${horario.dia.toLowerCase()}`}>
+                    <Switch
+                      checked={horario.activo}
+                      onCheckedChange={(checked) =>
+                        setHorarios((prev) =>
+                          prev.map((h, i) => i === index ? { ...h, activo: checked } : h)
+                        )
+                      }
                   <div key={horario.dia} className="flex items-center gap-4 p-3 rounded-md border" data-testid={`horario-${horario.dia.toLowerCase().replace('é','e').replace('é','e')}`}>
                     <Switch
                       checked={horario.activo}
@@ -473,6 +490,11 @@ export default function Configuracion() {
                       <Input
                         type="time"
                         value={horario.inicio}
+                        onChange={(e) =>
+                          setHorarios((prev) =>
+                            prev.map((h, i) => i === index ? { ...h, inicio: e.target.value } : h)
+                          )
+                        }
                         onChange={(e) => updateHorario(index, "inicio", e.target.value)}
                         disabled={!horario.activo}
                         className="w-32"
@@ -481,6 +503,11 @@ export default function Configuracion() {
                       <Input
                         type="time"
                         value={horario.fin}
+                        onChange={(e) =>
+                          setHorarios((prev) =>
+                            prev.map((h, i) => i === index ? { ...h, fin: e.target.value } : h)
+                          )
+                        }
                         onChange={(e) => updateHorario(index, "fin", e.target.value)}
                         disabled={!horario.activo}
                         className="w-32"
