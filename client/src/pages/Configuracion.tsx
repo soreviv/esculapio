@@ -61,6 +61,7 @@ export default function Configuracion() {
 
   const { data: users = [], isLoading: usersLoading } = useQuery<UserRecord[]>({
     queryKey: ["/api/users"],
+    enabled: activeTab === "usuarios",
   });
 
   const createUserMutation = useMutation({
@@ -273,7 +274,7 @@ export default function Configuracion() {
                 ) : users.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">No hay usuarios registrados.</p>
                 ) : (
-                  users.map((u, idx) => {
+                  users.map((u) => {
                     const initials = u.nombre
                       .split(" ")
                       .map((n) => n[0])
@@ -282,7 +283,7 @@ export default function Configuracion() {
                       .toUpperCase();
                     const roleLabel = u.role === "medico" ? "Médico" : u.role === "enfermeria" ? "Enfermería" : "Administrador";
                     return (
-                      <div key={u.id} className="flex items-center justify-between gap-4 p-4 rounded-md border" data-testid={`user-item-${idx + 1}`}>
+                      <div key={u.id} className="flex items-center justify-between gap-4 p-4 rounded-md border" data-testid={`user-item-${u.id}`}>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                             <span className="text-sm font-medium text-primary">{initials}</span>
