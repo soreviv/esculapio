@@ -50,16 +50,7 @@ import {
 export default function Configuracion() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("establecimiento");
-  const [horarios, setHorarios] = useState([
-    { dia: "Lunes",     inicio: "08:00", fin: "20:00", activo: true  },
-    { dia: "Martes",    inicio: "08:00", fin: "20:00", activo: true  },
-    { dia: "Miércoles", inicio: "08:00", fin: "20:00", activo: true  },
-    { dia: "Jueves",    inicio: "08:00", fin: "20:00", activo: true  },
-    { dia: "Viernes",   inicio: "08:00", fin: "20:00", activo: true  },
-    { dia: "Sábado",    inicio: "09:00", fin: "14:00", activo: true  },
-    { dia: "Domingo",   inicio: "",      fin: "",      activo: false },
-  ]);
-  const [horarios, setHorarios] = useState<ClinicHoursDay[]>(DEFAULT_CLINIC_HOURS);
+  const [schedules, setSchedules] = useState<ClinicHoursDay[]>(DEFAULT_CLINIC_HOURS);
   const [isNewUserDialogOpen, setIsNewUserDialogOpen] = useState(false);
   const [newUserForm, setNewUserForm] = useState({
     username: "",
@@ -102,11 +93,11 @@ export default function Configuracion() {
 
   useEffect(() => {
     if (clinicHoursData) {
-      setHorarios(clinicHoursData);
+      setSchedules(clinicHoursData);
     }
   }, [clinicHoursData]);
 
-  const saveHorariosMutation = useMutation({
+  const saveSchedulesMutation = useMutation({
     mutationFn: async (hours: ClinicHoursDay[]) => {
       const res = await apiRequest("PUT", "/api/config/clinic-hours", hours);
       return res.json();
@@ -120,8 +111,8 @@ export default function Configuracion() {
     },
   });
 
-  const updateHorario = (index: number, field: keyof ClinicHoursDay, value: string | boolean) => {
-    setHorarios((prev) => prev.map((h, i) => i === index ? { ...h, [field]: value } : h));
+  const updateSchedule = (index: number, field: keyof ClinicHoursDay, value: string | boolean) => {
+    setSchedules((prev) => prev.map((h, i) => i === index ? { ...h, [field]: value } : h));
   };
 
   const handleSave = (section: string) => {
@@ -471,45 +462,27 @@ export default function Configuracion() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                {horarios.map((horario, index) => (
-                  <div key={index} className="flex items-center gap-4 p-3 rounded-md border" data-testid={`horario-${horario.dia.toLowerCase()}`}>
+                {schedules.map((schedule, index) => (
+                  <div key={schedule.dia} className="flex items-center gap-4 p-3 rounded-md border" data-testid={`horario-${schedule.dia.toLowerCase().replace('é','e')}`}>
                     <Switch
-                      checked={horario.activo}
-                      onCheckedChange={(checked) =>
-                        setHorarios((prev) =>
-                          prev.map((h, i) => i === index ? { ...h, activo: checked } : h)
-                        )
-                      }
-                  <div key={horario.dia} className="flex items-center gap-4 p-3 rounded-md border" data-testid={`horario-${horario.dia.toLowerCase().replace('é','e').replace('é','e')}`}>
-                    <Switch
-                      checked={horario.activo}
-                      onCheckedChange={(checked) => updateHorario(index, "activo", checked)}
+                      checked={schedule.activo}
+                      onCheckedChange={(checked) => updateSchedule(index, "activo", checked)}
                     />
-                    <span className="w-24 font-medium">{horario.dia}</span>
+                    <span className="w-24 font-medium">{schedule.dia}</span>
                     <div className="flex items-center gap-2 flex-1">
                       <Input
                         type="time"
-                        value={horario.inicio}
-                        onChange={(e) =>
-                          setHorarios((prev) =>
-                            prev.map((h, i) => i === index ? { ...h, inicio: e.target.value } : h)
-                          )
-                        }
-                        onChange={(e) => updateHorario(index, "inicio", e.target.value)}
-                        disabled={!horario.activo}
+                        value={schedule.inicio}
+                        onChange={(e) => updateSchedule(index, "inicio", e.target.value)}
+                        disabled={!schedule.activo}
                         className="w-32"
                       />
                       <span className="text-muted-foreground">a</span>
                       <Input
                         type="time"
-                        value={horario.fin}
-                        onChange={(e) =>
-                          setHorarios((prev) =>
-                            prev.map((h, i) => i === index ? { ...h, fin: e.target.value } : h)
-                          )
-                        }
-                        onChange={(e) => updateHorario(index, "fin", e.target.value)}
-                        disabled={!horario.activo}
+                        value={schedule.fin}
+                        onChange={(e) => updateSchedule(index, "fin", e.target.value)}
+                        disabled={!schedule.activo}
                         className="w-32"
                       />
                     </div>
@@ -541,12 +514,12 @@ export default function Configuracion() {
 
               <div className="flex justify-end">
                 <Button
-                  onClick={() => saveHorariosMutation.mutate(horarios)}
-                  disabled={saveHorariosMutation.isPending}
+                  onClick={() => saveSchedulesMutation.mutate(schedules)}
+                  disabled={saveSchedulesMutation.isPending}
                   data-testid="button-save-horarios"
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {saveHorariosMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                  {saveSchedulesMutation.isPending ? "Guardando..." : "Guardar Cambios"}
                 </Button>
               </div>
             </CardContent>
