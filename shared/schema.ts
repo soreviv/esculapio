@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, real, date, time, index, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, real, date, time, index, uuid, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -268,6 +268,7 @@ export const establishmentConfig = pgTable("establishment_config", {
   responsableSanitario: text("responsable_sanitario"),
   cedulaResponsable: text("cedula_responsable"),
   logoUrl: text("logo_url"),
+  horarios: jsonb("horarios"),
   activo: boolean("activo").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -317,6 +318,23 @@ export type InsertNursingNote = z.infer<typeof insertNursingNoteSchema>;
 export type NursingNote = typeof nursingNotes.$inferSelect;
 export type InsertEstablishmentConfig = z.infer<typeof insertEstablishmentConfigSchema>;
 export type EstablishmentConfig = typeof establishmentConfig.$inferSelect;
+
+export interface ClinicHoursDay {
+  dia: string;
+  activo: boolean;
+  inicio: string;
+  fin: string;
+}
+
+export const DEFAULT_CLINIC_HOURS: ClinicHoursDay[] = [
+  { dia: "Lunes",     activo: true,  inicio: "08:00", fin: "20:00" },
+  { dia: "Martes",    activo: true,  inicio: "08:00", fin: "20:00" },
+  { dia: "Miércoles", activo: true,  inicio: "08:00", fin: "20:00" },
+  { dia: "Jueves",    activo: true,  inicio: "08:00", fin: "20:00" },
+  { dia: "Viernes",   activo: true,  inicio: "08:00", fin: "20:00" },
+  { dia: "Sábado",    activo: true,  inicio: "09:00", fin: "14:00" },
+  { dia: "Domingo",   activo: false, inicio: "",      fin: ""      },
+];
 
 // Enriched types with joined data
 export type AppointmentWithDetails = Appointment & {

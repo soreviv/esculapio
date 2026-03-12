@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { AuditLog, User as UserRecord } from "@shared/schema";
+import type { AuditLog, User as UserRecord, ClinicHoursDay } from "@shared/schema";
+import { DEFAULT_CLINIC_HOURS } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Settings,
@@ -58,6 +59,7 @@ export default function Configuracion() {
     { dia: "Sábado",    inicio: "09:00", fin: "14:00", activo: true  },
     { dia: "Domingo",   inicio: "",      fin: "",      activo: false },
   ]);
+  const [horarios, setHorarios] = useState<ClinicHoursDay[]>(DEFAULT_CLINIC_HOURS);
   const [isNewUserDialogOpen, setIsNewUserDialogOpen] = useState(false);
   const [newUserForm, setNewUserForm] = useState({
     username: "",
@@ -93,6 +95,34 @@ export default function Configuracion() {
       toast({ title: "Error", description: message, variant: "destructive" });
     },
   });
+
+  const { data: clinicHoursData } = useQuery<ClinicHoursDay[]>({
+    queryKey: ["/api/config/clinic-hours"],
+  });
+
+  useEffect(() => {
+    if (clinicHoursData) {
+      setHorarios(clinicHoursData);
+    }
+  }, [clinicHoursData]);
+
+  const saveHorariosMutation = useMutation({
+    mutationFn: async (hours: ClinicHoursDay[]) => {
+      const res = await apiRequest("PUT", "/api/config/clinic-hours", hours);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/config/clinic-hours"] });
+      toast({ title: "Horarios guardados", description: "Los horarios de atención han sido actualizados." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudieron guardar los horarios.", variant: "destructive" });
+    },
+  });
+
+  const updateHorario = (index: number, field: keyof ClinicHoursDay, value: string | boolean) => {
+    setHorarios((prev) => prev.map((h, i) => i === index ? { ...h, [field]: value } : h));
+  };
 
   const handleSave = (section: string) => {
     toast({
@@ -450,6 +480,10 @@ export default function Configuracion() {
                           prev.map((h, i) => i === index ? { ...h, activo: checked } : h)
                         )
                       }
+                  <div key={horario.dia} className="flex items-center gap-4 p-3 rounded-md border" data-testid={`horario-${horario.dia.toLowerCase().replace('é','e').replace('é','e')}`}>
+                    <Switch
+                      checked={horario.activo}
+                      onCheckedChange={(checked) => updateHorario(index, "activo", checked)}
                     />
                     <span className="w-24 font-medium">{horario.dia}</span>
                     <div className="flex items-center gap-2 flex-1">
@@ -461,6 +495,7 @@ export default function Configuracion() {
                             prev.map((h, i) => i === index ? { ...h, inicio: e.target.value } : h)
                           )
                         }
+                        onChange={(e) => updateHorario(index, "inicio", e.target.value)}
                         disabled={!horario.activo}
                         className="w-32"
                       />
@@ -473,6 +508,7 @@ export default function Configuracion() {
                             prev.map((h, i) => i === index ? { ...h, fin: e.target.value } : h)
                           )
                         }
+                        onChange={(e) => updateHorario(index, "fin", e.target.value)}
                         disabled={!horario.activo}
                         className="w-32"
                       />
@@ -504,9 +540,13 @@ export default function Configuracion() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={() => handleSave("horarios")} data-testid="button-save-horarios">
+                <Button
+                  onClick={() => saveHorariosMutation.mutate(horarios)}
+                  disabled={saveHorariosMutation.isPending}
+                  data-testid="button-save-horarios"
+                >
                   <Save className="h-4 w-4 mr-2" />
-                  Guardar Cambios
+                  {saveHorariosMutation.isPending ? "Guardando..." : "Guardar Cambios"}
                 </Button>
               </div>
             </CardContent>
