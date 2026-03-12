@@ -1320,5 +1320,40 @@ export async function registerRoutes(
     }
   });
 
+  // Clinic Hours
+  app.get("/api/config/clinic-hours", isAuthenticated(), async (req, res) => {
+    try {
+      const hours = await storage.getClinicHours();
+      res.json(hours);
+    } catch (error) {
+      console.error("Error fetching clinic hours:", error);
+      res.status(500).json({ error: "Error al obtener los horarios" });
+    }
+  });
+
+  app.put("/api/config/clinic-hours", isAdmin(), async (req, res) => {
+    try {
+      const hours = req.body;
+      if (!Array.isArray(hours)) {
+        return res.status(400).json({ error: "El cuerpo debe ser un array de horarios" });
+      }
+      const updated = await storage.updateClinicHours(hours);
+      await storage.createAuditLog({
+        userId: req.session.userId!,
+        accion: "actualizar_horarios",
+        entidad: "establishment_config",
+        entidadId: null,
+        detalles: JSON.stringify({ horarios: hours }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating clinic hours:", error);
+      res.status(500).json({ error: "Error al guardar los horarios" });
+    }
+  });
+
   return httpServer;
 }
