@@ -41,13 +41,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      # Actualizar paquetes de Replit juntos
-      replit:
-        patterns:
-          - "@replit/*"
-        update-types:
-          - "minor"
-          - "patch"
     ignore:
       # Evitar actualizaciones major de React hasta validación manual
       - dependency-name: "react"
