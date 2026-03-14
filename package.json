@@ -131,14 +131,14 @@
     "minimatch": "^10.2.3",
     "rollup": "^4.59.0",
     "glob": "^10.5.0",
-    "undici": ">=7.24.2"
+    "undici": ">=7.24.1"
   },
   "pnpm": {
     "overrides": {
       "esbuild": "^0.25.0",
       "minimatch": "^10.2.3",
       "glob": "^10.5.0",
-      "undici": ">=7.24.2"
+      "undici": ">=7.24.1"
     }
   }
 }
