@@ -36,6 +36,18 @@ export interface NewNoteDialogProps {
   onSuccess?: () => void;
 }
 
+interface VitalsFormData {
+  presionSistolica: string;
+  presionDiastolica: string;
+  frecuenciaCardiaca: string;
+  frecuenciaRespiratoria: string;
+  temperatura: string;
+  saturacionOxigeno: string;
+  peso: string;
+  talla: string;
+  glucosa: string;
+}
+
 interface NoteFormData {
   tipo: string;
   motivoConsulta: string;
@@ -45,7 +57,20 @@ interface NoteFormData {
   plan: string;
   pronostico: string;
   diagnosticos: DiagnosticoSeleccionado[];
+  vitals: VitalsFormData;
 }
+
+const initialVitals: VitalsFormData = {
+  presionSistolica: "",
+  presionDiastolica: "",
+  frecuenciaCardiaca: "",
+  frecuenciaRespiratoria: "",
+  temperatura: "",
+  saturacionOxigeno: "",
+  peso: "",
+  talla: "",
+  glucosa: "",
+};
 
 const initialFormData: NoteFormData = {
   tipo: "",
@@ -56,6 +81,7 @@ const initialFormData: NoteFormData = {
   plan: "",
   pronostico: "",
   diagnosticos: [],
+  vitals: initialVitals,
 };
 
 const tiposNota = [
@@ -87,21 +113,31 @@ export function NewNoteDialog({
 
   // Mutation para crear nota
   const createNoteMutation = useMutation({
-    mutationFn: async (data: { note: any; sign: boolean }) => {
+    mutationFn: async (data: { note: any; vitals: any; sign: boolean }) => {
+      // Guardar signos vitales si hay alguno
+      const hasVitals = Object.values(data.vitals).some((v) => v !== null);
+      if (hasVitals) {
+        await fetch("/api/vitals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...data.vitals, patientId }),
+        });
+      }
+
       // Crear la nota
       const response = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data.note),
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Error al crear nota");
       }
-      
+
       const note = await response.json();
-      
+
       // Si se debe firmar, hacer la firma
       if (data.sign) {
         const signResponse = await fetch(`/api/notes/${note.id}/sign`, {
@@ -121,6 +157,7 @@ export function NewNoteDialog({
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/notes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/vitals`] });
       
       toast({
         title: variables.sign ? "Nota firmada" : "Nota guardada",
@@ -202,6 +239,22 @@ export function NewNoteDialog({
     fecha: new Date().toISOString(),
   });
 
+  const prepareVitalsData = () => {
+    const v = formData.vitals;
+    const parsed = {
+      presionSistolica: v.presionSistolica ? parseInt(v.presionSistolica) : null,
+      presionDiastolica: v.presionDiastolica ? parseInt(v.presionDiastolica) : null,
+      frecuenciaCardiaca: v.frecuenciaCardiaca ? parseInt(v.frecuenciaCardiaca) : null,
+      frecuenciaRespiratoria: v.frecuenciaRespiratoria ? parseInt(v.frecuenciaRespiratoria) : null,
+      temperatura: v.temperatura ? parseFloat(v.temperatura) : null,
+      saturacionOxigeno: v.saturacionOxigeno ? parseInt(v.saturacionOxigeno) : null,
+      peso: v.peso ? parseFloat(v.peso) : null,
+      talla: v.talla ? parseInt(v.talla) : null,
+      glucosa: v.glucosa ? parseInt(v.glucosa) : null,
+    };
+    return parsed;
+  };
+
   const handleSaveDraft = () => {
     if (!formData.tipo) {
       toast({
@@ -214,6 +267,7 @@ export function NewNoteDialog({
 
     createNoteMutation.mutate({
       note: prepareNoteData(),
+      vitals: prepareVitalsData(),
       sign: false,
     });
   };
@@ -235,6 +289,7 @@ export function NewNoteDialog({
       // Crear y firmar en un paso
       createNoteMutation.mutate({
         note: prepareNoteData(),
+        vitals: prepareVitalsData(),
         sign: true,
       });
     }
@@ -314,18 +369,112 @@ export function NewNoteDialog({
 
           <Separator />
 
-          {/* Formato SOAP */}
-          <div className="space-y-1">
+          {/* Signos Vitales */}
+          <div className="space-y-3">
             <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-              Nota Clínica (Formato SOAP)
+              Signos Vitales
             </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Presión arterial (mmHg)</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="number"
+                    placeholder="Sistólica"
+                    value={formData.vitals.presionSistolica}
+                    onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, presionSistolica: e.target.value } })}
+                    disabled={isLoading}
+                  />
+                  <span className="text-muted-foreground">/</span>
+                  <Input
+                    type="number"
+                    placeholder="Diastólica"
+                    value={formData.vitals.presionDiastolica}
+                    onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, presionDiastolica: e.target.value } })}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">FC (lpm)</Label>
+                <Input
+                  type="number"
+                  placeholder="Frec. cardíaca"
+                  value={formData.vitals.frecuenciaCardiaca}
+                  onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, frecuenciaCardiaca: e.target.value } })}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">FR (rpm)</Label>
+                <Input
+                  type="number"
+                  placeholder="Frec. respiratoria"
+                  value={formData.vitals.frecuenciaRespiratoria}
+                  onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, frecuenciaRespiratoria: e.target.value } })}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Temperatura (°C)</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  placeholder="36.6"
+                  value={formData.vitals.temperatura}
+                  onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, temperatura: e.target.value } })}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">SpO₂ (%)</Label>
+                <Input
+                  type="number"
+                  placeholder="Saturación O₂"
+                  value={formData.vitals.saturacionOxigeno}
+                  onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, saturacionOxigeno: e.target.value } })}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Glucosa (mg/dL)</Label>
+                <Input
+                  type="number"
+                  placeholder="Glucosa capilar"
+                  value={formData.vitals.glucosa}
+                  onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, glucosa: e.target.value } })}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Peso (kg)</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  placeholder="Peso"
+                  value={formData.vitals.peso}
+                  onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, peso: e.target.value } })}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Talla (cm)</Label>
+                <Input
+                  type="number"
+                  placeholder="Talla"
+                  value={formData.vitals.talla}
+                  onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, talla: e.target.value } })}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
           </div>
 
+          <Separator />
+
+          {/* Campos clínicos */}
           <div className="space-y-2">
-            <Label htmlFor="subjetivo" className="flex items-center gap-2">
-              <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">S</span>
-              Subjetivo / Padecimiento Actual
-            </Label>
+            <Label htmlFor="subjetivo">Padecimiento Actual</Label>
             <Textarea
               id="subjetivo"
               value={formData.subjetivo}
@@ -338,15 +487,12 @@ export function NewNoteDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="objetivo" className="flex items-center gap-2">
-              <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-bold">O</span>
-              Objetivo
-            </Label>
+            <Label htmlFor="objetivo">Exploración Física</Label>
             <Textarea
               id="objetivo"
               value={formData.objetivo}
               onChange={(e) => setFormData({ ...formData, objetivo: e.target.value })}
-              placeholder="Hallazgos a la exploración física, signos vitales, estudios..."
+              placeholder="Hallazgos a la exploración física..."
               rows={3}
               disabled={isLoading}
               data-testid="textarea-objetivo"
@@ -354,10 +500,7 @@ export function NewNoteDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="analisis" className="flex items-center gap-2">
-              <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-bold">A</span>
-              Análisis
-            </Label>
+            <Label htmlFor="analisis">Análisis</Label>
             <Textarea
               id="analisis"
               value={formData.analisis}
@@ -370,10 +513,7 @@ export function NewNoteDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="plan" className="flex items-center gap-2">
-              <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-bold">P</span>
-              Plan
-            </Label>
+            <Label htmlFor="plan">Plan</Label>
             <Textarea
               id="plan"
               value={formData.plan}
