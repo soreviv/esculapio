@@ -1321,7 +1321,7 @@ export async function registerRoutes(
   });
 
   // Clinic Hours
-  app.get("/api/config/clinic-hours", isAuthenticated(), async (req, res) => {
+  app.get("/api/config/clinic-hours", isAuthenticated, async (req, res) => {
     try {
       const hours = await storage.getClinicHours();
       res.json(hours);
@@ -1331,7 +1331,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/config/clinic-hours", isAdmin(), async (req, res) => {
+  app.put("/api/config/clinic-hours", isAdmin, async (req, res) => {
     try {
       const hours = req.body;
       if (!Array.isArray(hours)) {
