@@ -39,7 +39,6 @@ export interface NewNoteDialogProps {
 interface NoteFormData {
   tipo: string;
   motivoConsulta: string;
-  padecimientoActual: string;
   subjetivo: string;
   objetivo: string;
   analisis: string;
@@ -51,7 +50,6 @@ interface NoteFormData {
 const initialFormData: NoteFormData = {
   tipo: "",
   motivoConsulta: "",
-  padecimientoActual: "",
   subjetivo: "",
   objetivo: "",
   analisis: "",
@@ -194,14 +192,13 @@ export function NewNoteDialog({
     medicoId,
     tipo: formData.tipo,
     motivoConsulta: formData.motivoConsulta || null,
-    padecimientoActual: formData.padecimientoActual || null,
+    padecimientoActual: formData.subjetivo || null,
     subjetivo: formData.subjetivo || null,
     objetivo: formData.objetivo || null,
     analisis: formData.analisis || null,
     plan: formData.plan || null,
     pronostico: formData.pronostico || null,
-    diagnosticos: formData.diagnosticos.map(d => d.descripcion),
-    diagnosticosCie10: formData.diagnosticos.map(d => d.codigo),
+    diagnoses: formData.diagnosticos.map(d => ({ codigo: d.codigo, tipo: "presuntivo" })),
     fecha: new Date().toISOString(),
   });
 
@@ -315,20 +312,6 @@ export function NewNoteDialog({
             </div>
           </div>
 
-          {/* Padecimiento actual */}
-          <div className="space-y-2">
-            <Label htmlFor="padecimiento">Padecimiento Actual</Label>
-            <Textarea
-              id="padecimiento"
-              value={formData.padecimientoActual}
-              onChange={(e) => setFormData({ ...formData, padecimientoActual: e.target.value })}
-              placeholder="Descripción del padecimiento actual del paciente..."
-              rows={2}
-              disabled={isLoading}
-              data-testid="textarea-padecimiento"
-            />
-          </div>
-
           <Separator />
 
           {/* Formato SOAP */}
@@ -341,7 +324,7 @@ export function NewNoteDialog({
           <div className="space-y-2">
             <Label htmlFor="subjetivo" className="flex items-center gap-2">
               <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">S</span>
-              Subjetivo
+              Subjetivo / Padecimiento Actual
             </Label>
             <Textarea
               id="subjetivo"
