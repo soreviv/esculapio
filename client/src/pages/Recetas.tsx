@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pill, Plus, Calendar, User, Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Pill, Calendar, User, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { PrescriptionWithDetails } from "@shared/schema";
+import { NewPrescriptionDialog } from "@/components/ehr/NewPrescriptionDialog";
 
 function printPrescription(prescription: PrescriptionWithDetails) {
   const printWindow = window.open('', '_blank');
@@ -339,10 +340,7 @@ export default function Recetas() {
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Recetas</h1>
           <p className="text-muted-foreground">Historial de prescripciones médicas</p>
         </div>
-        <Button data-testid="button-new-prescription" disabled>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Receta
-        </Button>
+        <NewPrescriptionDialog />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

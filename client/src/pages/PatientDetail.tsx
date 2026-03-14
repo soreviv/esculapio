@@ -13,6 +13,7 @@ import { MedicalNoteCard } from "@/components/ehr/MedicalNoteCard";
 import { PrescriptionCard } from "@/components/ehr/PrescriptionCard";
 import { NewNoteDialog } from "@/components/ehr/NewNoteDialog";
 import { RecordVitalsDialog } from "@/components/ehr/RecordVitalsDialog";
+import { NewPrescriptionDialog } from "@/components/ehr/NewPrescriptionDialog";
 import { PatientTimeline } from "@/components/ehr/PatientTimeline";
 import {
   ArrowLeft,
@@ -388,10 +389,10 @@ export default function PatientDetail() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <CardTitle className="text-lg font-medium">Medicamentos</CardTitle>
-                    <Button size="sm" data-testid="button-new-prescription">
-                      <Pill className="h-4 w-4 mr-2" />
-                      Nueva Receta
-                    </Button>
+                    <NewPrescriptionDialog
+                      patientId={patient.id}
+                      onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/patients", params.id, "prescriptions"] })}
+                    />
                   </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
