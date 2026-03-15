@@ -17,6 +17,30 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+            return "vendor-react";
+          }
+          if (id.includes("node_modules/recharts/") || id.includes("node_modules/d3-")) {
+            return "vendor-charts";
+          }
+          if (id.includes("node_modules/@radix-ui/")) {
+            return "vendor-radix";
+          }
+          if (id.includes("node_modules/@tanstack/")) {
+            return "vendor-query";
+          }
+          if (id.includes("node_modules/react-hook-form/") || id.includes("node_modules/@hookform/") || id.includes("node_modules/zod/")) {
+            return "vendor-forms";
+          }
+          if (id.includes("node_modules/date-fns/") || id.includes("node_modules/lucide-react/")) {
+            return "vendor-utils";
+          }
+        },
+      },
+    },
   },
   server: {
     fs: {

@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -10,20 +10,21 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
-import Dashboard from "@/pages/Dashboard";
-import Pacientes from "@/pages/Pacientes";
-import PatientDetail from "@/pages/PatientDetail";
-import Citas from "@/pages/Citas";
-import Expedientes from "@/pages/Expedientes";
-import Laboratorio from "@/pages/Laboratorio";
-import Recetas from "@/pages/Recetas";
-import SignosVitales from "@/pages/SignosVitales";
-import AvisoPrivacidad from "@/pages/AvisoPrivacidad";
-import Ayuda from "@/pages/Ayuda";
-import Configuracion from "@/pages/Configuracion";
-import Login from "@/pages/Login";
-import NotFound from "@/pages/not-found";
 import { apiRequest } from "@/lib/queryClient";
+
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Pacientes = lazy(() => import("@/pages/Pacientes"));
+const PatientDetail = lazy(() => import("@/pages/PatientDetail"));
+const Citas = lazy(() => import("@/pages/Citas"));
+const Expedientes = lazy(() => import("@/pages/Expedientes"));
+const Laboratorio = lazy(() => import("@/pages/Laboratorio"));
+const Recetas = lazy(() => import("@/pages/Recetas"));
+const SignosVitales = lazy(() => import("@/pages/SignosVitales"));
+const AvisoPrivacidad = lazy(() => import("@/pages/AvisoPrivacidad"));
+const Ayuda = lazy(() => import("@/pages/Ayuda"));
+const Configuracion = lazy(() => import("@/pages/Configuracion"));
+const Login = lazy(() => import("@/pages/Login"));
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 interface AuthUser {
   id: string;
@@ -34,22 +35,32 @@ interface AuthUser {
   cedula?: string;
 }
 
+function PageLoader() {
+  return (
+    <div className="min-h-full flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+    </div>
+  );
+}
+
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/pacientes" component={Pacientes} />
-      <Route path="/pacientes/:id" component={PatientDetail} />
-      <Route path="/expedientes" component={Expedientes} />
-      <Route path="/citas" component={Citas} />
-      <Route path="/laboratorio" component={Laboratorio} />
-      <Route path="/recetas" component={Recetas} />
-      <Route path="/signos-vitales" component={SignosVitales} />
-      <Route path="/aviso-privacidad" component={AvisoPrivacidad} />
-      <Route path="/ayuda" component={Ayuda} />
-      <Route path="/configuracion" component={Configuracion} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/pacientes" component={Pacientes} />
+        <Route path="/pacientes/:id" component={PatientDetail} />
+        <Route path="/expedientes" component={Expedientes} />
+        <Route path="/citas" component={Citas} />
+        <Route path="/laboratorio" component={Laboratorio} />
+        <Route path="/recetas" component={Recetas} />
+        <Route path="/signos-vitales" component={SignosVitales} />
+        <Route path="/aviso-privacidad" component={AvisoPrivacidad} />
+        <Route path="/ayuda" component={Ayuda} />
+        <Route path="/configuracion" component={Configuracion} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
@@ -144,7 +155,11 @@ function AppContent() {
   }
 
   if (!user) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-background"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+        <Login onLogin={handleLogin} />
+      </Suspense>
+    );
   }
 
   return <AuthenticatedApp user={user} onLogout={handleLogout} />;
