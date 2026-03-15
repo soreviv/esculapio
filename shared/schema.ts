@@ -143,6 +143,7 @@ export const vitals = pgTable("vitals", {
 // Prescriptions
 export const prescriptions = pgTable("prescriptions", {
   id: uuid("id").primaryKey().defaultRandom(),
+  recetaId: uuid("receta_id"),                         // groups multiple meds under one receta
   patientId: uuid("patient_id").notNull().references(() => patients.id),
   medicoId: uuid("medico_id").notNull().references(() => users.id),
   medicamento: text("medicamento").notNull(),
@@ -152,10 +153,12 @@ export const prescriptions = pgTable("prescriptions", {
   frecuencia: text("frecuencia").notNull(),
   duracion: text("duracion"),
   indicaciones: text("indicaciones"),
-  status: text("status").notNull().default("activa"), 
+  instruccionesGenerales: text("instrucciones_generales"), // shared instructions for the whole receta
+  status: text("status").notNull().default("activa"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   patientIdIdx: index("prescriptions_patient_id_idx").on(table.patientId),
+  recetaIdIdx: index("prescriptions_receta_id_idx").on(table.recetaId),
 }));
 
 // Audit Logs

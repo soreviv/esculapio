@@ -13,6 +13,7 @@ import {
   type PatientConsent, type InsertPatientConsent,
   type LabOrder, type InsertLabOrder, type LabOrderWithDetails,
   type DashboardMetrics, type PatientSearchFilters, type TimelineEvent,
+  type EstablishmentConfig,
   type ClinicHoursDay, DEFAULT_CLINIC_HOURS,
   users, patients, medicalNotes, medicalNoteAddendums, medicalNoteDiagnoses,
   vitals, prescriptions, appointments,
@@ -328,6 +329,10 @@ export class DatabaseStorage implements IStorage {
     return newPrescription;
   }
 
+  async createPrescriptionBatch(items: InsertPrescription[]): Promise<Prescription[]> {
+    return db.insert(prescriptions).values(items).returning();
+  }
+
   async updatePrescription(id: string, prescription: Partial<InsertPrescription>): Promise<Prescription | undefined> {
     const [updated] = await db.update(prescriptions).set(prescription).where(eq(prescriptions.id, id)).returning();
     return updated;
@@ -511,6 +516,8 @@ export class DatabaseStorage implements IStorage {
         frecuencia: prescriptions.frecuencia,
         duracion: prescriptions.duracion,
         indicaciones: prescriptions.indicaciones,
+        instruccionesGenerales: prescriptions.instruccionesGenerales,
+        recetaId: prescriptions.recetaId,
         status: prescriptions.status,
         createdAt: prescriptions.createdAt,
         medicoNombre: users.nombre,
@@ -926,6 +933,14 @@ export class DatabaseStorage implements IStorage {
 
   async getPatientLabOrders(patientId: string): Promise<LabOrder[]> {
     return this.getLabOrders(patientId);
+  }
+
+  async getEstablishmentConfig(): Promise<EstablishmentConfig | null> {
+    const [config] = await db.select()
+      .from(establishmentConfig)
+      .where(eq(establishmentConfig.activo, true))
+      .limit(1);
+    return config ?? null;
   }
 
   async getClinicHours(): Promise<ClinicHoursDay[]> {

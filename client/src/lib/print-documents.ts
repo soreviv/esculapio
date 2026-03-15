@@ -1046,134 +1046,503 @@ export function printLabGabinetOrder({ order, patient, diagnosticoCie10, tipoEst
 
 export interface PrescriptionData {
   prescriptions: Prescription[];
+  instruccionesGenerales?: string;
   patient: Patient;
   medico: Partial<User>;
+  establishment?: Partial<import("@shared/schema").EstablishmentConfig> | null;
 }
 
-export function printPrescriptionCOFEPRIS({ prescriptions, patient, medico }: PrescriptionData): void {
+export function printPrescriptionCOFEPRIS({ prescriptions, instruccionesGenerales, patient, medico, establishment }: PrescriptionData): void {
   const age = calculateAge(patient.fechaNacimiento);
+  const folio = generateFolio('RX', prescriptions[0]?.id || Date.now().toString());
+  const fecha = formatDate(new Date());
+  const hora = format(new Date(), 'HH:mm');
 
-  const html = `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <title>Receta Médica - ${patient.nombre}</title>
-      <style>${baseStyles}</style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="header-content">
-          <div class="logo-area">Logo del<br>Consultorio</div>
-          <div class="establishment-info">
-            <div class="establishment-name">Dr. ${medico.nombre || '_______________'}</div>
-            <div class="doctor-credentials">
-              ${medico.especialidad ? `<p>Especialidad: ${medico.especialidad}</p>` : ''}
-              ${medico.cedula ? `<p>Cédula Profesional: ${medico.cedula}</p>` : ''}
-            </div>
-          </div>
-          <div class="contact-info">
-            <p>Fecha:</p>
-            <p><strong>${formatDate(new Date())}</strong></p>
-          </div>
-        </div>
-      </div>
+  const clinicName = establishment?.nombreEstablecimiento || `Consultorio Médico`;
+  const clinicAddress = [establishment?.domicilio, establishment?.ciudad, establishment?.estado]
+    .filter(Boolean).join(', ');
+  const clinicPhone = establishment?.telefono || '';
+  const clinicLicense = establishment?.licenciaSanitaria || '';
+  const clinicLogo = establishment?.logoUrl || '';
+  const clinicRfc = establishment?.rfc || '';
 
-      <div class="title-bar" style="background: #0369a1;">RECETA MÉDICA</div>
+  const doctorTitle = `Dr${medico.nombre?.toLowerCase().startsWith('dra') ? 'a' : ''}. ${medico.nombre || '_______________'}`;
 
-      <div class="section">
-        <div class="section-header">Datos del Paciente</div>
-        <div class="section-content">
-          <div class="field-row">
-            <div class="field" style="flex: 2;">
-              <div class="field-label">Nombre Completo</div>
-              <div class="field-value">${patient.nombre} ${patient.apellidoPaterno} ${patient.apellidoMaterno || ''}</div>
-            </div>
-            <div class="field">
-              <div class="field-label">Edad</div>
-              <div class="field-value">${age} años</div>
-            </div>
-            <div class="field">
-              <div class="field-label">Sexo</div>
-              <div class="field-value">${patient.sexo === 'M' ? 'M' : 'F'}</div>
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field" style="flex: 2;">
-              <div class="field-label">Domicilio</div>
-              <div class="field-value">${patient.direccion || ''}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+  const prescriptionStyles = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      padding: 24px 28px;
+      max-width: 820px;
+      margin: 0 auto;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #1e293b;
+      background: #fff;
+    }
 
-      <div class="section" style="min-height: 300px;">
-        <div class="section-header">Prescripción</div>
-        <div class="section-content">
-          <div class="rx-symbol">Rp/</div>
-          
-          ${prescriptions.map((rx, i) => `
-            <div class="medication-box">
-              <div style="font-size: 13px; font-weight: bold; color: #0369a1; margin-bottom: 8px;">
-                ${i + 1}. ${rx.medicamento}
-              </div>
-              <table style="font-size: 10px;">
-                <tr>
-                  <td style="width: 25%;"><strong>Presentación:</strong> ${rx.presentacion || '_________'}</td>
-                  <td style="width: 25%;"><strong>Dosis:</strong> ${rx.dosis}</td>
-                  <td style="width: 25%;"><strong>Vía:</strong> ${rx.via}</td>
-                  <td style="width: 25%;"><strong>Cantidad:</strong> _________</td>
-                </tr>
-                <tr>
-                  <td colspan="2"><strong>Frecuencia:</strong> ${rx.frecuencia}</td>
-                  <td colspan="2"><strong>Duración:</strong> ${rx.duracion || '_________'}</td>
-                </tr>
-              </table>
-              ${rx.indicaciones ? `
-                <div style="margin-top: 8px; padding: 8px; background: #f0f9ff; border-left: 3px solid #0369a1; font-size: 10px;">
-                  <strong>Indicaciones:</strong> ${rx.indicaciones}
-                </div>
-              ` : ''}
-            </div>
-          `).join('')}
-        </div>
-      </div>
+    /* ── HEADER ── */
+    .rx-header {
+      display: flex;
+      align-items: stretch;
+      border: 2px solid #1e3a5f;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0;
+    }
+    .rx-header-logo {
+      width: 88px;
+      min-height: 88px;
+      background: #f0f4f8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-right: 2px solid #1e3a5f;
+      flex-shrink: 0;
+    }
+    .rx-header-logo img {
+      max-width: 80px;
+      max-height: 80px;
+      object-fit: contain;
+    }
+    .rx-header-logo-placeholder {
+      font-size: 9px;
+      color: #94a3b8;
+      text-align: center;
+      padding: 8px;
+    }
+    .rx-header-clinic {
+      flex: 1;
+      padding: 10px 14px;
+    }
+    .rx-clinic-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e3a5f;
+      letter-spacing: 0.3px;
+      margin-bottom: 3px;
+    }
+    .rx-doctor-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #0f5278;
+      margin-bottom: 2px;
+    }
+    .rx-credentials {
+      font-size: 10px;
+      color: #475569;
+      line-height: 1.55;
+    }
+    .rx-header-right {
+      padding: 10px 14px;
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 160px;
+      border-left: 1px solid #c8d7e8;
+    }
+    .rx-folio {
+      font-size: 9px;
+      color: #64748b;
+    }
+    .rx-folio strong { color: #1e3a5f; font-size: 10px; }
+    .rx-date { font-size: 10px; color: #1e293b; }
+    .rx-date strong { display: block; font-size: 12px; color: #1e3a5f; }
 
-      <div class="signature-section">
-        <div class="signature-box">
-          <div class="signature-line">
-            Firma Autógrafa del Médico<br>
-            (Conforme a identificación oficial)
-          </div>
-        </div>
-        <div class="signature-box">
-          <div class="signature-line">
-            Sello del Consultorio
-          </div>
-        </div>
-      </div>
+    /* ── TITLE BAR ── */
+    .rx-title-bar {
+      background: linear-gradient(90deg, #1e3a5f 0%, #0369a1 100%);
+      color: #fff;
+      text-align: center;
+      padding: 7px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      border-radius: 0 0 3px 3px;
+    }
 
-      <div class="folio">
-        <span>Folio: ${generateFolio('RX', prescriptions[0]?.id || Date.now().toString())}</span>
-        <span>Hora: ${format(new Date(), 'HH:mm')} hrs</span>
-      </div>
+    /* ── SECTIONS ── */
+    .rx-section {
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .rx-section-title {
+      background: #e8f0f9;
+      padding: 5px 12px;
+      font-weight: 700;
+      font-size: 10px;
+      color: #1e3a5f;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    .rx-section-body { padding: 10px 12px; }
 
-      <div class="legal-notice">
-        <strong>AVISO IMPORTANTE:</strong> Esta receta es válida únicamente para los medicamentos aquí prescritos.
-        La prescripción de medicamentos controlados requiere recetario especial autorizado por COFEPRIS.
-        Conserve este documento como comprobante de su consulta médica.
-      </div>
+    /* ── PATIENT ROW ── */
+    .rx-patient-grid {
+      display: grid;
+      grid-template-columns: 2fr 80px 60px 1fr;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .rx-patient-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .rx-field-label {
+      font-size: 8.5px;
+      color: #64748b;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      margin-bottom: 2px;
+    }
+    .rx-field-value {
+      font-size: 11.5px;
+      color: #0f172a;
+      border-bottom: 1px solid #94a3b8;
+      min-height: 18px;
+      padding-bottom: 1px;
+      font-weight: 500;
+    }
 
-      <div class="footer">
-        Receta elaborada conforme al Art. 240 de la Ley General de Salud y lineamientos de COFEPRIS
-      </div>
+    /* ── RX SYMBOL ── */
+    .rx-symbol {
+      font-size: 26px;
+      font-weight: 900;
+      color: #1e3a5f;
+      font-family: 'Times New Roman', serif;
+      line-height: 1;
+      margin-bottom: 10px;
+    }
 
-      <script>window.onload = function() { window.print(); }</script>
-    </body>
-    </html>
+    /* ── MEDICATION CARDS ── */
+    .med-card {
+      border: 1px solid #bfdbfe;
+      border-left: 4px solid #1e3a5f;
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: #f8fbff;
+    }
+    .med-card:last-child { margin-bottom: 0; }
+    .med-card-header {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .med-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      background: #1e3a5f;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .med-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0c1f3d;
+    }
+    .med-presentation {
+      font-size: 11px;
+      color: #475569;
+      font-style: italic;
+    }
+    .med-details {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 6px;
+      background: #fff;
+      border: 1px solid #dbeafe;
+      border-radius: 3px;
+      padding: 7px 10px;
+    }
+    .med-detail-item {}
+    .med-detail-label {
+      font-size: 8.5px;
+      color: #64748b;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .med-detail-value {
+      font-size: 11px;
+      color: #1e293b;
+      font-weight: 600;
+    }
+    .med-indicaciones {
+      margin-top: 6px;
+      padding: 6px 9px;
+      background: #eff6ff;
+      border-left: 3px solid #3b82f6;
+      font-size: 10px;
+      color: #1e40af;
+      border-radius: 0 3px 3px 0;
+    }
+    .med-indicaciones strong { color: #1d4ed8; }
+
+    /* ── INSTRUCCIONES GENERALES ── */
+    .rx-instructions {
+      background: #fefce8;
+      border: 1px solid #fde047;
+      border-left: 4px solid #ca8a04;
+      border-radius: 4px;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: #713f12;
+      line-height: 1.6;
+    }
+    .rx-instructions-title {
+      font-weight: 700;
+      color: #92400e;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    /* ── SIGNATURES ── */
+    .rx-signatures {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 32px;
+      padding-top: 0;
+    }
+    .rx-sig-box {
+      text-align: center;
+      width: 42%;
+    }
+    .rx-sig-line {
+      border-top: 1.5px solid #1e3a5f;
+      padding-top: 6px;
+      font-size: 10px;
+      color: #475569;
+      line-height: 1.5;
+    }
+    .rx-sig-space { height: 56px; }
+
+    /* ── FOOTER ── */
+    .rx-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: #94a3b8;
+      margin-top: 14px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .rx-legal {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: 3px;
+      padding: 7px 10px;
+      font-size: 9px;
+      color: #78350f;
+      margin-top: 10px;
+      line-height: 1.55;
+    }
+    .rx-footer {
+      text-align: center;
+      font-size: 9px;
+      color: #94a3b8;
+      margin-top: 10px;
+      padding-top: 6px;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    @media print {
+      body { padding: 8px 12px; }
+      .no-print { display: none !important; }
+      @page { margin: 1.2cm 1cm; size: letter portrait; }
+    }
   `;
 
-  openPrintWindow(html, `Receta - ${patient.nombre}`);
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Receta Médica — ${patient.nombre} ${patient.apellidoPaterno}</title>
+  <style>${prescriptionStyles}</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="rx-header">
+    <div class="rx-header-logo">
+      ${clinicLogo
+        ? `<img src="${clinicLogo}" alt="Logo" />`
+        : `<div class="rx-header-logo-placeholder">Logo<br>Consultorio</div>`
+      }
+    </div>
+    <div class="rx-header-clinic">
+      <div class="rx-clinic-name">${clinicName}</div>
+      <div class="rx-doctor-name">${doctorTitle}</div>
+      <div class="rx-credentials">
+        ${medico.especialidad ? `Especialidad: <strong>${medico.especialidad}</strong><br>` : ''}
+        ${medico.cedula ? `Cédula Profesional: <strong>${medico.cedula}</strong><br>` : ''}
+        ${clinicAddress ? `${clinicAddress}<br>` : ''}
+        ${clinicPhone ? `Tel: ${clinicPhone}` : ''}
+        ${clinicRfc ? `&nbsp;&nbsp;RFC: ${clinicRfc}` : ''}
+        ${clinicLicense ? `<br>Lic. Sanitaria: <strong>${clinicLicense}</strong>` : ''}
+      </div>
+    </div>
+    <div class="rx-header-right">
+      <div class="rx-folio">
+        Folio<br><strong>${folio}</strong>
+      </div>
+      <div class="rx-date">
+        Fecha de expedición<br>
+        <strong>${fecha}</strong>
+        <div style="font-size:9px;color:#64748b;margin-top:2px">${hora} hrs</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rx-title-bar">Receta Médica</div>
+
+  <!-- DATOS DEL PACIENTE -->
+  <div class="rx-section">
+    <div class="rx-section-title">Datos del Paciente</div>
+    <div class="rx-section-body">
+      <div class="rx-patient-grid">
+        <div>
+          <div class="rx-field-label">Nombre completo</div>
+          <div class="rx-field-value">${patient.nombre} ${patient.apellidoPaterno} ${patient.apellidoMaterno || ''}</div>
+        </div>
+        <div>
+          <div class="rx-field-label">Edad</div>
+          <div class="rx-field-value">${age} años</div>
+        </div>
+        <div>
+          <div class="rx-field-label">Sexo</div>
+          <div class="rx-field-value">${patient.sexo === 'M' ? 'Masculino' : 'Femenino'}</div>
+        </div>
+        <div>
+          <div class="rx-field-label">Fecha de nacimiento</div>
+          <div class="rx-field-value">${patient.fechaNacimiento ? formatDate(new Date(patient.fechaNacimiento)) : '—'}</div>
+        </div>
+      </div>
+      <div class="rx-patient-grid-2">
+        <div>
+          <div class="rx-field-label">Domicilio</div>
+          <div class="rx-field-value">${patient.direccion || '—'}</div>
+        </div>
+        <div>
+          <div class="rx-field-label">Alergias conocidas</div>
+          <div class="rx-field-value" style="color:${patient.alergias?.length ? '#b91c1c' : '#94a3b8'}">${patient.alergias?.length ? patient.alergias.join(', ') : 'Sin alergias registradas'}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRESCRIPCIÓN -->
+  <div class="rx-section">
+    <div class="rx-section-title">Prescripción Médica</div>
+    <div class="rx-section-body">
+      <div class="rx-symbol">&#x211E;</div>
+
+      ${prescriptions.map((rx, i) => `
+        <div class="med-card">
+          <div class="med-card-header">
+            <span class="med-number">${i + 1}</span>
+            <span class="med-name">${rx.medicamento}</span>
+            ${rx.presentacion ? `<span class="med-presentation">— ${rx.presentacion}</span>` : ''}
+          </div>
+          <div class="med-details">
+            <div class="med-detail-item">
+              <div class="med-detail-label">Dosis</div>
+              <div class="med-detail-value">${rx.dosis}</div>
+            </div>
+            <div class="med-detail-item">
+              <div class="med-detail-label">Vía</div>
+              <div class="med-detail-value">${rx.via}</div>
+            </div>
+            <div class="med-detail-item">
+              <div class="med-detail-label">Frecuencia</div>
+              <div class="med-detail-value">${rx.frecuencia}</div>
+            </div>
+            <div class="med-detail-item">
+              <div class="med-detail-label">Duración</div>
+              <div class="med-detail-value">${rx.duracion || '—'}</div>
+            </div>
+          </div>
+          ${rx.indicaciones ? `
+            <div class="med-indicaciones">
+              <strong>Indicaciones:</strong> ${rx.indicaciones}
+            </div>
+          ` : ''}
+        </div>
+      `).join('')}
+    </div>
+  </div>
+
+  ${instruccionesGenerales ? `
+  <!-- INSTRUCCIONES GENERALES -->
+  <div class="rx-section">
+    <div class="rx-section-title">Instrucciones Médicas Generales</div>
+    <div class="rx-section-body">
+      <div class="rx-instructions">
+        <div class="rx-instructions-title">Indicaciones para el paciente</div>
+        ${instruccionesGenerales}
+      </div>
+    </div>
+  </div>
+  ` : ''}
+
+  <!-- FIRMAS -->
+  <div class="rx-signatures">
+    <div class="rx-sig-box">
+      <div class="rx-sig-space"></div>
+      <div class="rx-sig-line">
+        <strong>Firma Autógrafa del Médico</strong><br>
+        ${doctorTitle}<br>
+        ${medico.cedula ? `Cédula: ${medico.cedula}` : ''}
+      </div>
+    </div>
+    <div class="rx-sig-box">
+      <div class="rx-sig-space"></div>
+      <div class="rx-sig-line">
+        <strong>Sello del Consultorio</strong><br>
+        ${clinicName}
+      </div>
+    </div>
+  </div>
+
+  <!-- META -->
+  <div class="rx-meta">
+    <span>Folio: ${folio} &nbsp;|&nbsp; ${fecha} — ${hora} hrs</span>
+    <span>${prescriptions.length} medicamento${prescriptions.length !== 1 ? 's' : ''} prescritos</span>
+  </div>
+
+  <div class="rx-legal">
+    <strong>AVISO COFEPRIS:</strong> Esta receta es válida únicamente para los medicamentos aquí prescritos y en las dosis indicadas.
+    La prescripción de medicamentos controlados requiere recetario especial autorizado por COFEPRIS (Art. 28 de la NOM-072-SSA1-2012).
+    Conserve este documento como comprobante de su consulta médica. Receta expedida conforme al Art. 240 de la Ley General de Salud.
+  </div>
+
+  <div class="rx-footer">
+    Sistema de Gestión de Salud Digital &nbsp;|&nbsp; NOM-004-SSA3-2012 &nbsp;|&nbsp; NOM-024-SSA3-2012 &nbsp;|&nbsp; COFEPRIS
+  </div>
+
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`;
+
+  openPrintWindow(html, `Receta — ${patient.nombre} ${patient.apellidoPaterno}`);
 }
 
 // =====================

@@ -12,7 +12,7 @@ import {
   insertCie10Schema,
   insertPatientConsentSchema
 } from "@shared/schema";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isMedicoOrEnfermeria } from "./auth";
 
 /**
@@ -850,6 +850,55 @@ export async function registerRoutes(
     }
   });
 
+  // Batch prescription creation — all medications share a receta_id
+  app.post("/api/prescriptions/batch", isAuthenticated, isMedico, async (req, res) => {
+    try {
+      const { patientId, instruccionesGenerales, medicamentos } = req.body;
+
+      if (!patientId || !Array.isArray(medicamentos) || medicamentos.length === 0) {
+        return res.status(400).json({ error: "Se requiere patientId y al menos un medicamento" });
+      }
+
+      const recetaId = randomUUID();
+      const medicoId = req.session.userId!;
+
+      const itemSchemas = medicamentos.map((med: unknown) =>
+        insertPrescriptionSchema.safeParse({
+          ...(med as object),
+          patientId,
+          medicoId,
+          recetaId,
+          instruccionesGenerales: instruccionesGenerales || null,
+          status: "activa",
+        })
+      );
+
+      const invalid = itemSchemas.find((r) => !r.success);
+      if (invalid && !invalid.success) {
+        return res.status(400).json({ error: invalid.error.errors });
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const items = itemSchemas.map((r) => (r as any).data);
+      const created = await storage.createPrescriptionBatch(items);
+
+      await storage.createAuditLog({
+        userId: medicoId,
+        accion: "crear_receta",
+        entidad: "prescriptions",
+        entidadId: null,
+        detalles: JSON.stringify({ recetaId, patientId, medicamentos: created.length }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
+      res.status(201).json({ recetaId, prescriptions: created });
+    } catch (error) {
+      res.status(500).json({ error: "Error al crear la receta" });
+    }
+  });
+
   app.post("/api/prescriptions", isAuthenticated, isMedico, async (req, res) => {
     try {
       const parsed = insertPrescriptionSchema.safeParse(req.body);
@@ -1317,6 +1366,16 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Integrity check error:", error);
       res.status(500).json({ error: "Error en la verificación de integridad" });
+    }
+  });
+
+  // Establishment Config
+  app.get("/api/config/establishment", isAuthenticated, async (req, res) => {
+    try {
+      const config = await storage.getEstablishmentConfig();
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ error: "Error al obtener la configuración del consultorio" });
     }
   });
 

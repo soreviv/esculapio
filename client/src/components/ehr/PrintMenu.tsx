@@ -40,14 +40,15 @@ import {
   type PrescriptionData,
   type ConsentData
 } from "@/lib/print-documents";
-import type { 
-  Patient, 
-  MedicalNote, 
-  Vitals, 
-  Prescription, 
+import type {
+  Patient,
+  MedicalNote,
+  Vitals,
+  Prescription,
   LabOrder,
   PatientConsent,
-  User as UserType
+  User as UserType,
+  EstablishmentConfig
 } from "@shared/schema";
 
 interface PrintMenuProps {
@@ -70,6 +71,10 @@ export function PrintMenu({ patient, medico }: PrintMenuProps) {
 
   const { data: prescriptions } = useQuery<Prescription[]>({
     queryKey: [`/api/patients/${patient.id}/prescriptions`],
+  });
+
+  const { data: establishment } = useQuery<EstablishmentConfig | null>({
+    queryKey: ["/api/config/establishment"],
   });
 
   const { data: labOrders } = useQuery<LabOrder[]>({
@@ -119,10 +124,11 @@ export function PrintMenu({ patient, medico }: PrintMenuProps) {
       alert('No hay recetas activas para imprimir');
       return;
     }
-    PrintDocuments.prescription({ 
-      prescriptions: activePrescriptions, 
-      patient, 
-      medico: medico || {} 
+    PrintDocuments.prescription({
+      prescriptions: activePrescriptions,
+      patient,
+      medico: medico || {},
+      establishment: establishment ?? undefined,
     });
   };
 
