@@ -32,10 +32,12 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Printer,
 } from "lucide-react";
 import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertVitals, type PatientConsent, type User, type LabOrder } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { printMedicalNote, printLabGabinetOrder } from "@/lib/print-documents";
 
 function calculateAge(fechaNacimiento: string): number {
   const today = new Date();
@@ -125,6 +127,20 @@ export default function PatientDetail() {
 
   const handleNoteSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/patients", params.id, "notes"] });
+  };
+
+  const handlePrintNote = (note: MedicalNoteWithDetails) => {
+    if (!patient) return;
+    printMedicalNote({
+      note: {
+        ...note,
+        medicoNombre: note.medicoNombre,
+        medicoEspecialidad: note.medicoEspecialidad ?? undefined,
+        diagnosticos: note.diagnosticos,
+      },
+      patient,
+      vitals: latestVitals ?? null,
+    });
   };
 
   const createVitalsMutation = useMutation({
@@ -360,6 +376,7 @@ export default function PatientDetail() {
                         diagnosticos={note.diagnosticos || []}
                         firmada={note.firmada}
                         onView={() => console.log("View note:", note.id)}
+                        onPrint={() => handlePrintNote(note)}
                       />
                     ))
                   ) : (
@@ -454,12 +471,21 @@ export default function PatientDetail() {
                               <Badge key={e} variant="secondary" className="text-xs">{e}</Badge>
                             ))}
                           </div>
-                          <div className="flex gap-1 shrink-0">
+                          <div className="flex gap-1 shrink-0 items-center">
                             {order.urgente && <Badge variant="destructive" className="text-xs">Urgente</Badge>}
                             {order.ayuno && <Badge variant="outline" className="text-xs">Ayuno</Badge>}
                             <Badge variant={order.status === "pendiente" ? "outline" : "secondary"} className="text-xs capitalize">
                               {order.status}
                             </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              title="Imprimir / Guardar PDF"
+                              onClick={() => printLabGabinetOrder({ order, patient })}
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </div>
                         {order.diagnosticoPresuntivo && (

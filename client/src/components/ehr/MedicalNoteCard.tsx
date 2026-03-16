@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { FileText, CheckCircle, Clock, Eye } from "lucide-react";
+import { FileText, CheckCircle, Clock, Eye, Printer } from "lucide-react";
 
 export interface MedicalNoteCardProps {
   id: string;
@@ -15,6 +15,7 @@ export interface MedicalNoteCardProps {
   diagnosticos?: (string | { codigo: string; descripcion: string })[];
   firmada: boolean;
   onView?: () => void;
+  onPrint?: () => void;
 }
 
 const tipoLabels: Record<string, string> = {
@@ -41,6 +42,7 @@ export function MedicalNoteCard({
   diagnosticos = [],
   firmada,
   onView,
+  onPrint,
 }: MedicalNoteCardProps) {
   const renderDiagnosis = (dx: string | { codigo: string; descripcion: string }) => {
     if (typeof dx === 'string') return dx;
@@ -114,16 +116,29 @@ export function MedicalNoteCard({
           </div>
         )}
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full mt-2"
-          onClick={onView}
-          data-testid="button-view-note"
-        >
-          <Eye className="h-4 w-4 mr-2" />
-          Ver nota completa
-        </Button>
+        <div className="flex gap-2 mt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex-1"
+            onClick={onView}
+            data-testid="button-view-note"
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Ver nota completa
+          </Button>
+          {onPrint && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onPrint}
+              data-testid="button-print-note"
+              title="Imprimir / Guardar PDF"
+            >
+              <Printer className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
