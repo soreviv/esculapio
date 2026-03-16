@@ -1387,6 +1387,33 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/config/establishment", isAuthenticated, isMedico, async (req, res) => {
+    try {
+      const allowed = [
+        "tipoEstablecimiento", "nombreEstablecimiento", "domicilio", "ciudad", "estado",
+        "codigoPostal", "telefono", "nombreInstitucion", "razonSocial", "rfc",
+        "licenciaSanitaria", "responsableSanitario", "cedulaResponsable",
+      ];
+      const data = Object.fromEntries(
+        Object.entries(req.body).filter(([k]) => allowed.includes(k))
+      );
+      const config = await storage.updateEstablishmentConfig(data);
+      await storage.createAuditLog({
+        userId: req.session.userId!,
+        accion: "actualizar",
+        entidad: "establishment_config",
+        entidadId: null,
+        detalles: JSON.stringify({ campos: Object.keys(data) }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ error: "Error al actualizar la configuración del establecimiento" });
+    }
+  });
+
   // Logo Upload
   const uploadsDir = path.join(process.cwd(), "dist", "public", "uploads");
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -1409,7 +1436,7 @@ export async function registerRoutes(
     },
   });
 
-  app.post("/api/config/logo", isAdmin, logoUpload.single("logo"), async (req, res) => {
+  app.post("/api/config/logo", isAuthenticated, isMedico, logoUpload.single("logo"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No se recibió ningún archivo" });
@@ -1443,7 +1470,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/config/clinic-hours", isAdmin, async (req, res) => {
+  app.put("/api/config/clinic-hours", isAuthenticated, isMedico, async (req, res) => {
     try {
       const hours = req.body;
       if (!Array.isArray(hours)) {

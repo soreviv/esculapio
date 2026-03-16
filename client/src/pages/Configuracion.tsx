@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { AuditLog, User as UserRecord, ClinicHoursDay } from "@shared/schema";
+import type { AuditLog, User as UserRecord, ClinicHoursDay, EstablishmentConfig } from "@shared/schema";
 import { DEFAULT_CLINIC_HOURS } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -54,15 +54,60 @@ export default function Configuracion() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
-  const { data: establishmentConfig } = useQuery<{ logoUrl?: string | null }>({
+  const [establishmentForm, setEstablishmentForm] = useState({
+    nombreEstablecimiento: "",
+    razonSocial: "",
+    rfc: "",
+    domicilio: "",
+    ciudad: "",
+    estado: "",
+    codigoPostal: "",
+    telefono: "",
+    responsableSanitario: "",
+    licenciaSanitaria: "",
+    cedulaResponsable: "",
+  });
+
+  const { data: establishmentConfig } = useQuery<EstablishmentConfig | null>({
     queryKey: ["/api/config/establishment"],
   });
 
   useEffect(() => {
-    if (establishmentConfig?.logoUrl) {
-      setLogoPreview(establishmentConfig.logoUrl);
+    if (establishmentConfig) {
+      setEstablishmentForm({
+        nombreEstablecimiento: establishmentConfig.nombreEstablecimiento ?? "",
+        razonSocial: establishmentConfig.razonSocial ?? "",
+        rfc: establishmentConfig.rfc ?? "",
+        domicilio: establishmentConfig.domicilio ?? "",
+        ciudad: establishmentConfig.ciudad ?? "",
+        estado: establishmentConfig.estado ?? "",
+        codigoPostal: establishmentConfig.codigoPostal ?? "",
+        telefono: establishmentConfig.telefono ?? "",
+        responsableSanitario: establishmentConfig.responsableSanitario ?? "",
+        licenciaSanitaria: establishmentConfig.licenciaSanitaria ?? "",
+        cedulaResponsable: establishmentConfig.cedulaResponsable ?? "",
+      });
+      if (establishmentConfig.logoUrl) setLogoPreview(establishmentConfig.logoUrl);
     }
   }, [establishmentConfig]);
+
+  const saveEstablishmentMutation = useMutation({
+    mutationFn: async (data: typeof establishmentForm) => {
+      const res = await apiRequest("PUT", "/api/config/establishment", data);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error al guardar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/config/establishment"] });
+      toast({ title: "Configuración guardada", description: "Los datos del establecimiento han sido actualizados." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
 
   const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -212,34 +257,59 @@ export default function Configuracion() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="nombreEstablecimiento">Nombre del Establecimiento</Label>
-                  <Input 
-                    id="nombreEstablecimiento" 
-                    placeholder="Clínica San Rafael" 
+                  <Input
+                    id="nombreEstablecimiento"
+                    placeholder="Clínica San Rafael"
                     data-testid="input-nombre-establecimiento"
+                    value={establishmentForm.nombreEstablecimiento}
+                    onChange={(e) => setEstablishmentForm((f) => ({ ...f, nombreEstablecimiento: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="razonSocial">Razón Social</Label>
-                  <Input 
-                    id="razonSocial" 
-                    placeholder="Servicios Médicos San Rafael S.A. de C.V." 
+                  <Input
+                    id="razonSocial"
+                    placeholder="Servicios Médicos San Rafael S.A. de C.V."
                     data-testid="input-razon-social"
+                    value={establishmentForm.razonSocial}
+                    onChange={(e) => setEstablishmentForm((f) => ({ ...f, razonSocial: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="rfc">RFC</Label>
-                  <Input 
-                    id="rfc" 
-                    placeholder="SMS123456789" 
+                  <Input
+                    id="rfc"
+                    placeholder="SMS123456789"
                     data-testid="input-rfc"
+                    value={establishmentForm.rfc}
+                    onChange={(e) => setEstablishmentForm((f) => ({ ...f, rfc: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="clues">Clave CLUES</Label>
-                  <Input 
-                    id="clues" 
-                    placeholder="DFSSA012345" 
-                    data-testid="input-clues"
+                  <Label htmlFor="responsableSanitario">Responsable Sanitario</Label>
+                  <Input
+                    id="responsableSanitario"
+                    placeholder="Dr. Juan Pérez García"
+                    value={establishmentForm.responsableSanitario}
+                    onChange={(e) => setEstablishmentForm((f) => ({ ...f, responsableSanitario: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="licenciaSanitaria">Licencia Sanitaria</Label>
+                  <Input
+                    id="licenciaSanitaria"
+                    placeholder="LS-123456"
+                    value={establishmentForm.licenciaSanitaria}
+                    onChange={(e) => setEstablishmentForm((f) => ({ ...f, licenciaSanitaria: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cedulaResponsable">Cédula del Responsable</Label>
+                  <Input
+                    id="cedulaResponsable"
+                    placeholder="1234567"
+                    value={establishmentForm.cedulaResponsable}
+                    onChange={(e) => setEstablishmentForm((f) => ({ ...f, cedulaResponsable: e.target.value }))}
                   />
                 </div>
               </div>
@@ -247,38 +317,43 @@ export default function Configuracion() {
               <Separator />
 
               <div className="space-y-2">
-                <Label htmlFor="direccion">Dirección Completa</Label>
-                <Textarea 
-                  id="direccion" 
-                  placeholder="Av. Insurgentes Sur 1234, Col. Del Valle, Alcaldía Benito Juárez, CDMX, C.P. 03100"
+                <Label htmlFor="domicilio">Dirección Completa</Label>
+                <Textarea
+                  id="domicilio"
+                  placeholder="Av. Insurgentes Sur 1234, Col. Del Valle, CDMX"
                   data-testid="input-direccion"
+                  value={establishmentForm.domicilio}
+                  onChange={(e) => setEstablishmentForm((f) => ({ ...f, domicilio: e.target.value }))}
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
+                  <Label htmlFor="ciudad">Ciudad</Label>
+                  <Input
+                    id="ciudad"
+                    placeholder="Ciudad de México"
+                    value={establishmentForm.ciudad}
+                    onChange={(e) => setEstablishmentForm((f) => ({ ...f, ciudad: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="estado">Estado</Label>
+                  <Input
+                    id="estado"
+                    placeholder="CDMX"
+                    value={establishmentForm.estado}
+                    onChange={(e) => setEstablishmentForm((f) => ({ ...f, estado: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="telefono">Teléfono</Label>
-                  <Input 
-                    id="telefono" 
-                    placeholder="(55) 1234-5678" 
+                  <Input
+                    id="telefono"
+                    placeholder="(55) 1234-5678"
                     data-testid="input-telefono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Correo Electrónico</Label>
-                  <Input 
-                    id="email" 
-                    type="email"
-                    placeholder="contacto@clinica.com" 
-                    data-testid="input-email"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sitioWeb">Sitio Web</Label>
-                  <Input 
-                    id="sitioWeb" 
-                    placeholder="www.clinica.com" 
-                    data-testid="input-sitio-web"
+                    value={establishmentForm.telefono}
+                    onChange={(e) => setEstablishmentForm((f) => ({ ...f, telefono: e.target.value }))}
                   />
                 </div>
               </div>
@@ -318,9 +393,13 @@ export default function Configuracion() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={() => handleSave("establecimiento")} data-testid="button-save-establecimiento">
+                <Button
+                  onClick={() => saveEstablishmentMutation.mutate(establishmentForm)}
+                  disabled={saveEstablishmentMutation.isPending}
+                  data-testid="button-save-establecimiento"
+                >
                   <Save className="h-4 w-4 mr-2" />
-                  Guardar Cambios
+                  {saveEstablishmentMutation.isPending ? "Guardando..." : "Guardar Cambios"}
                 </Button>
               </div>
             </CardContent>

@@ -981,6 +981,32 @@ export class DatabaseStorage implements IStorage {
     return hours;
   }
 
+  async updateEstablishmentConfig(data: Partial<typeof establishmentConfig.$inferInsert>): Promise<EstablishmentConfig | null> {
+    const [existing] = await db.select({ id: establishmentConfig.id })
+      .from(establishmentConfig)
+      .where(eq(establishmentConfig.activo, true))
+      .limit(1);
+
+    if (existing) {
+      const [updated] = await db.update(establishmentConfig)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(establishmentConfig.id, existing.id))
+        .returning();
+      return updated ?? null;
+    } else {
+      const [inserted] = await db.insert(establishmentConfig).values({
+        tipoEstablecimiento: "Consultorio",
+        nombreEstablecimiento: "",
+        domicilio: "",
+        ciudad: "",
+        estado: "",
+        activo: true,
+        ...data,
+      }).returning();
+      return inserted ?? null;
+    }
+  }
+
   async updateLogoUrl(logoUrl: string): Promise<void> {
     const [existing] = await db.select({ id: establishmentConfig.id })
       .from(establishmentConfig)
