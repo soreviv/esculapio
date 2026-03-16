@@ -14,6 +14,7 @@ import { PrescriptionCard } from "@/components/ehr/PrescriptionCard";
 import { NewNoteDialog } from "@/components/ehr/NewNoteDialog";
 import { RecordVitalsDialog } from "@/components/ehr/RecordVitalsDialog";
 import { NewPrescriptionDialog } from "@/components/ehr/NewPrescriptionDialog";
+import { NewLabOrderDialog } from "@/components/ehr/NewLabOrderDialog";
 import { PatientTimeline } from "@/components/ehr/PatientTimeline";
 import {
   ArrowLeft,
@@ -22,7 +23,7 @@ import {
   Pill,
   Activity,
   FlaskConical,
-  User,
+  User as UserIcon,
   Phone,
   Mail,
   MapPin,
@@ -32,7 +33,7 @@ import {
   XCircle,
   Clock,
 } from "lucide-react";
-import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertVitals, type PatientConsent, type User } from "@shared/schema";
+import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertVitals, type PatientConsent, type User, type LabOrder } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -105,6 +106,11 @@ export default function PatientDetail() {
 
   const { data: prescriptions = [] } = useQuery<PrescriptionWithDetails[]>({
     queryKey: ["/api/patients", params.id, "prescriptions"],
+    enabled: !!params.id,
+  });
+
+  const { data: labOrders = [] } = useQuery<LabOrder[]>({
+    queryKey: ["/api/patients", params.id, "lab-orders"],
     enabled: !!params.id,
   });
 
@@ -241,7 +247,7 @@ export default function PatientDetail() {
 
               <div className="mt-4 pt-4 border-t space-y-3">
                 <div className="flex items-start gap-2 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <UserIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <div>
                     <p className="text-xs text-muted-foreground">CURP</p>
                     <p className="font-mono text-xs">{patient.curp}</p>
@@ -428,16 +434,43 @@ export default function PatientDetail() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <CardTitle className="text-lg font-medium">Estudios de Laboratorio</CardTitle>
-                    <Button variant="outline" size="sm" data-testid="button-new-lab-order">
-                      <FlaskConical className="h-4 w-4 mr-2" />
-                      Ordenar Estudio
-                    </Button>
+                    <NewLabOrderDialog
+                      patientId={patient.id}
+                      onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/patients", params.id, "lab-orders"] })}
+                    />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    No hay estudios de laboratorio registrados.
-                  </p>
+                <CardContent className="space-y-3">
+                  {labOrders.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No hay estudios de laboratorio registrados.
+                    </p>
+                  ) : (
+                    labOrders.map((order) => (
+                      <div key={order.id} className="border rounded-lg p-3 space-y-2 bg-slate-50">
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div className="flex flex-wrap gap-1">
+                            {order.estudios.map((e) => (
+                              <Badge key={e} variant="secondary" className="text-xs">{e}</Badge>
+                            ))}
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            {order.urgente && <Badge variant="destructive" className="text-xs">Urgente</Badge>}
+                            {order.ayuno && <Badge variant="outline" className="text-xs">Ayuno</Badge>}
+                            <Badge variant={order.status === "pendiente" ? "outline" : "secondary"} className="text-xs capitalize">
+                              {order.status}
+                            </Badge>
+                          </div>
+                        </div>
+                        {order.diagnosticoPresuntivo && (
+                          <p className="text-xs text-muted-foreground">Dx: {order.diagnosticoPresuntivo}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : ""}
+                        </p>
+                      </div>
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

@@ -6,6 +6,7 @@ import { FlaskConical, Plus, FileText, Clock, Printer, AlertTriangle } from "luc
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { LabOrderWithDetails } from "@shared/schema";
+import { NewLabOrderDialog } from "@/components/ehr/NewLabOrderDialog";
 
 function printLabOrder(order: LabOrderWithDetails) {
   const printWindow = window.open('', '_blank');
@@ -371,10 +372,14 @@ export default function Laboratorio() {
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Laboratorio</h1>
           <p className="text-muted-foreground">Gestión de estudios y resultados de laboratorio</p>
         </div>
-        <Button data-testid="button-new-lab-order" disabled>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Orden
-        </Button>
+        <NewLabOrderDialog
+          trigger={
+            <Button data-testid="button-new-lab-order">
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Orden
+            </Button>
+          }
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
