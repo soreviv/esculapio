@@ -117,11 +117,15 @@ export function NewNoteDialog({
       // Guardar signos vitales si hay alguno
       const hasVitals = Object.values(data.vitals).some((v) => v !== null);
       if (hasVitals) {
-        await fetch("/api/vitals", {
+        const vitalsResponse = await fetch("/api/vitals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...data.vitals, patientId }),
         });
+        if (!vitalsResponse.ok) {
+          const vitalsError = await vitalsResponse.json().catch(() => ({}));
+          throw new Error(vitalsError.error || "Error al guardar signos vitales");
+        }
       }
 
       // Crear la nota
@@ -226,7 +230,6 @@ export function NewNoteDialog({
 
   const prepareNoteData = () => ({
     patientId,
-    medicoId,
     tipo: formData.tipo,
     motivoConsulta: formData.motivoConsulta || null,
     padecimientoActual: formData.subjetivo || null,
