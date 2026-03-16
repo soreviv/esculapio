@@ -32,7 +32,7 @@ import {
   XCircle,
   Clock,
 } from "lucide-react";
-import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertVitals, type PatientConsent } from "@shared/schema";
+import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertVitals, type PatientConsent, type User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -111,6 +111,10 @@ export default function PatientDetail() {
   const { data: consents = [] } = useQuery<PatientConsent[]>({
     queryKey: ["/api/patients", params.id, "consents"],
     enabled: !!params.id,
+  });
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
   });
 
   const handleNoteSuccess = () => {
@@ -206,7 +210,7 @@ export default function PatientDetail() {
           <NewNoteDialog
             patientId={patient.id}
             patientNombre={fullName}
-            medicoId="system"
+            medicoId={currentUser?.id ?? ""}
             onSuccess={handleNoteSuccess}
           />
         </div>
