@@ -707,14 +707,19 @@ export async function registerRoutes(
 
   app.post("/api/notes", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const { diagnoses, medicoId: _medicoId, ...noteData } = req.body;
+      const { diagnoses, ...noteData } = req.body;
+
+      // Always enforce the authenticated user as the author and use server-side date
+      // (client-provided medicoId may be a placeholder; fecha may be an ISO string)
+      noteData.medicoId = req.session.userId!;
+      if (noteData.fecha && typeof noteData.fecha === "string") {
+        noteData.fecha = new Date(noteData.fecha);
+      }
+
       const parsed = insertMedicalNoteSchema.safeParse(noteData);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
-
-      // Enforce the current user as the author (ignore any medicoId from client)
-      parsed.data.medicoId = req.session.userId!;
 
       const note = await storage.createMedicalNote(parsed.data, diagnoses);
       
