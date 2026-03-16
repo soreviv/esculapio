@@ -236,7 +236,6 @@ export function NewNoteDialog({
     plan: formData.plan || null,
     pronostico: formData.pronostico || null,
     diagnoses: formData.diagnosticos.map(d => ({ codigo: d.codigo, tipo: "presuntivo" })),
-    fecha: new Date().toISOString(),
   });
 
   const prepareVitalsData = () => {
@@ -342,7 +341,7 @@ export function NewNoteDialog({
                 onValueChange={(v) => setFormData({ ...formData, tipo: v })}
                 disabled={isLoading}
               >
-                <SelectTrigger data-testid="select-note-type">
+                <SelectTrigger id="tipo" data-testid="select-note-type">
                   <SelectValue placeholder="Seleccionar tipo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -376,9 +375,11 @@ export function NewNoteDialog({
             </h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Presión arterial (mmHg)</Label>
+                <Label className="text-xs" htmlFor="presionSistolica">Presión arterial (mmHg)</Label>
                 <div className="flex gap-2 items-center">
                   <Input
+                    id="presionSistolica"
+                    name="presionSistolica"
                     type="number"
                     placeholder="Sistólica"
                     value={formData.vitals.presionSistolica}
@@ -387,6 +388,8 @@ export function NewNoteDialog({
                   />
                   <span className="text-muted-foreground">/</span>
                   <Input
+                    id="presionDiastolica"
+                    name="presionDiastolica"
                     type="number"
                     placeholder="Diastólica"
                     value={formData.vitals.presionDiastolica}
@@ -396,8 +399,10 @@ export function NewNoteDialog({
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">FC (lpm)</Label>
+                <Label className="text-xs" htmlFor="frecuenciaCardiaca">FC (lpm)</Label>
                 <Input
+                  id="frecuenciaCardiaca"
+                  name="frecuenciaCardiaca"
                   type="number"
                   placeholder="Frec. cardíaca"
                   value={formData.vitals.frecuenciaCardiaca}
@@ -406,8 +411,10 @@ export function NewNoteDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">FR (rpm)</Label>
+                <Label className="text-xs" htmlFor="frecuenciaRespiratoria">FR (rpm)</Label>
                 <Input
+                  id="frecuenciaRespiratoria"
+                  name="frecuenciaRespiratoria"
                   type="number"
                   placeholder="Frec. respiratoria"
                   value={formData.vitals.frecuenciaRespiratoria}
@@ -416,8 +423,10 @@ export function NewNoteDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Temperatura (°C)</Label>
+                <Label className="text-xs" htmlFor="temperatura">Temperatura (°C)</Label>
                 <Input
+                  id="temperatura"
+                  name="temperatura"
                   type="number"
                   step="0.1"
                   placeholder="36.6"
@@ -427,8 +436,10 @@ export function NewNoteDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">SpO₂ (%)</Label>
+                <Label className="text-xs" htmlFor="saturacionOxigeno">SpO₂ (%)</Label>
                 <Input
+                  id="saturacionOxigeno"
+                  name="saturacionOxigeno"
                   type="number"
                   placeholder="Saturación O₂"
                   value={formData.vitals.saturacionOxigeno}
@@ -437,8 +448,10 @@ export function NewNoteDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Glucosa (mg/dL)</Label>
+                <Label className="text-xs" htmlFor="glucosa">Glucosa (mg/dL)</Label>
                 <Input
+                  id="glucosa"
+                  name="glucosa"
                   type="number"
                   placeholder="Glucosa capilar"
                   value={formData.vitals.glucosa}
@@ -447,8 +460,10 @@ export function NewNoteDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Peso (kg)</Label>
+                <Label className="text-xs" htmlFor="peso">Peso (kg)</Label>
                 <Input
+                  id="peso"
+                  name="peso"
                   type="number"
                   step="0.1"
                   placeholder="Peso"
@@ -458,8 +473,10 @@ export function NewNoteDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Talla (cm)</Label>
+                <Label className="text-xs" htmlFor="talla">Talla (cm)</Label>
                 <Input
+                  id="talla"
+                  name="talla"
                   type="number"
                   placeholder="Talla"
                   value={formData.vitals.talla}
@@ -553,7 +570,7 @@ export function NewNoteDialog({
               onValueChange={(v) => setFormData({ ...formData, pronostico: v })}
               disabled={isLoading}
             >
-              <SelectTrigger data-testid="select-pronostico">
+              <SelectTrigger id="pronostico" data-testid="select-pronostico">
                 <SelectValue placeholder="Seleccionar pronóstico" />
               </SelectTrigger>
               <SelectContent>
