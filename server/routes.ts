@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 import { 
   insertPatientSchema, 
@@ -1376,6 +1379,51 @@ export async function registerRoutes(
       res.json(config);
     } catch (error) {
       res.status(500).json({ error: "Error al obtener la configuración del consultorio" });
+    }
+  });
+
+  // Logo Upload
+  const uploadsDir = path.join(process.cwd(), "dist", "public", "uploads");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+  const logoUpload = multer({
+    storage: multer.diskStorage({
+      destination: uploadsDir,
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `logo-${Date.now()}${ext}`);
+      },
+    }),
+    limits: { fileSize: 2 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (["image/png", "image/jpeg", "image/jpg"].includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Solo se permiten imágenes PNG o JPG"));
+      }
+    },
+  });
+
+  app.post("/api/config/logo", isAdmin, logoUpload.single("logo"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No se recibió ningún archivo" });
+      }
+      const logoUrl = `/uploads/${req.file.filename}`;
+      await storage.updateLogoUrl(logoUrl);
+      await storage.createAuditLog({
+        userId: req.session.userId!,
+        accion: "actualizar_logo",
+        entidad: "establishment_config",
+        entidadId: null,
+        detalles: JSON.stringify({ logoUrl }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      res.json({ logoUrl });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Error al subir el logo" });
     }
   });
 
