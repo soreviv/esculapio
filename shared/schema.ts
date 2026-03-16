@@ -280,7 +280,9 @@ export const establishmentConfig = pgTable("establishment_config", {
 // Insert schemas and types
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPatientSchema = createInsertSchema(patients).omit({ id: true, createdAt: true });
-export const insertMedicalNoteSchema = createInsertSchema(medicalNotes).omit({ id: true, createdAt: true });
+export const insertMedicalNoteSchema = createInsertSchema(medicalNotes)
+  .omit({ id: true, createdAt: true })
+  .extend({ fecha: z.coerce.date().optional() });
 export const insertMedicalNoteAddendumSchema = createInsertSchema(medicalNoteAddendums).omit({ id: true, createdAt: true });
 export const insertMedicalNoteDiagnosisSchema = createInsertSchema(medicalNoteDiagnoses).omit({ id: true, createdAt: true });
 export const insertVitalsSchema = createInsertSchema(vitals).omit({ id: true, createdAt: true });

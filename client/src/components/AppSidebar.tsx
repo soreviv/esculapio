@@ -85,7 +85,11 @@ const systemItems = [
   },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  user: { nombre: string; especialidad?: string; role: string };
+}
+
+export function AppSidebar({ user }: AppSidebarProps) {
   const [location] = useLocation();
 
   return (
@@ -174,13 +178,13 @@ export function AppSidebar() {
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-primary/10 text-primary text-xs">
-              DR
+              {user.nombre.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">Dr. Roberto García</p>
+            <p className="text-sm font-medium truncate">{user.nombre}</p>
             <p className="text-xs text-muted-foreground truncate">
-              Medicina General
+              {user.especialidad ?? user.role}
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,39 @@ import {
 export default function Configuracion() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("establecimiento");
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  const { data: establishmentConfig } = useQuery<{ logoUrl?: string | null }>({
+    queryKey: ["/api/config/establishment"],
+  });
+
+  useEffect(() => {
+    if (establishmentConfig?.logoUrl) {
+      setLogoPreview(establishmentConfig.logoUrl);
+    }
+  }, [establishmentConfig]);
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const res = await fetch("/api/config/logo", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al subir el logo");
+      setLogoPreview(data.logoUrl);
+      toast({ title: "Logo actualizado", description: "El logotipo del establecimiento fue guardado." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
   const [schedules, setSchedules] = useState<ClinicHoursDay[]>(DEFAULT_CLINIC_HOURS);
   const [isNewUserDialogOpen, setIsNewUserDialogOpen] = useState(false);
   const [newUserForm, setNewUserForm] = useState({
@@ -255,12 +288,28 @@ export default function Configuracion() {
               <div className="space-y-2">
                 <Label>Logotipo del Establecimiento</Label>
                 <div className="flex items-center gap-4">
-                  <div className="w-24 h-24 border-2 border-dashed rounded-md flex items-center justify-center bg-muted/50">
-                    <Building2 className="h-8 w-8 text-muted-foreground" />
+                  <div className="w-24 h-24 border-2 border-dashed rounded-md flex items-center justify-center bg-muted/50 overflow-hidden">
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
+                    ) : (
+                      <Building2 className="h-8 w-8 text-muted-foreground" />
+                    )}
                   </div>
-                  <Button variant="outline" data-testid="button-upload-logo">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="hidden"
+                    onChange={handleLogoChange}
+                  />
+                  <Button
+                    variant="outline"
+                    data-testid="button-upload-logo"
+                    disabled={isUploadingLogo}
+                    onClick={() => logoInputRef.current?.click()}
+                  >
                     <Upload className="h-4 w-4 mr-2" />
-                    Subir Logo
+                    {isUploadingLogo ? "Subiendo..." : "Subir Logo"}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">

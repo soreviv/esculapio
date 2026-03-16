@@ -125,6 +125,9 @@ export interface IStorage {
   // Clinic Hours
   getClinicHours(): Promise<ClinicHoursDay[]>;
   updateClinicHours(hours: ClinicHoursDay[]): Promise<ClinicHoursDay[]>;
+
+  // Establishment Logo
+  updateLogoUrl(logoUrl: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -976,6 +979,29 @@ export class DatabaseStorage implements IStorage {
       });
     }
     return hours;
+  }
+
+  async updateLogoUrl(logoUrl: string): Promise<void> {
+    const [existing] = await db.select({ id: establishmentConfig.id })
+      .from(establishmentConfig)
+      .where(eq(establishmentConfig.activo, true))
+      .limit(1);
+
+    if (existing) {
+      await db.update(establishmentConfig)
+        .set({ logoUrl, updatedAt: new Date() })
+        .where(eq(establishmentConfig.id, existing.id));
+    } else {
+      await db.insert(establishmentConfig).values({
+        tipoEstablecimiento: "Consultorio",
+        nombreEstablecimiento: "Salud Digital",
+        domicilio: "",
+        ciudad: "",
+        estado: "",
+        logoUrl,
+        activo: true,
+      });
+    }
   }
 }
 
