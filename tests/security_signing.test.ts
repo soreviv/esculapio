@@ -128,7 +128,7 @@ describe("Security - Access Control", () => {
 
       await request(app)
         .post("/api/vitals")
-        .send({ registradoPorId: "00000000-0000-0000-0000-000000000999", patientId: "00000000-0000-0000-0000-000000000001", frecuenciaCardiaca: 80 });
+        .send({ registradoPorId: "00000000-0000-4000-8000-000000000099", patientId: "00000000-0000-4000-8000-000000000001", frecuenciaCardiaca: 80 });
 
       expect(storage.createVitals).toHaveBeenCalledWith(expect.objectContaining({
         registradoPorId: "user-1"

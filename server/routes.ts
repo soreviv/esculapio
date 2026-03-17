@@ -4,6 +4,16 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
+import {
+  patientToFhir,
+  userToPractitioner,
+  medicalNoteToEncounter,
+  vitalsToObservations,
+  prescriptionToMedicationRequest,
+  labOrderToServiceRequest,
+  createPatientBundle,
+  getCapabilityStatement,
+} from "@shared/fhir-mappers";
 import { 
   insertPatientSchema, 
   insertMedicalNoteSchema, 
@@ -391,6 +401,16 @@ export async function registerRoutes(
   app.get("/api/patients", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const patients = await storage.getPatients();
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "patients",
+        entidadId: null,
+        detalles: JSON.stringify({ accion: "listar_pacientes", total: patients.length }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
       res.json(patients);
     } catch (error) {
       res.status(500).json({ error: "Error fetching patients" });
@@ -417,6 +437,16 @@ export async function registerRoutes(
     try {
       const query = req.query.q as string || "";
       const patients = await storage.searchPatients(query);
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "patients",
+        entidadId: null,
+        detalles: JSON.stringify({ accion: "buscar_pacientes", query, resultados: patients.length }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
       res.json(patients);
     } catch (error) {
       res.status(500).json({ error: "Error searching patients" });
@@ -637,6 +667,16 @@ export async function registerRoutes(
   app.get("/api/patients/:patientId/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const notes = await storage.getMedicalNotesWithDetails(req.params.patientId);
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "medical_notes",
+        entidadId: null,
+        detalles: JSON.stringify({ patientId: req.params.patientId, total: notes.length }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
       res.json(notes);
     } catch (error) {
       res.status(500).json({ error: "Error fetching notes" });
@@ -795,6 +835,16 @@ export async function registerRoutes(
   app.get("/api/patients/:patientId/vitals", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const vitalsList = await storage.getVitals(req.params.patientId);
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "vitals",
+        entidadId: null,
+        detalles: JSON.stringify({ patientId: req.params.patientId, total: vitalsList.length }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
       res.json(vitalsList);
     } catch (error) {
       res.status(500).json({ error: "Error fetching vitals" });
@@ -804,6 +854,16 @@ export async function registerRoutes(
   app.get("/api/patients/:patientId/vitals/latest", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const latest = await storage.getLatestVitals(req.params.patientId);
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "vitals",
+        entidadId: latest?.id || null,
+        detalles: JSON.stringify({ patientId: req.params.patientId, accion: "ultimo_registro" }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
       res.json(latest || null);
     } catch (error) {
       res.status(500).json({ error: "Error fetching latest vitals" });
@@ -852,6 +912,16 @@ export async function registerRoutes(
   app.get("/api/patients/:patientId/prescriptions", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const prescriptions = await storage.getPrescriptionsWithDetails(req.params.patientId);
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "prescriptions",
+        entidadId: null,
+        detalles: JSON.stringify({ patientId: req.params.patientId, total: prescriptions.length }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
       res.json(prescriptions);
     } catch (error) {
       res.status(500).json({ error: "Error fetching prescriptions" });
@@ -993,6 +1063,16 @@ export async function registerRoutes(
   app.get("/api/patients/:patientId/appointments", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const appointments = await storage.getAppointmentsByPatient(req.params.patientId);
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "appointments",
+        entidadId: null,
+        detalles: JSON.stringify({ patientId: req.params.patientId, total: appointments.length }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
       res.json(appointments);
     } catch (error) {
       res.status(500).json({ error: "Error fetching appointments" });
@@ -1209,6 +1289,16 @@ export async function registerRoutes(
   app.get("/api/patients/:patientId/lab-orders", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const orders = await storage.getLabOrders(req.params.patientId);
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "lab_orders",
+        entidadId: null,
+        detalles: JSON.stringify({ patientId: req.params.patientId, total: orders.length }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
       res.json(orders);
     } catch (error) {
       res.status(500).json({ error: "Error fetching lab orders" });
@@ -1221,6 +1311,16 @@ export async function registerRoutes(
       if (!order) {
         return res.status(404).json({ error: "Lab order not found" });
       }
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "lab_orders",
+        entidadId: order.id,
+        detalles: JSON.stringify({ patientId: order.patientId }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
       res.json(order);
     } catch (error) {
       res.status(500).json({ error: "Error fetching lab order" });
@@ -1491,6 +1591,178 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating clinic hours:", error);
       res.status(500).json({ error: "Error al guardar los horarios" });
+    }
+  });
+
+  // =====================
+  // FHIR R4 Endpoints
+  // =====================
+
+  const FHIR_CONTENT_TYPE = "application/fhir+json";
+
+  // CapabilityStatement
+  app.get("/fhir/metadata", isAuthenticated, (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    res.setHeader("Content-Type", FHIR_CONTENT_TYPE);
+    res.json(getCapabilityStatement(baseUrl));
+  });
+
+  // Patient resource
+  app.get("/fhir/Patient/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const patient = await storage.getPatient(req.params.id);
+      if (!patient) {
+        return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Patient not found" }] });
+      }
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "patients",
+        entidadId: patient.id,
+        detalles: JSON.stringify({ fhir: true }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      res.setHeader("Content-Type", FHIR_CONTENT_TYPE);
+      res.json(patientToFhir(patient));
+    } catch (error) {
+      res.status(500).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "exception", diagnostics: "Internal server error" }] });
+    }
+  });
+
+  // Patient search
+  app.get("/fhir/Patient", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const query = (req.query.name || req.query.identifier || "") as string;
+      const patients = query ? await storage.searchPatients(query) : await storage.getPatients();
+      const bundle = {
+        resourceType: "Bundle",
+        type: "searchset",
+        total: patients.length,
+        entry: patients.map((p) => ({ fullUrl: `Patient/${p.id}`, resource: patientToFhir(p) })),
+      };
+      res.setHeader("Content-Type", FHIR_CONTENT_TYPE);
+      res.json(bundle);
+    } catch (error) {
+      res.status(500).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "exception", diagnostics: "Internal server error" }] });
+    }
+  });
+
+  // Practitioner resource
+  app.get("/fhir/Practitioner/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Practitioner not found" }] });
+      }
+      res.setHeader("Content-Type", FHIR_CONTENT_TYPE);
+      res.json(userToPractitioner(user));
+    } catch (error) {
+      res.status(500).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "exception", diagnostics: "Internal server error" }] });
+    }
+  });
+
+  // Encounter resource (Nota Médica)
+  app.get("/fhir/Encounter/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const note = await storage.getMedicalNote(req.params.id);
+      if (!note) {
+        return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Encounter not found" }] });
+      }
+      const patient = await storage.getPatient(note.patientId);
+      if (!patient) {
+        return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Associated patient not found" }] });
+      }
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "medical_notes",
+        entidadId: note.id,
+        detalles: JSON.stringify({ fhir: true }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      res.setHeader("Content-Type", FHIR_CONTENT_TYPE);
+      res.json(medicalNoteToEncounter(note, patient));
+    } catch (error) {
+      res.status(500).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "exception", diagnostics: "Internal server error" }] });
+    }
+  });
+
+  // Observation resource (Signos Vitales)
+  app.get("/fhir/Observation/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const vitals = await storage.getVitalsById(req.params.id);
+      if (!vitals) {
+        return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Observation not found" }] });
+      }
+      const observations = vitalsToObservations(vitals, vitals.patientId);
+      const panel = observations[0];
+      res.setHeader("Content-Type", FHIR_CONTENT_TYPE);
+      res.json(panel);
+    } catch (error) {
+      res.status(500).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "exception", diagnostics: "Internal server error" }] });
+    }
+  });
+
+  // MedicationRequest resource (Receta)
+  app.get("/fhir/MedicationRequest/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const prescription = await storage.getPrescription(req.params.id);
+      if (!prescription) {
+        return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "MedicationRequest not found" }] });
+      }
+      res.setHeader("Content-Type", FHIR_CONTENT_TYPE);
+      res.json(prescriptionToMedicationRequest(prescription, prescription.patientId));
+    } catch (error) {
+      res.status(500).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "exception", diagnostics: "Internal server error" }] });
+    }
+  });
+
+  // ServiceRequest resource (Orden de Laboratorio)
+  app.get("/fhir/ServiceRequest/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const order = await storage.getLabOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "ServiceRequest not found" }] });
+      }
+      res.setHeader("Content-Type", FHIR_CONTENT_TYPE);
+      res.json(labOrderToServiceRequest(order, order.patientId));
+    } catch (error) {
+      res.status(500).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "exception", diagnostics: "Internal server error" }] });
+    }
+  });
+
+  // Patient $everything — Bundle completo del expediente
+  app.get("/fhir/Patient/:id/\\$everything", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const patient = await storage.getPatient(req.params.id);
+      if (!patient) {
+        return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Patient not found" }] });
+      }
+      const [notes, vitals, prescriptions, labOrders, consents] = await Promise.all([
+        storage.getMedicalNotes(patient.id),
+        storage.getVitals(patient.id),
+        storage.getPrescriptions(patient.id),
+        storage.getLabOrders(patient.id),
+        storage.getPatientConsents(patient.id),
+      ]);
+      await storage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "leer",
+        entidad: "patients",
+        entidadId: patient.id,
+        detalles: JSON.stringify({ fhir: true, operacion: "$everything" }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      res.setHeader("Content-Type", FHIR_CONTENT_TYPE);
+      res.json(createPatientBundle(patient, notes, vitals, prescriptions, labOrders, consents));
+    } catch (error) {
+      res.status(500).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "exception", diagnostics: "Internal server error" }] });
     }
   });
 

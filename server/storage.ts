@@ -349,8 +349,6 @@ export class DatabaseStorage implements IStorage {
   async getAppointment(id: string): Promise<Appointment | undefined> {
     const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
     return appointment;
-    const [result] = await db.select().from(appointments).where(eq(appointments.id, id));
-    return result;
   }
 
   async getAppointmentsByPatient(patientId: string): Promise<Appointment[]> {
