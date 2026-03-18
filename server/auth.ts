@@ -8,6 +8,7 @@ declare module "express-session" {
     userId: string;
     role: string;
     nombre: string;
+    pendingTwoFactor?: boolean; // true when password OK but TOTP not yet verified
   }
 }
 
@@ -26,7 +27,7 @@ export interface PasswordValidationResult {
 
 export function validatePasswordStrength(password: string, userInputs: string[] = []): PasswordValidationResult {
   const result = zxcvbn(password, userInputs);
-  
+
   return {
     valid: result.score >= MIN_PASSWORD_SCORE,
     score: result.score,
@@ -47,7 +48,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 export function isAuthenticated(req: Request, res: Response, next: NextFunction) {
-  if (req.session?.userId) {
+  if (req.session?.userId && !req.session?.pendingTwoFactor) {
     return next();
   }
   return res.status(401).json({ error: "No autorizado. Por favor inicie sesión." });

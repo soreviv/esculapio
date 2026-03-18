@@ -29,6 +29,9 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getUsers(): Promise<User[]>;
+  setTotpSecret(userId: string, secret: string): Promise<void>;
+  enableTotp(userId: string): Promise<void>;
+  disableTotp(userId: string): Promise<void>;
   
   // Patients
   getPatients(): Promise<Patient[]>;
@@ -140,6 +143,18 @@ export class DatabaseStorage implements IStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
     return user;
+  }
+
+  async setTotpSecret(userId: string, secret: string): Promise<void> {
+    await db.update(users).set({ totpSecret: secret, totpEnabled: false }).where(eq(users.id, userId));
+  }
+
+  async enableTotp(userId: string): Promise<void> {
+    await db.update(users).set({ totpEnabled: true }).where(eq(users.id, userId));
+  }
+
+  async disableTotp(userId: string): Promise<void> {
+    await db.update(users).set({ totpEnabled: false, totpSecret: null }).where(eq(users.id, userId));
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {

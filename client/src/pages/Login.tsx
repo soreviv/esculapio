@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, User, ShieldCheck, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Lock, User, ShieldCheck, AlertCircle, Eye, EyeOff, KeyRound } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const loginSchema = z.object({
   username: z.string().min(1, "El usuario es requerido"),
@@ -37,6 +38,8 @@ export default function Login({ onLogin }: LoginProps) {
   const { toast } = useToast();
   const [showError, setShowError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -51,8 +54,34 @@ export default function Login({ onLogin }: LoginProps) {
       const response = await apiRequest("POST", "/api/login", data);
       return response.json();
     },
-    onSuccess: (data: LoginResponse) => {
+    onSuccess: (data: any) => {
       setShowError(false);
+      if (data.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        return;
+      }
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: `Bienvenido, ${data.nombre}`,
+      });
+      onLogin(data as LoginResponse);
+      setLocation("/");
+    },
+    onError: () => {
+      setShowError(true);
+    },
+  });
+
+  const totpMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const response = await apiRequest("POST", "/api/auth/2fa/verify", { code });
+      if (!response.ok) {
+        const body = await response.json();
+        throw new Error(body.error || "Código incorrecto");
+      }
+      return response.json();
+    },
+    onSuccess: (data: LoginResponse) => {
       toast({
         title: "Inicio de sesión exitoso",
         description: `Bienvenido, ${data.nombre}`,
@@ -61,12 +90,12 @@ export default function Login({ onLogin }: LoginProps) {
       setLocation("/");
     },
     onError: (error: Error) => {
-      setShowError(true);
       toast({
-        title: "Error de autenticación",
-        description: "Usuario o contraseña incorrectos",
+        title: "Código incorrecto",
+        description: error.message,
         variant: "destructive",
       });
+      setTotpCode("");
     },
   });
 
@@ -74,6 +103,87 @@ export default function Login({ onLogin }: LoginProps) {
     setShowError(false);
     loginMutation.mutate(data);
   };
+
+  const onTotpSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (totpCode.length === 6) totpMutation.mutate(totpCode);
+  };
+
+  if (requiresTwoFactor) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center space-y-2">
+            <div className="flex justify-center mb-4">
+              <div className="p-3 rounded-full bg-primary/10">
+                <KeyRound className="h-10 w-10 text-primary" />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Verificación 2FA</h1>
+            <p className="text-muted-foreground">
+              Ingrese el código de su aplicación autenticadora
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Autenticación de dos factores</CardTitle>
+              <CardDescription>
+                Abra Google Authenticator, Authy u otra app TOTP y copie el código de 6 dígitos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={onTotpSubmit} className="space-y-6">
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={totpCode}
+                    onChange={setTotpCode}
+                    autoFocus
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={totpCode.length !== 6 || totpMutation.isPending}
+                >
+                  {totpMutation.isPending ? "Verificando..." : "Verificar código"}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    setRequiresTwoFactor(false);
+                    setTotpCode("");
+                    form.reset();
+                  }}
+                >
+                  Volver al inicio de sesión
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <div className="text-center text-xs text-muted-foreground space-y-1">
+            <p>Sistema conforme a NOM-024-SSA3-2012</p>
+            <p>Protección de datos según LFPDPPP</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -108,7 +218,7 @@ export default function Login({ onLogin }: LoginProps) {
                     <span>Usuario o contraseña incorrectos</span>
                   </div>
                 )}
-                
+
                 <FormField
                   control={form.control}
                   name="username"

@@ -12,6 +12,8 @@ export const users = pgTable("users", {
   nombre: text("nombre").notNull(),
   especialidad: text("especialidad"),
   cedula: text("cedula"),
+  totpSecret: text("totp_secret"),       // encrypted TOTP secret
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

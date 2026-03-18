@@ -26,6 +26,9 @@ import {
   insertPatientConsentSchema
 } from "@shared/schema";
 import { createHash, randomUUID } from "crypto";
+import * as OTPAuth from "otpauth";
+import QRCode from "qrcode";
+import { encrypt, decrypt } from "./crypto";
 import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isMedicoOrEnfermeria } from "./auth";
 
 /**
@@ -129,6 +132,21 @@ export async function registerRoutes(
 
       if (res.headersSent) return;
 
+      // If 2FA is enabled, pause login until TOTP is verified
+      if (user.totpEnabled) {
+        req.session.userId = user.id;
+        req.session.role = user.role;
+        req.session.nombre = user.nombre;
+        req.session.pendingTwoFactor = true;
+
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => (err ? reject(err) : resolve()));
+        }).catch(() => res.status(500).json({ error: "Error al guardar la sesión" }));
+
+        if (res.headersSent) return;
+        return res.status(200).json({ requiresTwoFactor: true });
+      }
+
       req.session.userId = user.id;
       req.session.role = user.role;
       req.session.nombre = user.nombre;
@@ -227,6 +245,211 @@ export async function registerRoutes(
       res.status(401).json({ error: "No autenticado" });
     }
   });
+
+  // ── 2FA endpoints ───────────────────────────────────────────────────────────
+
+  // Verify TOTP during login (session is pendingTwoFactor)
+  app.post("/api/auth/2fa/verify", async (req, res) => {
+    try {
+      const { code } = req.body;
+      if (!req.session?.userId || !req.session?.pendingTwoFactor) {
+        return res.status(401).json({ error: "No hay sesión pendiente de verificación" });
+      }
+      if (!code) {
+        return res.status(400).json({ error: "El código es requerido" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user?.totpSecret) {
+        return res.status(400).json({ error: "2FA no configurado" });
+      }
+
+      const totp = new OTPAuth.TOTP({
+        issuer: "MediRecord",
+        label: user.username,
+        secret: OTPAuth.Secret.fromBase32(decrypt(user.totpSecret)),
+        digits: 6,
+        period: 30,
+      });
+
+      const delta = totp.validate({ token: String(code).replace(/\s/g, ""), window: 1 });
+      if (delta === null) {
+        await storage.createAuditLog({
+          userId: user.id,
+          accion: "login_2fa_fallido",
+          entidad: "auth",
+          entidadId: user.id,
+          detalles: JSON.stringify({ reason: "invalid_totp" }),
+          ipAddress: req.ip || req.socket.remoteAddress || null,
+          userAgent: req.get("User-Agent") || null,
+          fecha: new Date(),
+        });
+        return res.status(401).json({ error: "Código incorrecto o expirado" });
+      }
+
+      // Complete login
+      req.session.pendingTwoFactor = false;
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => (err ? reject(err) : resolve()));
+      });
+
+      await storage.createAuditLog({
+        userId: user.id,
+        accion: "login",
+        entidad: "auth",
+        entidadId: user.id,
+        detalles: JSON.stringify({ role: user.role, metodo: "totp" }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        nombre: user.nombre,
+        especialidad: user.especialidad,
+        cedula: user.cedula,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Error al verificar el código" });
+    }
+  });
+
+  // Generate TOTP secret and QR code (first-time setup)
+  app.post("/api/auth/2fa/setup", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+
+      if (user.totpEnabled) {
+        return res.status(400).json({ error: "2FA ya está activado. Desactívalo primero." });
+      }
+
+      const secret = new OTPAuth.Secret({ size: 20 });
+      await storage.setTotpSecret(user.id, encrypt(secret.base32));
+
+      const totp = new OTPAuth.TOTP({
+        issuer: "MediRecord",
+        label: user.username,
+        secret,
+        digits: 6,
+        period: 30,
+      });
+
+      const otpAuthUrl = totp.toString();
+      const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
+
+      res.json({
+        secret: secret.base32,
+        otpAuthUrl,
+        qrCode: qrCodeDataUrl,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Error al generar el código 2FA" });
+    }
+  });
+
+  // Confirm setup by verifying the first TOTP code
+  app.post("/api/auth/2fa/setup/confirm", isAuthenticated, async (req, res) => {
+    try {
+      const { code } = req.body;
+      if (!code) return res.status(400).json({ error: "El código es requerido" });
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.totpSecret) {
+        return res.status(400).json({ error: "Primero genera el secreto con POST /api/auth/2fa/setup" });
+      }
+      if (user.totpEnabled) {
+        return res.status(400).json({ error: "2FA ya está activado" });
+      }
+
+      const totp = new OTPAuth.TOTP({
+        issuer: "MediRecord",
+        label: user.username,
+        secret: OTPAuth.Secret.fromBase32(decrypt(user.totpSecret)),
+        digits: 6,
+        period: 30,
+      });
+
+      const delta = totp.validate({ token: String(code).replace(/\s/g, ""), window: 1 });
+      if (delta === null) {
+        return res.status(401).json({ error: "Código incorrecto. Intente de nuevo." });
+      }
+
+      await storage.enableTotp(user.id);
+
+      await storage.createAuditLog({
+        userId: user.id,
+        accion: "2fa_activado",
+        entidad: "auth",
+        entidadId: user.id,
+        detalles: JSON.stringify({}),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
+      res.json({ message: "Autenticación de dos factores activada exitosamente" });
+    } catch (error) {
+      res.status(500).json({ error: "Error al activar 2FA" });
+    }
+  });
+
+  // Disable 2FA (requires current TOTP code to confirm)
+  app.post("/api/auth/2fa/disable", isAuthenticated, async (req, res) => {
+    try {
+      const { code } = req.body;
+      if (!code) return res.status(400).json({ error: "El código TOTP es requerido para desactivar 2FA" });
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.totpEnabled || !user.totpSecret) {
+        return res.status(400).json({ error: "2FA no está activado" });
+      }
+
+      const totp = new OTPAuth.TOTP({
+        issuer: "MediRecord",
+        label: user.username,
+        secret: OTPAuth.Secret.fromBase32(decrypt(user.totpSecret)),
+        digits: 6,
+        period: 30,
+      });
+
+      const delta = totp.validate({ token: String(code).replace(/\s/g, ""), window: 1 });
+      if (delta === null) {
+        return res.status(401).json({ error: "Código incorrecto" });
+      }
+
+      await storage.disableTotp(user.id);
+
+      await storage.createAuditLog({
+        userId: user.id,
+        accion: "2fa_desactivado",
+        entidad: "auth",
+        entidadId: user.id,
+        detalles: JSON.stringify({}),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
+      res.json({ message: "Autenticación de dos factores desactivada" });
+    } catch (error) {
+      res.status(500).json({ error: "Error al desactivar 2FA" });
+    }
+  });
+
+  // Status — returns whether current user has 2FA enabled
+  app.get("/api/auth/2fa/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      res.json({ totpEnabled: user?.totpEnabled ?? false });
+    } catch (error) {
+      res.status(500).json({ error: "Error al obtener estado 2FA" });
+    }
+  });
+
 
   app.post("/api/register", isAuthenticated, isAdmin, async (req, res) => {
     try {
