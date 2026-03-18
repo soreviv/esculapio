@@ -1,8 +1,21 @@
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { FileText, CheckCircle, Clock, Eye, Printer } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { FileText, CheckCircle, Clock, Eye, Printer, FilePlus, Save } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export interface MedicalNoteCardProps {
   id: string;
@@ -33,6 +46,7 @@ const tipoLabels: Record<string, string> = {
 };
 
 export function MedicalNoteCard({
+  id,
   tipo,
   fecha,
   hora,
@@ -44,6 +58,32 @@ export function MedicalNoteCard({
   onView,
   onPrint,
 }: MedicalNoteCardProps) {
+  const [addendumOpen, setAddendumOpen] = useState(false);
+  const [addendumText, setAddendumText] = useState("");
+  const { toast } = useToast();
+
+  const addendumMutation = useMutation({
+    mutationFn: async (contenido: string) => {
+      const res = await apiRequest("POST", `/api/notes/${id}/addendums`, { contenido });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Addendum registrado",
+        description: "El anexo ha sido agregado a la nota médica.",
+      });
+      setAddendumOpen(false);
+      setAddendumText("");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el addendum.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const renderDiagnosis = (dx: string | { codigo: string; descripcion: string }) => {
     if (typeof dx === 'string') return dx;
     return `${dx.codigo} ${dx.descripcion}`;
@@ -127,6 +167,17 @@ export function MedicalNoteCard({
             <Eye className="h-4 w-4 mr-2" />
             Ver nota completa
           </Button>
+          {firmada && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAddendumOpen(true)}
+              data-testid="button-add-addendum"
+              title="Agregar addendum a nota firmada"
+            >
+              <FilePlus className="h-4 w-4" />
+            </Button>
+          )}
           {onPrint && (
             <Button
               variant="ghost"
@@ -140,6 +191,39 @@ export function MedicalNoteCard({
           )}
         </div>
       </CardContent>
+
+      <Dialog open={addendumOpen} onOpenChange={setAddendumOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agregar Addendum</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="addendum-contenido">
+              Contenido del addendum (NOM-024 — anexo a nota firmada)
+            </Label>
+            <Textarea
+              id="addendum-contenido"
+              value={addendumText}
+              onChange={(e) => setAddendumText(e.target.value)}
+              placeholder="Describa la información adicional o corrección..."
+              rows={5}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddendumOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => addendumMutation.mutate(addendumText)}
+              disabled={!addendumText.trim() || addendumMutation.isPending}
+              data-testid="button-save-addendum"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {addendumMutation.isPending ? "Guardando..." : "Guardar Addendum"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

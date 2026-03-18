@@ -15,6 +15,7 @@ import { NewNoteDialog } from "@/components/ehr/NewNoteDialog";
 import { RecordVitalsDialog } from "@/components/ehr/RecordVitalsDialog";
 import { NewPrescriptionDialog } from "@/components/ehr/NewPrescriptionDialog";
 import { NewLabOrderDialog } from "@/components/ehr/NewLabOrderDialog";
+import { EditPatientDialog } from "@/components/ehr/EditPatientDialog";
 import { PatientTimeline } from "@/components/ehr/PatientTimeline";
 import {
   ArrowLeft,
@@ -316,6 +317,13 @@ export default function PatientDetail() {
                   )}
                 </div>
               )}
+
+              <div className="mt-4 pt-4 border-t">
+                <EditPatientDialog
+                  patient={patient}
+                  onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/patients", params.id] })}
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
