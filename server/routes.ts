@@ -30,6 +30,7 @@ import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { encrypt, decrypt } from "./crypto";
 import { hashPassword, verifyPassword, validatePasswordStrength, isAuthenticated, isAdmin, isMedico, isMedicoOrEnfermeria } from "./auth";
+import { isTokenReplayed, markTokenUsed, getLockoutExpiry, recordFailure, clearFailures } from "./totp-guard";
 
 /**
  * Registra y configura todos los endpoints REST bajo /api en la aplicación Express proporcionada.
@@ -138,6 +139,7 @@ export async function registerRoutes(
         req.session.role = user.role;
         req.session.nombre = user.nombre;
         req.session.pendingTwoFactor = true;
+        req.session.pendingTwoFactorExpiry = Date.now() + 5 * 60 * 1000; // 5-minute window
 
         await new Promise<void>((resolve, reject) => {
           req.session.save((err) => (err ? reject(err) : resolve()));
@@ -255,13 +257,38 @@ export async function registerRoutes(
       if (!req.session?.userId || !req.session?.pendingTwoFactor) {
         return res.status(401).json({ error: "No hay sesión pendiente de verificación" });
       }
+
+      // Check that the pending 2FA window has not expired (5 minutes)
+      if (!req.session.pendingTwoFactorExpiry || Date.now() > req.session.pendingTwoFactorExpiry) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ error: "La sesión de verificación ha expirado. Inicie sesión nuevamente." });
+      }
+
       if (!code) {
         return res.status(400).json({ error: "El código es requerido" });
       }
 
-      const user = await storage.getUser(req.session.userId);
+      const userId = req.session.userId;
+
+      // Check brute-force lockout
+      const lockUntil = getLockoutExpiry(userId);
+      if (lockUntil) {
+        const remainingMin = Math.ceil((lockUntil - Date.now()) / 60_000);
+        return res.status(429).json({
+          error: `Demasiados intentos fallidos. Intente de nuevo en ${remainingMin} minuto(s).`,
+        });
+      }
+
+      const user = await storage.getUser(userId);
       if (!user?.totpSecret) {
         return res.status(400).json({ error: "2FA no configurado" });
+      }
+
+      const token = String(code).replace(/\s/g, "");
+
+      // Replay attack prevention
+      if (isTokenReplayed(userId, token)) {
+        return res.status(401).json({ error: "Este código ya fue utilizado. Espere el siguiente código." });
       }
 
       const totp = new OTPAuth.TOTP({
@@ -272,14 +299,15 @@ export async function registerRoutes(
         period: 30,
       });
 
-      const delta = totp.validate({ token: String(code).replace(/\s/g, ""), window: 1 });
+      const delta = totp.validate({ token, window: 1 });
       if (delta === null) {
+        const failCount = recordFailure(userId);
         await storage.createAuditLog({
           userId: user.id,
           accion: "login_2fa_fallido",
           entidad: "auth",
           entidadId: user.id,
-          detalles: JSON.stringify({ reason: "invalid_totp" }),
+          detalles: JSON.stringify({ reason: "invalid_totp", failCount }),
           ipAddress: req.ip || req.socket.remoteAddress || null,
           userAgent: req.get("User-Agent") || null,
           fecha: new Date(),
@@ -287,8 +315,13 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Código incorrecto o expirado" });
       }
 
+      // Mark token as used to prevent replays
+      markTokenUsed(userId, token);
+      clearFailures(userId);
+
       // Complete login
       req.session.pendingTwoFactor = false;
+      req.session.pendingTwoFactorExpiry = undefined;
       await new Promise<void>((resolve, reject) => {
         req.session.save((err) => (err ? reject(err) : resolve()));
       });

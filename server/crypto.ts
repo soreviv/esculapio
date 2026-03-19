@@ -51,7 +51,6 @@ export function decrypt(encryptedData: string): string {
     
     return decrypted;
   } catch (error) {
-    console.error("Decryption failed:", error);
-    return "Error al desencriptar datos";
+    throw new Error("Decryption failed: data may be corrupt or the key has changed");
   }
 }

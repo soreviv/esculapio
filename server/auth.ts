@@ -8,7 +8,8 @@ declare module "express-session" {
     userId: string;
     role: string;
     nombre: string;
-    pendingTwoFactor?: boolean; // true when password OK but TOTP not yet verified
+    pendingTwoFactor?: boolean;       // true when password OK but TOTP not yet verified
+    pendingTwoFactorExpiry?: number;  // Unix ms — session expires if TOTP not completed in time
   }
 }
 
