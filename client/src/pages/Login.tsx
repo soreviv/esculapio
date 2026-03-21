@@ -8,8 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, User, ShieldCheck, AlertCircle, Eye, EyeOff, KeyRound } from "lucide-react";
+import { Lock, User, ShieldCheck, AlertCircle, Eye, EyeOff, KeyRound, HelpCircle, CheckCircle2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
@@ -40,6 +41,30 @@ export default function Login({ onLogin }: LoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [totpCode, setTotpCode] = useState("");
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryUsername, setRecoveryUsername] = useState("");
+  const [recoverySent, setRecoverySent] = useState(false);
+
+  const recoveryMutation = useMutation({
+    mutationFn: async (username: string) => {
+      const response = await apiRequest("POST", "/api/password-reset-request", { username });
+      if (!response.ok) {
+        const body = await response.json();
+        throw new Error(body.error || "Error al procesar la solicitud");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      setRecoverySent(true);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -176,10 +201,6 @@ export default function Login({ onLogin }: LoginProps) {
             </CardContent>
           </Card>
 
-          <div className="text-center text-xs text-muted-foreground space-y-1">
-            <p>Sistema conforme a NOM-024-SSA3-2012</p>
-            <p>Protección de datos según LFPDPPP</p>
-          </div>
         </div>
       </div>
     );
@@ -288,16 +309,92 @@ export default function Login({ onLogin }: LoginProps) {
                 >
                   {loginMutation.isPending ? "Iniciando sesión..." : "Iniciar Sesión"}
                 </Button>
+
+                <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-sm text-muted-foreground hover:text-primary p-0 h-auto"
+                    onClick={() => {
+                      setRecoveryUsername("");
+                      setRecoverySent(false);
+                      setShowRecovery(true);
+                    }}
+                  >
+                    <HelpCircle className="h-3.5 w-3.5 mr-1" />
+                    ¿Olvidaste tu contraseña?
+                  </Button>
+                </div>
               </form>
             </Form>
           </CardContent>
         </Card>
-
-        <div className="text-center text-xs text-muted-foreground space-y-1">
-          <p>Sistema conforme a NOM-024-SSA3-2012</p>
-          <p>Protección de datos según LFPDPPP</p>
-        </div>
       </div>
+
+      <Dialog open={showRecovery} onOpenChange={(open) => { setShowRecovery(open); if (!open) setRecoverySent(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recuperar contraseña</DialogTitle>
+            <DialogDescription>
+              Ingresa tu nombre de usuario para solicitar el restablecimiento de contraseña.
+            </DialogDescription>
+          </DialogHeader>
+
+          {recoverySent ? (
+            <div className="flex flex-col items-center gap-4 py-4">
+              <div className="p-3 rounded-full bg-green-100">
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              </div>
+              <div className="text-center space-y-2">
+                <p className="font-medium">Solicitud enviada</p>
+                <p className="text-sm text-muted-foreground">
+                  Tu solicitud ha sido registrada. Por favor contacta al administrador del sistema para obtener tu nueva contraseña temporal.
+                </p>
+              </div>
+              <Button className="w-full" onClick={() => { setShowRecovery(false); setRecoverySent(false); }}>
+                Entendido
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Usuario</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Ingrese su usuario"
+                    className="pl-10"
+                    value={recoveryUsername}
+                    onChange={(e) => setRecoveryUsername(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && recoveryUsername.trim()) {
+                        recoveryMutation.mutate(recoveryUsername.trim());
+                      }
+                    }}
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowRecovery(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={!recoveryUsername.trim() || recoveryMutation.isPending}
+                  onClick={() => recoveryMutation.mutate(recoveryUsername.trim())}
+                >
+                  {recoveryMutation.isPending ? "Enviando..." : "Enviar solicitud"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
