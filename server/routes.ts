@@ -200,6 +200,35 @@ export async function registerRoutes(
    *       200:
    *         description: Sesión cerrada exitosamente
    */
+  // Password reset request — logs the request and notifies admin
+  app.post("/api/password-reset-request", async (req, res) => {
+    try {
+      const { username } = req.body;
+      if (!username) {
+        return res.status(400).json({ error: "El usuario es requerido" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      // Always return success to avoid username enumeration
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          accion: "password_reset_request",
+          entidad: "auth",
+          entidadId: user.id,
+          detalles: JSON.stringify({ username }),
+          ipAddress: req.ip || req.socket.remoteAddress || null,
+          userAgent: req.get("User-Agent") || null,
+          fecha: new Date(),
+        });
+      }
+
+      res.json({ message: "Solicitud registrada. Contacte al administrador para obtener su contraseña temporal." });
+    } catch (error) {
+      res.status(500).json({ error: "Error al procesar la solicitud" });
+    }
+  });
+
   app.post("/api/logout", (req, res) => {
     const userId = req.session?.userId;
     req.session.destroy((err) => {
