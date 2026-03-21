@@ -18,6 +18,7 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+ecosystem.config.cjs
 
 # Pruebas y Cobertura
 coverage/
