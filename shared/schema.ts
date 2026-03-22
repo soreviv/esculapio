@@ -11,7 +11,10 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("medico"), // medico, enfermera, admin
   nombre: text("nombre").notNull(),
   especialidad: text("especialidad"),
-  cedula: text("cedula"),
+  cedula: text("cedula"),                // Cédula de Medicina General (licenciatura)
+  cedulaEspecialidad: text("cedula_especialidad"), // Cédula de Especialidad
+  universidad: text("universidad"),      // Universidad que expidió el título
+  logoUniversidadUrl: text("logo_universidad_url"), // Escudo de la universidad
   totpSecret: text("totp_secret"),       // encrypted TOTP secret
   totpEnabled: boolean("totp_enabled").notNull().default(false),
   email: text("email"),

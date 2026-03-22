@@ -1553,12 +1553,39 @@ export async function registerRoutes(
 
   app.put("/api/users/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const { email, nombre, especialidad, cedula } = req.body;
-      const updated = await storage.updateUser(req.params.id, { email, nombre, especialidad, cedula });
+      const { email, nombre, especialidad, cedula, cedulaEspecialidad, universidad } = req.body;
+      const updated = await storage.updateUser(req.params.id, { email, nombre, especialidad, cedula, cedulaEspecialidad, universidad });
       if (!updated) return res.status(404).json({ error: "Usuario no encontrado" });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Error al actualizar el usuario" });
+    }
+  });
+
+  // Upload escudo de universidad del médico
+  const escudoUpload = multer({
+    storage: multer.diskStorage({
+      destination: path.join(process.cwd(), "dist", "public", "uploads"),
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `escudo-${Date.now()}${ext}`);
+      },
+    }),
+    limits: { fileSize: 2 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      cb(null, /image\/(jpeg|png|gif|webp|svg\+xml)/.test(file.mimetype));
+    },
+  });
+
+  app.post("/api/users/:id/escudo-universidad", isAuthenticated, isAdmin, escudoUpload.single("escudo"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No se recibió ningún archivo" });
+      const logoUniversidadUrl = `/uploads/${req.file.filename}`;
+      const updated = await storage.updateUser(req.params.id, { logoUniversidadUrl });
+      if (!updated) return res.status(404).json({ error: "Usuario no encontrado" });
+      res.json({ logoUniversidadUrl });
+    } catch (error) {
+      res.status(500).json({ error: "Error al subir el escudo" });
     }
   });
 

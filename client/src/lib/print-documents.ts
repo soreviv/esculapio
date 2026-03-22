@@ -1393,13 +1393,19 @@ export function printPrescriptionCOFEPRIS({ prescriptions, instruccionesGenerale
       <div class="rx-doctor-name">${doctorTitle}</div>
       <div class="rx-credentials">
         ${medico.especialidad ? `Especialidad: <strong>${medico.especialidad}</strong><br>` : ''}
-        ${medico.cedula ? `Cédula Profesional: <strong>${medico.cedula}</strong><br>` : ''}
+        ${medico.cedula ? `Cédula Med. General: <strong>${medico.cedula}</strong><br>` : ''}
+        ${(medico as any).cedulaEspecialidad ? `Cédula Especialidad: <strong>${(medico as any).cedulaEspecialidad}</strong><br>` : ''}
+        ${(medico as any).universidad ? `Universidad: ${(medico as any).universidad}<br>` : ''}
         ${clinicAddress ? `${clinicAddress}<br>` : ''}
         ${clinicPhone ? `Tel: ${clinicPhone}` : ''}
         ${clinicRfc ? `&nbsp;&nbsp;RFC: ${clinicRfc}` : ''}
         ${clinicLicense ? `<br>Lic. Sanitaria: <strong>${clinicLicense}</strong>` : ''}
       </div>
     </div>
+    ${(medico as any).logoUniversidadUrl ? `
+    <div style="width:72px;min-height:88px;background:#f0f4f8;display:flex;align-items:center;justify-content:center;border-left:2px solid #1e3a5f;flex-shrink:0;padding:4px;">
+      <img src="${(medico as any).logoUniversidadUrl}" alt="Escudo universidad" style="max-width:64px;max-height:80px;object-fit:contain;" />
+    </div>` : ''}
     <div class="rx-header-right">
       <div class="rx-folio">
         Folio<br><strong>${folio}</strong>
@@ -1510,7 +1516,8 @@ export function printPrescriptionCOFEPRIS({ prescriptions, instruccionesGenerale
       <div class="rx-sig-line">
         <strong>Firma Autógrafa del Médico</strong><br>
         ${doctorTitle}<br>
-        ${medico.cedula ? `Cédula: ${medico.cedula}` : ''}
+        ${medico.cedula ? `Céd. Med. General: ${medico.cedula}` : ''}
+        ${(medico as any).cedulaEspecialidad ? `<br>Céd. Especialidad: ${(medico as any).cedulaEspecialidad}` : ''}
       </div>
     </div>
     <div class="rx-sig-box">

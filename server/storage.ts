@@ -134,7 +134,7 @@ export interface IStorage {
   updateLogoUrl(logoUrl: string): Promise<void>;
 
   // Update user profile
-  updateUser(userId: string, data: Partial<Pick<InsertUser, "email" | "nombre" | "especialidad" | "cedula">>): Promise<User | undefined>;
+  updateUser(userId: string, data: Partial<Pick<InsertUser, "email" | "nombre" | "especialidad" | "cedula" | "cedulaEspecialidad" | "universidad" | "logoUniversidadUrl">>): Promise<User | undefined>;
 
   // Password Reset Tokens
   createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken>;

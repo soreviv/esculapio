@@ -140,7 +140,7 @@ export default function Configuracion() {
     email: "",
   });
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
-  const [editUserForm, setEditUserForm] = useState({ email: "", nombre: "", especialidad: "", cedula: "" });
+  const [editUserForm, setEditUserForm] = useState({ email: "", nombre: "", especialidad: "", cedula: "", cedulaEspecialidad: "", universidad: "" });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<UserRecord[]>({
     queryKey: ["/api/users"],
@@ -169,12 +169,14 @@ export default function Configuracion() {
   });
 
   const editUserMutation = useMutation({
-    mutationFn: async (data: { id: string; email: string; nombre: string; especialidad: string; cedula: string }) => {
+    mutationFn: async (data: { id: string; email: string; nombre: string; especialidad: string; cedula: string; cedulaEspecialidad: string; universidad: string }) => {
       const res = await apiRequest("PUT", `/api/users/${data.id}`, {
         email: data.email || null,
         nombre: data.nombre,
         especialidad: data.especialidad || null,
         cedula: data.cedula || null,
+        cedulaEspecialidad: data.cedulaEspecialidad || null,
+        universidad: data.universidad || null,
       });
       return res.json();
     },
@@ -491,6 +493,8 @@ export default function Configuracion() {
                                 nombre: u.nombre,
                                 especialidad: u.especialidad ?? "",
                                 cedula: u.cedula ?? "",
+                                cedulaEspecialidad: (u as any).cedulaEspecialidad ?? "",
+                                universidad: (u as any).universidad ?? "",
                               });
                             }}
                           >
@@ -533,7 +537,7 @@ export default function Configuracion() {
 
           {/* Dialog: Editar Usuario */}
           <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Editar Usuario</DialogTitle>
               </DialogHeader>
@@ -563,16 +567,82 @@ export default function Configuracion() {
                     id="edit-especialidad"
                     value={editUserForm.especialidad}
                     onChange={(e) => setEditUserForm((f) => ({ ...f, especialidad: e.target.value }))}
+                    placeholder="Ej. Medicina Interna"
                   />
                 </div>
+
+                <Separator />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cédulas Profesionales (COFEPRIS)</p>
+
                 <div className="space-y-1">
-                  <Label htmlFor="edit-cedula">Cédula Profesional</Label>
+                  <Label htmlFor="edit-cedula">Cédula de Medicina General</Label>
                   <Input
                     id="edit-cedula"
                     value={editUserForm.cedula}
                     onChange={(e) => setEditUserForm((f) => ({ ...f, cedula: e.target.value }))}
+                    placeholder="Número de cédula de licenciatura"
                   />
                 </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-cedula-esp">Cédula de Especialidad</Label>
+                  <Input
+                    id="edit-cedula-esp"
+                    value={editUserForm.cedulaEspecialidad}
+                    onChange={(e) => setEditUserForm((f) => ({ ...f, cedulaEspecialidad: e.target.value }))}
+                    placeholder="Número de cédula de especialidad (si aplica)"
+                  />
+                </div>
+
+                <Separator />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Universidad</p>
+
+                <div className="space-y-1">
+                  <Label htmlFor="edit-universidad">Universidad que expidió el título</Label>
+                  <Input
+                    id="edit-universidad"
+                    value={editUserForm.universidad}
+                    onChange={(e) => setEditUserForm((f) => ({ ...f, universidad: e.target.value }))}
+                    placeholder="Ej. Universidad Nacional Autónoma de México"
+                  />
+                </div>
+
+                {editingUser && (
+                  <div className="space-y-2">
+                    <Label>Escudo de la Universidad</Label>
+                    {(editingUser as any).logoUniversidadUrl && (
+                      <img
+                        src={(editingUser as any).logoUniversidadUrl}
+                        alt="Escudo universidad"
+                        className="h-16 w-16 object-contain border rounded"
+                      />
+                    )}
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !editingUser) return;
+                        const formData = new FormData();
+                        formData.append("escudo", file);
+                        try {
+                          const res = await fetch(`/api/users/${editingUser.id}/escudo-universidad`, {
+                            method: "POST",
+                            body: formData,
+                            credentials: "include",
+                          });
+                          if (!res.ok) throw new Error();
+                          const data = await res.json();
+                          setEditingUser({ ...editingUser, ...(data as any) });
+                          queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                          toast({ title: "Escudo actualizado" });
+                        } catch {
+                          toast({ title: "Error", description: "No se pudo subir el escudo.", variant: "destructive" });
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">PNG, JPG o SVG. Máx. 2MB. Aparecerá en la receta médica.</p>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingUser(null)}>Cancelar</Button>
