@@ -620,7 +620,7 @@ export async function registerRoutes(
 
   app.post("/api/register", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const { username, password, role, nombre, especialidad, cedula } = req.body;
+      const { username, password, role, nombre, especialidad, cedula, email } = req.body;
       
       if (!username || !password || !nombre) {
         return res.status(400).json({ error: "Username, password y nombre son requeridos" });
@@ -650,6 +650,7 @@ export async function registerRoutes(
         nombre,
         especialidad,
         cedula,
+        email: email || null,
       });
       
       await storage.createAuditLog({
@@ -1547,6 +1548,17 @@ export async function registerRoutes(
       res.json(users);
     } catch (error) {
       res.status(500).json({ error: "Error fetching users" });
+    }
+  });
+
+  app.put("/api/users/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { email, nombre, especialidad, cedula } = req.body;
+      const updated = await storage.updateUser(req.params.id, { email, nombre, especialidad, cedula });
+      if (!updated) return res.status(404).json({ error: "Usuario no encontrado" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Error al actualizar el usuario" });
     }
   });
 

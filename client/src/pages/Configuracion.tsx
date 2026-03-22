@@ -137,7 +137,10 @@ export default function Configuracion() {
     role: "medico",
     especialidad: "",
     cedula: "",
+    email: "",
   });
+  const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  const [editUserForm, setEditUserForm] = useState({ email: "", nombre: "", especialidad: "", cedula: "" });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<UserRecord[]>({
     queryKey: ["/api/users"],
@@ -152,7 +155,7 @@ export default function Configuracion() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setIsNewUserDialogOpen(false);
-      setNewUserForm({ username: "", password: "", nombre: "", role: "medico", especialidad: "", cedula: "" });
+      setNewUserForm({ username: "", password: "", nombre: "", role: "medico", especialidad: "", cedula: "", email: "" });
       toast({ title: "Usuario creado", description: "El usuario fue registrado exitosamente." });
     },
     onError: (err: Error) => {
@@ -162,6 +165,26 @@ export default function Configuracion() {
         message = body.error || message;
       } catch {}
       toast({ title: "Error", description: message, variant: "destructive" });
+    },
+  });
+
+  const editUserMutation = useMutation({
+    mutationFn: async (data: { id: string; email: string; nombre: string; especialidad: string; cedula: string }) => {
+      const res = await apiRequest("PUT", `/api/users/${data.id}`, {
+        email: data.email || null,
+        nombre: data.nombre,
+        especialidad: data.especialidad || null,
+        cedula: data.cedula || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setEditingUser(null);
+      toast({ title: "Usuario actualizado", description: "Los datos del usuario fueron guardados." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo actualizar el usuario.", variant: "destructive" });
     },
   });
 
@@ -451,10 +474,28 @@ export default function Configuracion() {
                             <p className="text-sm text-muted-foreground">
                               {u.cedula ? `Cédula: ${u.cedula}` : u.especialidad || u.username}
                             </p>
+                            {u.email && (
+                              <p className="text-xs text-muted-foreground">{u.email}</p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary">{roleLabel}</Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingUser(u);
+                              setEditUserForm({
+                                email: u.email ?? "",
+                                nombre: u.nombre,
+                                especialidad: u.especialidad ?? "",
+                                cedula: u.cedula ?? "",
+                              });
+                            }}
+                          >
+                            Editar
+                          </Button>
                         </div>
                       </div>
                     );
@@ -489,6 +530,61 @@ export default function Configuracion() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Dialog: Editar Usuario */}
+          <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Editar Usuario</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-nombre">Nombre completo</Label>
+                  <Input
+                    id="edit-nombre"
+                    value={editUserForm.nombre}
+                    onChange={(e) => setEditUserForm((f) => ({ ...f, nombre: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-email">Correo electrónico</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editUserForm.email}
+                    onChange={(e) => setEditUserForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder="usuario@clinica.com"
+                  />
+                  <p className="text-xs text-muted-foreground">Requerido para recuperación de contraseña.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-especialidad">Especialidad</Label>
+                  <Input
+                    id="edit-especialidad"
+                    value={editUserForm.especialidad}
+                    onChange={(e) => setEditUserForm((f) => ({ ...f, especialidad: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-cedula">Cédula Profesional</Label>
+                  <Input
+                    id="edit-cedula"
+                    value={editUserForm.cedula}
+                    onChange={(e) => setEditUserForm((f) => ({ ...f, cedula: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingUser(null)}>Cancelar</Button>
+                <Button
+                  onClick={() => editingUser && editUserMutation.mutate({ id: editingUser.id, ...editUserForm })}
+                  disabled={editUserMutation.isPending || !editUserForm.nombre}
+                >
+                  {editUserMutation.isPending ? "Guardando..." : "Guardar cambios"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Dialog: Nuevo Usuario */}
           <Dialog open={isNewUserDialogOpen} onOpenChange={setIsNewUserDialogOpen}>
@@ -559,6 +655,16 @@ export default function Configuracion() {
                     value={newUserForm.cedula}
                     onChange={(e) => setNewUserForm((f) => ({ ...f, cedula: e.target.value }))}
                     placeholder="Ej. 12345678"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="new-email">Correo electrónico</Label>
+                  <Input
+                    id="new-email"
+                    type="email"
+                    value={newUserForm.email}
+                    onChange={(e) => setNewUserForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder="Ej. doctor@clinica.com"
                   />
                 </div>
               </div>

@@ -133,6 +133,9 @@ export interface IStorage {
   // Establishment Logo
   updateLogoUrl(logoUrl: string): Promise<void>;
 
+  // Update user profile
+  updateUser(userId: string, data: Partial<Pick<InsertUser, "email" | "nombre" | "especialidad" | "cedula">>): Promise<User | undefined>;
+
   // Password Reset Tokens
   createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken>;
   getPasswordResetToken(hashedToken: string): Promise<PasswordResetToken | undefined>;
@@ -1048,6 +1051,12 @@ export class DatabaseStorage implements IStorage {
         activo: true,
       });
     }
+  }
+
+  // Update user profile
+  async updateUser(userId: string, data: Partial<Pick<InsertUser, "email" | "nombre" | "especialidad" | "cedula">>): Promise<User | undefined> {
+    const [user] = await db.update(users).set(data).where(eq(users.id, userId)).returning();
+    return user;
   }
 
   // Password Reset Tokens
