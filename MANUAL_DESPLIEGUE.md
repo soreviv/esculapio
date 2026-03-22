@@ -92,18 +92,28 @@ Este es el paso más crítico. El sistema necesita variables de entorno para fun
    # --- CONFIGURACIÓN DE SERVIDOR ---
    NODE_ENV=production
    PORT=5000
-   
+
    # --- BASE DE DATOS ---
    # Formato: postgresql://usuario:password@host:puerto/nombre_db
    DATABASE_URL=postgresql://salud_digital:TU_PASSWORD_SEGURA@localhost:5432/salud_digital
-   
+
    # --- SEGURIDAD ---
-   # Genera esto con: openssl rand -hex 32
+   # Genera SESSION_SECRET con: openssl rand -hex 64
    SESSION_SECRET=cambiar_por_cadena_larga_y_aleatoria_min_64_chars
-   
+   # Genera ENCRYPTION_KEY con: openssl rand -hex 32  (OBLIGATORIA — el servidor no arranca sin ella)
+   ENCRYPTION_KEY=cambiar_por_cadena_aleatoria_de_exactamente_64_chars_hex
+
    # --- CONFIGURACIÓN INICIAL ---
    # Contraseña para el usuario 'admin' que se creará en el paso de seed
    ADMIN_PASSWORD=AdminSeguro2026!
+
+   # --- CORREO (para recuperación de contraseñas) ---
+   SMTP_HOST=smtp.tuproveedor.com
+   SMTP_PORT=587
+   SMTP_USER=tu_usuario@dominio.com
+   SMTP_PASS=tu_password_smtp
+   SMTP_FROM=noreply@tudominio.com
+   APP_BASE_URL=https://tu-dominio.com
    ```
 
 3. Guarda y sal (`Ctrl+O`, `Enter`, `Ctrl+X`).
@@ -150,15 +160,19 @@ Usaremos PM2 para mantener la aplicación viva siempre.
 # 1. Instalar PM2 globalmente
 sudo npm install -g pm2
 
-# 2. Iniciar la aplicación
-# Nota: --update-env asegura que PM2 tome las variables del .env cargado o del archivo
-pm2 start dist/index.cjs --name "salud-digital" --env production --update-env
+# 2. Copiar las variables del .env al ecosystem.config.cjs
+# Abre el archivo y actualiza los valores de DATABASE_URL, SESSION_SECRET,
+# ENCRYPTION_KEY, ADMIN_PASSWORD y SMTP_* con los mismos del .env
+nano ecosystem.config.cjs
 
-# 3. Configurar inicio automático al reiniciar servidor
+# 3. Iniciar la aplicación con el ecosystem config
+pm2 start ecosystem.config.cjs --env production
+
+# 4. Configurar inicio automático al reiniciar servidor
 pm2 startup
 # (Ejecuta el comando que te devuelva la terminal)
 
-# 4. Guardar la lista de procesos
+# 5. Guardar la lista de procesos
 pm2 save
 ```
 
@@ -208,5 +222,20 @@ Configuraremos Nginx como proxy inverso para que la app sea accesible por el pue
 ## ✅ Verificación Final
 
 1. Navega a `https://tu-dominio.com`.
-2. Intenta iniciar sesión con usuario: `admin` y la contraseña que definiste en `ADMIN_PASSWORD`.
+2. Inicia sesión con usuario: `admin` y la contraseña que definiste en `ADMIN_PASSWORD`.
 3. Revisa los logs si algo falla: `pm2 logs salud-digital`.
+
+---
+
+## 🔄 Actualizaciones (Re-deploy)
+
+Para desplegar nuevos cambios después de la instalación inicial, usa siempre:
+
+```bash
+cd /var/www/Salud-Digital
+git pull
+npm run deploy
+```
+
+El script `npm run deploy` hace en orden: build → libera el puerto → reinicia PM2.
+**Nunca usar solo `npm run build`** sin reiniciar el proceso, o el servidor seguirá sirviendo el binario viejo.

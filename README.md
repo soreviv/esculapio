@@ -64,8 +64,13 @@ El monorepo está organizado de la siguiente manera para una clara separación d
 │   └── fhir-mappers.ts     # Transformadores de datos a formato FHIR R4
 ├── tests/                  # Pruebas unitarias e integración (Vitest)
 ├── migrations/             # Migraciones de base de datos (Drizzle Kit)
-├── script/
-│   └── build.ts            # Script de build personalizado (esbuild + Vite)
+├── scripts/
+│   ├── build.ts            # Script de build personalizado (esbuild + Vite)
+│   ├── deploy.sh           # Script de deploy (build + reinicio PM2)
+│   ├── setup-env.cjs       # Generador de claves seguras para .env
+│   ├── seed-admin.ts       # Crea el usuario admin inicial
+│   ├── import-cie10-dgis.ts # Importa catálogo CIE-10 oficial DGIS
+│   └── backup-db.sh        # Backup automático de PostgreSQL
 └── dist/                   # Artefactos de producción (generado por build)
     ├── index.cjs           # Servidor backend compilado
     └── public/             # Frontend compilado
@@ -120,9 +125,11 @@ El monorepo está organizado de la siguiente manera para una clara separación d
 | :------ | :---------- |
 | `npm run dev` | Inicia el servidor de desarrollo (backend + Vite HMR) |
 | `npm run build` | Genera el build de producción (frontend Vite + backend esbuild) |
+| `npm run deploy` | Build + reinicio correcto del servidor en producción |
 | `npm run start` | Inicia el servidor en modo producción desde `dist/` |
 | `npm run check` | Verificación de tipos TypeScript (`tsc --noEmit`) |
 | `npm run db:push` | Aplica migraciones de base de datos con Drizzle Kit |
+| `npm run setup` | Genera `SESSION_SECRET` y `ENCRYPTION_KEY` en `.env` |
 | `npx vitest run` | Ejecuta las pruebas unitarias e integración |
 
 ## 🔐 Seguridad y Cumplimiento Normativo
@@ -265,10 +272,18 @@ El servidor en producción sirve el frontend estático desde `dist/public/` y ex
 | Variable | Requerida | Descripción | Ejemplo |
 | :------- | :-------- | :---------- | :------ |
 | `DATABASE_URL` | **Sí** | Cadena de conexión a PostgreSQL | `postgresql://user:pass@host:5432/db` |
-| `SESSION_SECRET` | **Sí** (producción) | Clave de cifrado de sesiones | Cadena aleatoria de 64+ caracteres |
+| `SESSION_SECRET` | **Sí** | Clave de cifrado de sesiones (64+ chars hex) | `openssl rand -hex 64` |
+| `ENCRYPTION_KEY` | **Sí** | Clave de cifrado de campos sensibles (32 bytes hex) | `openssl rand -hex 32` |
+| `ADMIN_PASSWORD` | **Sí** (primer deploy) | Contraseña del usuario admin inicial | `AdminSeguro2026!` |
 | `NODE_ENV` | No | Entorno de ejecución | `production` / `development` |
 | `PORT` | No | Puerto del servidor (default: 5000) | `5000` |
 | `LOG_LEVEL` | No | Nivel de logging Pino | `info` / `debug` / `warn` |
+| `SMTP_HOST` | No | Servidor SMTP para emails | `smtp.mailgun.org` |
+| `SMTP_PORT` | No | Puerto SMTP | `587` |
+| `SMTP_USER` | No | Usuario SMTP | `user@dominio.com` |
+| `SMTP_PASS` | No | Contraseña SMTP | — |
+| `SMTP_FROM` | No | Dirección de envío | `noreply@dominio.com` |
+| `APP_BASE_URL` | No | URL base de la app (para links en emails) | `https://tu-dominio.com` |
 
 ### CI/CD
 
@@ -322,13 +337,13 @@ npm run start
 - [x] Redacción automática de campos sensibles en logs (Pino)
 - [x] Helmet.js configurado para cabeceras HTTP de seguridad
 - [x] Documentación Swagger en `/api-docs`
-- [ ] Implementar HTTPS con certificados SSL/TLS (ej. Let's Encrypt)
-- [ ] Configurar `SESSION_SECRET` con valor aleatorio seguro (64+ chars)
-- [ ] Configurar respaldos automáticos de la base de datos PostgreSQL
-- [ ] Implementar sistema de recuperación de contraseñas (email)
-- [ ] Agregar autenticación de dos factores (2FA)
+- [x] Implementar HTTPS con certificados SSL/TLS (Let's Encrypt + Nginx)
+- [x] Configurar `SESSION_SECRET` y `ENCRYPTION_KEY` con valores aleatorios seguros
+- [x] Configurar respaldos automáticos de la base de datos PostgreSQL (`scripts/backup-db.sh`)
+- [x] Implementar sistema de recuperación de contraseñas (email)
+- [x] Autenticación de dos factores (2FA) con TOTP
+- [x] Configurar proxy inverso Nginx con compresión gzip
 - [ ] Configurar monitoreo y alertas (ej. Sentry, Grafana, UptimeRobot)
-- [ ] Configurar proxy inverso (Nginx/Apache) con compresión gzip
 
 ## 📊 Evaluación General del Proyecto
 

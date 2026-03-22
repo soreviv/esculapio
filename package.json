@@ -5,11 +5,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "tsx script/build.ts",
+    "build": "tsx scripts/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "setup": "node script/setup-env.cjs"
+    "setup": "node scripts/setup-env.cjs",
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
