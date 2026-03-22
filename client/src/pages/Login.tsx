@@ -346,9 +346,10 @@ export default function Login({ onLogin }: LoginProps) {
                 <CheckCircle2 className="h-8 w-8 text-green-600" />
               </div>
               <div className="text-center space-y-2">
-                <p className="font-medium">Solicitud enviada</p>
+                <p className="font-medium">Correo enviado</p>
                 <p className="text-sm text-muted-foreground">
-                  Tu solicitud ha sido registrada. Por favor contacta al administrador del sistema para obtener tu nueva contraseña temporal.
+                  Si la cuenta existe, recibirás un correo con un enlace para restablecer tu contraseña.
+                  El enlace es válido por <strong>1 hora</strong>. Revisa tu carpeta de spam si no lo encuentras.
                 </p>
               </div>
               <Button className="w-full" onClick={() => { setShowRecovery(false); setRecoverySent(false); }}>

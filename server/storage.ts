@@ -15,9 +15,10 @@ import {
   type DashboardMetrics, type PatientSearchFilters, type TimelineEvent,
   type EstablishmentConfig,
   type ClinicHoursDay, DEFAULT_CLINIC_HOURS,
+  type PasswordResetToken, type InsertPasswordResetToken,
   users, patients, medicalNotes, medicalNoteAddendums, medicalNoteDiagnoses,
   vitals, prescriptions, appointments,
-  auditLogs, cie10Catalog, patientConsents, labOrders, establishmentConfig
+  auditLogs, cie10Catalog, patientConsents, labOrders, establishmentConfig, passwordResetTokens
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, ilike, or, sql } from "drizzle-orm";
@@ -131,6 +132,12 @@ export interface IStorage {
 
   // Establishment Logo
   updateLogoUrl(logoUrl: string): Promise<void>;
+
+  // Password Reset Tokens
+  createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(hashedToken: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(id: string): Promise<void>;
+  updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1041,6 +1048,34 @@ export class DatabaseStorage implements IStorage {
         activo: true,
       });
     }
+  }
+
+  // Password Reset Tokens
+  async createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const [record] = await db.insert(passwordResetTokens).values(data).returning();
+    return record;
+  }
+
+  async getPasswordResetToken(hashedToken: string): Promise<PasswordResetToken | undefined> {
+    const [record] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, hashedToken));
+    return record;
+  }
+
+  async markPasswordResetTokenUsed(id: string): Promise<void> {
+    await db
+      .update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(passwordResetTokens.id, id));
+  }
+
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.id, userId));
   }
 }
 

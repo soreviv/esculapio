@@ -24,6 +24,7 @@ const AvisoPrivacidad = lazy(() => import("@/pages/AvisoPrivacidad"));
 const Ayuda = lazy(() => import("@/pages/Ayuda"));
 const Configuracion = lazy(() => import("@/pages/Configuracion"));
 const Login = lazy(() => import("@/pages/Login"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 interface AuthUser {
@@ -155,9 +156,10 @@ function AppContent() {
   }
 
   if (!user) {
+    const isResetRoute = window.location.pathname === "/reset-password";
     return (
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-background"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-        <Login onLogin={handleLogin} />
+        {isResetRoute ? <ResetPassword /> : <Login onLogin={handleLogin} />}
       </Suspense>
     );
   }

@@ -25,7 +25,8 @@ import {
   insertCie10Schema,
   insertPatientConsentSchema
 } from "@shared/schema";
-import { createHash, randomUUID } from "crypto";
+import { createHash, randomUUID, randomBytes } from "crypto";
+import { sendPasswordResetEmail } from "./mailer";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { encrypt, decrypt } from "./crypto";
@@ -202,32 +203,136 @@ export async function registerRoutes(
    *       200:
    *         description: Sesión cerrada exitosamente
    */
-  // Password reset request — logs the request and notifies admin
+  // Password reset — request link via email
   app.post("/api/password-reset-request", async (req, res) => {
+    const GENERIC_OK = { message: "Si la cuenta existe, recibirá un correo con instrucciones." };
     try {
       const { username } = req.body;
-      if (!username) {
+      if (!username || typeof username !== "string") {
         return res.status(400).json({ error: "El usuario es requerido" });
       }
 
-      const user = await storage.getUserByUsername(username);
-      // Always return success to avoid username enumeration
-      if (user) {
+      const user = await storage.getUserByUsername(username.trim());
+      if (!user) {
+        return res.json(GENERIC_OK);
+      }
+
+      if (!user.email) {
         await storage.createAuditLog({
           userId: user.id,
-          accion: "password_reset_request",
+          accion: "password_reset_request_no_email",
           entidad: "auth",
           entidadId: user.id,
-          detalles: JSON.stringify({ username }),
-          ipAddress: req.ip || req.socket.remoteAddress || null,
-          userAgent: req.get("User-Agent") || null,
+          detalles: JSON.stringify({ username: user.username }),
+          ipAddress: req.ip ?? req.socket.remoteAddress ?? null,
+          userAgent: req.get("User-Agent") ?? null,
           fecha: new Date(),
+        });
+        return res.json(GENERIC_OK);
+      }
+
+      const plainToken = randomBytes(32).toString("hex");
+      const hashedToken = createHash("sha256").update(plainToken).digest("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await storage.createPasswordResetToken({ userId: user.id, token: hashedToken, expiresAt, usedAt: null });
+
+      await storage.createAuditLog({
+        userId: user.id,
+        accion: "password_reset_request",
+        entidad: "auth",
+        entidadId: user.id,
+        detalles: JSON.stringify({ username: user.username }),
+        ipAddress: req.ip ?? req.socket.remoteAddress ?? null,
+        userAgent: req.get("User-Agent") ?? null,
+        fecha: new Date(),
+      });
+
+      sendPasswordResetEmail(user.email, user.nombre, plainToken).catch((err) => {
+        console.error("[mailer] Error al enviar correo de recuperación:", err);
+      });
+
+      res.json(GENERIC_OK);
+    } catch (error) {
+      res.status(500).json({ error: "Error al procesar la solicitud" });
+    }
+  });
+
+  // Password reset — validate token
+  app.get("/api/password-reset-validate/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token) return res.status(400).json({ valid: false, error: "Token requerido" });
+
+      const hashedToken = createHash("sha256").update(token).digest("hex");
+      const record = await storage.getPasswordResetToken(hashedToken);
+
+      if (!record) return res.status(404).json({ valid: false, error: "Token inválido o expirado" });
+      if (record.usedAt) return res.status(410).json({ valid: false, error: "El token ya fue utilizado" });
+      if (new Date() > record.expiresAt) return res.status(410).json({ valid: false, error: "El token ha expirado" });
+
+      res.json({ valid: true });
+    } catch (error) {
+      res.status(500).json({ valid: false, error: "Error al validar el token" });
+    }
+  });
+
+  // Password reset — confirm new password
+  app.post("/api/password-reset-confirm", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+
+      if (!token || typeof token !== "string") return res.status(400).json({ error: "Token requerido" });
+      if (!password || typeof password !== "string") return res.status(400).json({ error: "La nueva contraseña es requerida" });
+
+      const strengthResult = validatePasswordStrength(password);
+      if (!strengthResult.valid) {
+        return res.status(422).json({
+          error: "La contraseña no cumple los requisitos de seguridad",
+          feedback: strengthResult.feedback,
+          score: strengthResult.score,
         });
       }
 
-      res.json({ message: "Solicitud registrada. Contacte al administrador para obtener su contraseña temporal." });
+      const hashedToken = createHash("sha256").update(token).digest("hex");
+      const record = await storage.getPasswordResetToken(hashedToken);
+      const ipAddress = req.ip ?? req.socket.remoteAddress ?? null;
+      const userAgent = req.get("User-Agent") ?? null;
+
+      if (!record || record.usedAt || new Date() > record.expiresAt) {
+        if (record?.userId) {
+          await storage.createAuditLog({
+            userId: record.userId,
+            accion: "password_reset_confirm_failed",
+            entidad: "auth",
+            entidadId: record.userId,
+            detalles: JSON.stringify({ reason: record.usedAt ? "token_already_used" : "token_expired_or_invalid" }),
+            ipAddress,
+            userAgent,
+            fecha: new Date(),
+          });
+        }
+        return res.status(410).json({ error: "El token es inválido, ha expirado o ya fue utilizado" });
+      }
+
+      const newHash = await hashPassword(password);
+      await storage.updateUserPassword(record.userId, newHash);
+      await storage.markPasswordResetTokenUsed(record.id);
+
+      await storage.createAuditLog({
+        userId: record.userId,
+        accion: "password_reset_confirm",
+        entidad: "auth",
+        entidadId: record.userId,
+        detalles: JSON.stringify({ tokenId: record.id }),
+        ipAddress,
+        userAgent,
+        fecha: new Date(),
+      });
+
+      res.json({ message: "Contraseña restablecida exitosamente" });
     } catch (error) {
-      res.status(500).json({ error: "Error al procesar la solicitud" });
+      res.status(500).json({ error: "Error al restablecer la contraseña" });
     }
   });
 

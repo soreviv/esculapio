@@ -14,8 +14,22 @@ export const users = pgTable("users", {
   cedula: text("cedula"),
   totpSecret: text("totp_secret"),       // encrypted TOTP secret
   totpEnabled: boolean("totp_enabled").notNull().default(false),
+  email: text("email"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Password Reset Tokens
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 64 }).notNull().unique(), // SHA-256 hex = 64 chars
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_password_reset_tokens_user_id").on(table.userId),
+  index("idx_password_reset_tokens_token").on(table.token),
+]);
 
 // Patients (NOM-004-SSA3-2012 compliant)
 export const patients = pgTable("patients", {
@@ -296,6 +310,7 @@ export const insertPatientConsentSchema = createInsertSchema(patientConsents).om
 export const insertLabOrderSchema = createInsertSchema(labOrders).omit({ id: true, createdAt: true });
 export const insertNursingNoteSchema = createInsertSchema(nursingNotes).omit({ id: true, createdAt: true });
 export const insertEstablishmentConfigSchema = createInsertSchema(establishmentConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -325,6 +340,8 @@ export type InsertNursingNote = z.infer<typeof insertNursingNoteSchema>;
 export type NursingNote = typeof nursingNotes.$inferSelect;
 export type InsertEstablishmentConfig = z.infer<typeof insertEstablishmentConfigSchema>;
 export type EstablishmentConfig = typeof establishmentConfig.$inferSelect;
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 export interface ClinicHoursDay {
   dia: string;
