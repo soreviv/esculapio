@@ -210,7 +210,7 @@ export default function Configuracion() {
       return res.json();
     },
     onSuccess: (data) => {
-      setTwoFaQr(data.qrCodeDataUrl);
+      setTwoFaQr(data.qrCode);
       setTwoFaSecret(data.secret);
       setTwoFaStep("setup");
       setTwoFaCode("");
