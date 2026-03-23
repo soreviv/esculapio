@@ -306,8 +306,8 @@ importers:
         specifier: ^3.3.5
         version: 3.9.0(react@18.3.1)
       ws:
-        specifier: ^8.18.0
-        version: 8.19.0(bufferutil@4.1.0)
+        specifier: ^8.20.0
+        version: 8.20.0(bufferutil@4.1.0)
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -4079,8 +4079,8 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
-  ws@8.19.0:
-    resolution: {integrity: sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==}
+  ws@8.20.0:
+    resolution: {integrity: sha512-sAt8BhgNbzCtgGbt2OxmpuryO63ZoDk/sqaB/znQm94T4fCEsy/yV+7CdC1kJhOU9lboAEU7R3kquuycDoibVA==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -7661,7 +7661,7 @@ snapshots:
 
   wrappy@1.0.2: {}
 
-  ws@8.19.0(bufferutil@4.1.0):
+  ws@8.20.0(bufferutil@4.1.0):
     optionalDependencies:
       bufferutil: 4.1.0
 
