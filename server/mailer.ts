@@ -1,28 +1,16 @@
-import nodemailer from "nodemailer";
-import type { Transporter } from "nodemailer";
+import { BrevoClient } from "@getbrevo/brevo";
 
-let _transporter: Transporter | null = null;
+let _client: BrevoClient | null = null;
 
-function getTransporter(): Transporter {
-  if (_transporter) return _transporter;
+function getClient(): BrevoClient {
+  if (_client) return _client;
 
-  const required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"];
-  const missing = required.filter((k) => !process.env[k]);
-  if (missing.length) {
-    throw new Error(`Configuración SMTP incompleta. Variables faltantes: ${missing.join(", ")}`);
+  if (!process.env.BREVO_API_KEY) {
+    throw new Error("Configuración de correo incompleta. Variable faltante: BREVO_API_KEY");
   }
 
-  _transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: Number(process.env.SMTP_PORT) === 465,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-
-  return _transporter;
+  _client = new BrevoClient({ apiKey: process.env.BREVO_API_KEY });
+  return _client;
 }
 
 export async function sendPasswordResetEmail(
@@ -35,13 +23,13 @@ export async function sendPasswordResetEmail(
   const baseUrl = process.env.APP_BASE_URL ?? `http://localhost:${process.env.PORT ?? 5000}`;
   const resetUrl = `${baseUrl}/reset-password?token=${plainToken}`;
 
-  const transporter = getTransporter();
+  const client = getClient();
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM,
-    to: toEmail,
+  await client.transactionalEmails.sendTransacEmail({
+    sender: { name: "Salud Digital", email: process.env.SMTP_FROM ?? "contacto@viveros.click" },
+    to: [{ email: toEmail, name: toNombre }],
     subject: "Restablecimiento de contraseña — Salud Digital",
-    text: [
+    textContent: [
       `Estimado/a ${toNombre},`,
       "",
       "Recibimos una solicitud para restablecer la contraseña de su cuenta en Salud Digital.",
@@ -53,7 +41,7 @@ export async function sendPasswordResetEmail(
       "",
       "Salud Digital — Sistema de Expediente Clínico Electrónico",
     ].join("\n"),
-    html: `
+    htmlContent: `
       <p>Estimado/a <strong>${toNombre}</strong>,</p>
       <p>Recibimos una solicitud para restablecer la contraseña de su cuenta en <strong>Salud Digital</strong>.</p>
       <p>

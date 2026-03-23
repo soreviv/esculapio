@@ -19,7 +19,7 @@ const allowlist = [
   "memorystore",
   "multer",
   "nanoid",
-  "nodemailer",
+  "@getbrevo/brevo",
   "openai",
   "passport",
   "passport-local",
