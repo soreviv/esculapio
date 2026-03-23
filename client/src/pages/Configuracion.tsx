@@ -45,11 +45,20 @@ import {
   Activity,
   Pill,
   FlaskConical,
+  ShieldCheck,
+  ShieldOff,
+  Smartphone,
 } from "lucide-react";
 
 export default function Configuracion() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("establecimiento");
+
+  // 2FA state
+  const [twoFaStep, setTwoFaStep] = useState<"idle" | "setup" | "disable">("idle");
+  const [twoFaQr, setTwoFaQr] = useState<string | null>(null);
+  const [twoFaSecret, setTwoFaSecret] = useState<string | null>(null);
+  const [twoFaCode, setTwoFaCode] = useState("");
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -190,6 +199,63 @@ export default function Configuracion() {
     },
   });
 
+  const { data: twoFaStatus, refetch: refetchTwoFa } = useQuery<{ totpEnabled: boolean }>({
+    queryKey: ["/api/auth/2fa/status"],
+    enabled: activeTab === "seguridad",
+  });
+
+  const twoFaSetupMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/auth/2fa/setup");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setTwoFaQr(data.qrCodeDataUrl);
+      setTwoFaSecret(data.secret);
+      setTwoFaStep("setup");
+      setTwoFaCode("");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const twoFaConfirmMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const res = await apiRequest("POST", "/api/auth/2fa/setup/confirm", { code });
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error); }
+      return res.json();
+    },
+    onSuccess: () => {
+      setTwoFaStep("idle");
+      setTwoFaQr(null);
+      setTwoFaSecret(null);
+      setTwoFaCode("");
+      refetchTwoFa();
+      toast({ title: "2FA activado", description: "La autenticación de dos factores está activa." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Código incorrecto", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const twoFaDisableMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const res = await apiRequest("POST", "/api/auth/2fa/disable", { code });
+      if (!res.ok) { const b = await res.json(); throw new Error(b.error); }
+      return res.json();
+    },
+    onSuccess: () => {
+      setTwoFaStep("idle");
+      setTwoFaCode("");
+      refetchTwoFa();
+      toast({ title: "2FA desactivado", description: "La autenticación de dos factores fue desactivada." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Código incorrecto", description: err.message, variant: "destructive" });
+    },
+  });
+
   const { data: clinicHoursData } = useQuery<ClinicHoursDay[]>({
     queryKey: ["/api/config/clinic-hours"],
   });
@@ -264,6 +330,10 @@ export default function Configuracion() {
           <TabsTrigger value="auditoria" className="data-[state=active]:bg-muted" data-testid="tab-auditoria">
             <ClipboardList className="h-4 w-4 mr-2" />
             Auditoría
+          </TabsTrigger>
+          <TabsTrigger value="seguridad" className="data-[state=active]:bg-muted" data-testid="tab-seguridad">
+            <Key className="h-4 w-4 mr-2" />
+            Seguridad
           </TabsTrigger>
         </TabsList>
 
@@ -1184,6 +1254,113 @@ export default function Configuracion() {
                   Guardar Cambios
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="seguridad" className="space-y-4 mt-0">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                Autenticación de dos factores (2FA)
+              </CardTitle>
+              <CardDescription>
+                Protege tu cuenta con una segunda capa de verificación usando una app TOTP (Google Authenticator, Authy, etc.)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Status banner */}
+              <div className={`flex items-center gap-3 p-4 rounded-lg border ${twoFaStatus?.totpEnabled ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800" : "bg-muted border-border"}`}>
+                {twoFaStatus?.totpEnabled
+                  ? <ShieldCheck className="h-6 w-6 text-green-600 dark:text-green-400 shrink-0" />
+                  : <ShieldOff className="h-6 w-6 text-muted-foreground shrink-0" />}
+                <div>
+                  <p className="font-medium">{twoFaStatus?.totpEnabled ? "2FA activado" : "2FA desactivado"}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {twoFaStatus?.totpEnabled
+                      ? "Tu cuenta requiere un código TOTP al iniciar sesión."
+                      : "Tu cuenta solo requiere usuario y contraseña."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Activate flow */}
+              {!twoFaStatus?.totpEnabled && twoFaStep === "idle" && (
+                <Button onClick={() => twoFaSetupMutation.mutate()} disabled={twoFaSetupMutation.isPending}>
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  {twoFaSetupMutation.isPending ? "Generando..." : "Activar 2FA"}
+                </Button>
+              )}
+
+              {twoFaStep === "setup" && twoFaQr && (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium mb-2">1. Escanea el código QR con tu app TOTP:</p>
+                    <img src={twoFaQr} alt="QR 2FA" className="w-48 h-48 border rounded-lg" />
+                  </div>
+                  {twoFaSecret && (
+                    <div>
+                      <p className="text-sm font-medium mb-1">O ingresa la clave manualmente:</p>
+                      <code className="block bg-muted px-3 py-2 rounded text-sm font-mono break-all">{twoFaSecret}</code>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">2. Ingresa el código de 6 dígitos para confirmar:</p>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="000000"
+                        maxLength={6}
+                        value={twoFaCode}
+                        onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ""))}
+                        className="w-36 font-mono text-center text-lg"
+                      />
+                      <Button
+                        onClick={() => twoFaConfirmMutation.mutate(twoFaCode)}
+                        disabled={twoFaCode.length !== 6 || twoFaConfirmMutation.isPending}
+                      >
+                        {twoFaConfirmMutation.isPending ? "Verificando..." : "Confirmar"}
+                      </Button>
+                      <Button variant="outline" onClick={() => { setTwoFaStep("idle"); setTwoFaCode(""); }}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Disable flow */}
+              {twoFaStatus?.totpEnabled && twoFaStep === "idle" && (
+                <Button variant="destructive" onClick={() => { setTwoFaStep("disable"); setTwoFaCode(""); }}>
+                  <ShieldOff className="h-4 w-4 mr-2" />
+                  Desactivar 2FA
+                </Button>
+              )}
+
+              {twoFaStep === "disable" && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Ingresa tu código TOTP actual para confirmar:</p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="000000"
+                      maxLength={6}
+                      value={twoFaCode}
+                      onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ""))}
+                      className="w-36 font-mono text-center text-lg"
+                    />
+                    <Button
+                      variant="destructive"
+                      onClick={() => twoFaDisableMutation.mutate(twoFaCode)}
+                      disabled={twoFaCode.length !== 6 || twoFaDisableMutation.isPending}
+                    >
+                      {twoFaDisableMutation.isPending ? "Desactivando..." : "Desactivar"}
+                    </Button>
+                    <Button variant="outline" onClick={() => { setTwoFaStep("idle"); setTwoFaCode(""); }}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
