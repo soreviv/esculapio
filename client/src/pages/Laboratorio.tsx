@@ -235,7 +235,7 @@ function printLabOrder(order: LabOrderWithDetails) {
         <div class="header-top">
           <div class="logo-area">Logo del<br>Consultorio</div>
           <div class="doctor-info">
-            <div class="doctor-name">Dr. ________________________________</div>
+            <div class="doctor-name">Dr. ${order.medicoNombre || '________________________________'}</div>
             <div class="credentials">
               <p><strong>Cédula Profesional:</strong> ________________</p>
               <p><strong>Especialidad:</strong> ________________________________</p>

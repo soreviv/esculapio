@@ -112,10 +112,16 @@ export function PrintMenu({ patient, medico }: PrintMenuProps) {
   };
 
   const handlePrintLabOrder = (order: LabOrder, tipo: 'laboratorio' | 'gabinete' = 'laboratorio') => {
-    PrintDocuments.labGabinetOrder({ 
-      order: order as any, 
+    PrintDocuments.labGabinetOrder({
+      order: {
+        ...order,
+        medicoNombre: medico?.nombre,
+        medicoCedula: medico?.cedula,
+        medicoEspecialidad: medico?.especialidad,
+      } as any,
       patient,
-      tipoEstudio: tipo
+      tipoEstudio: tipo,
+      establishment,
     });
   };
 

@@ -877,8 +877,8 @@ export function printMedicalNote({ note, patient, vitals }: MedicalNoteData): vo
 // =====================
 
 export interface LabOrderData {
-  order: LabOrder & { 
-    patientNombre?: string; 
+  order: LabOrder & {
+    patientNombre?: string;
     patientApellido?: string;
     medicoNombre?: string;
     medicoCedula?: string;
@@ -887,9 +887,10 @@ export interface LabOrderData {
   patient: Patient;
   diagnosticoCie10?: { codigo: string; descripcion: string }[];
   tipoEstudio?: 'laboratorio' | 'gabinete';
+  establishment?: Partial<import("@shared/schema").EstablishmentConfig> | null;
 }
 
-export function printLabGabinetOrder({ order, patient, diagnosticoCie10, tipoEstudio = 'laboratorio' }: LabOrderData): void {
+export function printLabGabinetOrder({ order, patient, diagnosticoCie10, tipoEstudio = 'laboratorio', establishment }: LabOrderData): void {
   const age = calculateAge(patient.fechaNacimiento);
   const isGabinete = tipoEstudio === 'gabinete';
   
@@ -914,15 +915,21 @@ export function printLabGabinetOrder({ order, patient, diagnosticoCie10, tipoEst
     <body>
       <div class="header">
         <div class="header-content">
-          <div class="logo-area">Logo del<br>Consultorio</div>
+          ${establishment?.logoUrl
+            ? `<img src="${establishment.logoUrl}" alt="Logo" style="width:80px;height:80px;object-fit:contain;">`
+            : `<div class="logo-area">Logo del<br>Consultorio</div>`}
           <div class="establishment-info">
-            <div class="establishment-name">Dr. ${order.medicoNombre || '_______________'}</div>
+            <div class="establishment-name">${establishment?.nombreEstablecimiento || `Dr. ${order.medicoNombre || '_______________'}`}</div>
             <div class="doctor-credentials">
+              <p>Dr. ${order.medicoNombre || '_______________'}</p>
               ${order.medicoEspecialidad ? `<p>Especialidad: ${order.medicoEspecialidad}</p>` : ''}
               ${order.medicoCedula ? `<p>Cédula Profesional: ${order.medicoCedula}</p>` : ''}
             </div>
           </div>
           <div class="contact-info">
+            ${establishment?.domicilio ? `<p>${establishment.domicilio}</p>` : ''}
+            ${establishment?.ciudad ? `<p>${establishment.ciudad}${establishment.estado ? `, ${establishment.estado}` : ''}</p>` : ''}
+            ${establishment?.telefono ? `<p>Tel: ${establishment.telefono}</p>` : ''}
             <p>Fecha: <strong>${formatDate(order.createdAt)}</strong></p>
           </div>
         </div>
