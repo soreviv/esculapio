@@ -8,7 +8,7 @@ echo "[deploy] Building application..."
 npm run build
 
 echo "[deploy] Starting new build..."
-pm2 start ecosystem.config.cjs --env production
+pm2 start "$(dirname "$0")/../ecosystem.config.cjs" --env production
 
 echo "[deploy] Saving PM2 process list..."
 pm2 save
