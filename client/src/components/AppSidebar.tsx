@@ -184,7 +184,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{user.nombre}</p>
             <p className="text-xs text-muted-foreground truncate">
-              {user.especialidad ?? user.role}
+              {user.especialidad ?? (user.role === "medico" ? "Médico" : user.role === "enfermeria" ? "Enfermería" : user.role === "admin" ? "Administrador" : user.role)}
             </p>
           </div>
         </div>

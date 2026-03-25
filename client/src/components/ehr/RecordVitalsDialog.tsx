@@ -198,6 +198,9 @@ export function RecordVitalsDialog({ pacienteNombre, onSave }: RecordVitalsDialo
                 <Input
                   id="talla"
                   type="number"
+                  step="1"
+                  min="1"
+                  max="300"
                   value={formData.talla}
                   onChange={(e) => updateField("talla", e.target.value)}
                   placeholder="170"

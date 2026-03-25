@@ -7,7 +7,6 @@ import {
   FileQuestion,
   Scale,
   Phone,
-  Video,
   UserPlus,
   FileText,
   Activity,
@@ -310,86 +309,6 @@ export default function Ayuda() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Video className="h-5 w-5 text-primary" />
-              Recursos Multimedia
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Accede a nuestros tutoriales en video y guías visuales para aprovechar 
-              al máximo el sistema.
-            </p>
-
-            <div className="space-y-3">
-              <div className="p-3 rounded-md border hover-elevate cursor-pointer" data-testid="video-intro">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-primary/10">
-                    <Video className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Introducción al Sistema</p>
-                    <p className="text-xs text-muted-foreground">Duración: 5 min</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-md border hover-elevate cursor-pointer" data-testid="video-patients">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-primary/10">
-                    <Video className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Gestión de Pacientes</p>
-                    <p className="text-xs text-muted-foreground">Duración: 8 min</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-md border hover-elevate cursor-pointer" data-testid="video-notes">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-primary/10">
-                    <Video className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Notas Médicas y Firmas</p>
-                    <p className="text-xs text-muted-foreground">Duración: 10 min</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-md border hover-elevate cursor-pointer" data-testid="video-prescriptions">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-primary/10">
-                    <Video className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Recetas y Laboratorio</p>
-                    <p className="text-xs text-muted-foreground">Duración: 7 min</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-md border hover-elevate cursor-pointer" data-testid="video-compliance">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-primary/10">
-                    <Shield className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Cumplimiento Normativo</p>
-                    <p className="text-xs text-muted-foreground">Duración: 12 min</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground text-center pt-2">
-              Los videos estarán disponibles próximamente
-            </p>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

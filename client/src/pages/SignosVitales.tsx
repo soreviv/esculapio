@@ -1,16 +1,35 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Plus, Heart, Thermometer, Wind } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Activity, Plus, Heart, Thermometer, Wind, User } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { Vitals } from "@shared/schema";
+import type { Vitals, Patient } from "@shared/schema";
 
 export default function SignosVitales() {
+  const [patientFilter, setPatientFilter] = useState<string>("todos");
+
   const { data: vitals = [], isLoading } = useQuery<Vitals[]>({
     queryKey: ["/api/vitals"],
   });
+
+  const { data: patients = [] } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+  });
+
+  const getPatientName = (patientId: string) => {
+    const p = patients.find((p) => p.id === patientId);
+    return p ? `${p.nombre} ${p.apellidoPaterno}` : "Desconocido";
+  };
+
+  const filteredVitals = patientFilter === "todos"
+    ? vitals
+    : vitals.filter((v) => v.patientId === patientFilter);
+
+  const patientsWithVitals = patients.filter((p) => vitals.some((v) => v.patientId === p.id));
 
   return (
     <div className="p-6 space-y-6">
@@ -71,7 +90,25 @@ export default function SignosVitales() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Historial de Signos Vitales</CardTitle>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle>Historial de Signos Vitales</CardTitle>
+            {patientsWithVitals.length > 0 && (
+              <Select value={patientFilter} onValueChange={setPatientFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <User className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filtrar por paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los pacientes</SelectItem>
+                  {patientsWithVitals.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nombre} {p.apellidoPaterno}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -88,7 +125,7 @@ export default function SignosVitales() {
             </div>
           ) : (
             <div className="space-y-3">
-              {vitals.map((vital) => (
+              {filteredVitals.map((vital) => (
                 <div
                   key={vital.id}
                   className="flex items-start gap-4 p-4 rounded-md border"
@@ -98,6 +135,10 @@ export default function SignosVitales() {
                     <Activity className="h-4 w-4 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      {getPatientName(vital.patientId)}
+                    </p>
                     <div className="flex items-center gap-2 flex-wrap">
                       {(vital.presionSistolica || vital.presionDiastolica) && (
                         <Badge variant="outline">

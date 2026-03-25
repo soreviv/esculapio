@@ -338,6 +338,17 @@ export default function Configuracion() {
         </TabsList>
 
         <TabsContent value="establecimiento" className="space-y-4 mt-0">
+          {!establishmentForm.nombreEstablecimiento && (
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-800">
+              <Bell className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-yellow-800 dark:text-yellow-300">Datos del establecimiento pendientes</p>
+                <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                  Complete los datos de su establecimiento para que aparezcan correctamente en recetas, órdenes de laboratorio y documentos impresos.
+                </p>
+              </div>
+            </div>
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -843,23 +854,25 @@ export default function Configuracion() {
                       onCheckedChange={(checked) => updateSchedule(index, "activo", checked)}
                     />
                     <span className="w-24 font-medium">{schedule.dia}</span>
-                    <div className="flex items-center gap-2 flex-1">
-                      <Input
-                        type="time"
-                        value={schedule.inicio}
-                        onChange={(e) => updateSchedule(index, "inicio", e.target.value)}
-                        disabled={!schedule.activo}
-                        className="w-32"
-                      />
-                      <span className="text-muted-foreground">a</span>
-                      <Input
-                        type="time"
-                        value={schedule.fin}
-                        onChange={(e) => updateSchedule(index, "fin", e.target.value)}
-                        disabled={!schedule.activo}
-                        className="w-32"
-                      />
-                    </div>
+                    {schedule.activo ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          type="time"
+                          value={schedule.inicio}
+                          onChange={(e) => updateSchedule(index, "inicio", e.target.value)}
+                          className="w-32"
+                        />
+                        <span className="text-muted-foreground">a</span>
+                        <Input
+                          type="time"
+                          value={schedule.fin}
+                          onChange={(e) => updateSchedule(index, "fin", e.target.value)}
+                          className="w-32"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Cerrado</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1376,7 +1389,7 @@ function AuditLogTab() {
   const [filterEntity, setFilterEntity] = useState<string>("all");
 
   const { data: auditLogs = [], isLoading, refetch } = useQuery<AuditLog[]>({
-    queryKey: ["/api/audit-logs", 100],
+    queryKey: ["/api/audit-logs"],
   });
 
   const getEntityIcon = (entity: string) => {

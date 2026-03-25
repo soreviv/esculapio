@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,9 +25,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { FilePlus, Save, Lock, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { FilePlus, Save, Lock, AlertTriangle, CheckCircle2, FlaskConical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Cie10Search, type DiagnosticoSeleccionado } from "./Cie10Search";
+import type { LabOrder } from "@shared/schema";
 
 export interface NewNoteDialogProps {
   patientId: string;
@@ -104,6 +105,14 @@ export function NewNoteDialog({
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: labOrders = [] } = useQuery<LabOrder[]>({
+    queryKey: ["/api/patients", patientId, "lab-orders"],
+    enabled: open,
+  });
+
+  const pendingLabOrders = labOrders.filter((o) => o.status === "pendiente");
+  const pendingStudies = pendingLabOrders.flatMap((o) => o.estudios);
 
   // Validar si se puede firmar
   const canSign = 
@@ -335,6 +344,28 @@ export function NewNoteDialog({
         </DialogHeader>
         
         <div className="space-y-6 py-4">
+          {/* Recordatorio de resultados de laboratorio pendientes */}
+          {pendingLabOrders.length > 0 && (
+            <Alert className="bg-amber-50 border-amber-300 dark:bg-amber-950/30 dark:border-amber-700">
+              <FlaskConical className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="text-amber-800 dark:text-amber-300">
+                <strong>
+                  {pendingLabOrders.length === 1
+                    ? "Hay 1 orden de laboratorio pendiente de resultados."
+                    : `Hay ${pendingLabOrders.length} órdenes de laboratorio pendientes de resultados.`}
+                </strong>
+                {pendingStudies.length > 0 && (
+                  <span className="block mt-1 text-xs">
+                    Estudios: {pendingStudies.join(", ")}
+                  </span>
+                )}
+                <span className="block mt-1 text-xs">
+                  Recabe e integre los resultados en el campo de Exploración Física o Análisis.
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Tipo de nota y motivo */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

@@ -18,6 +18,8 @@ import {
   Activity,
   Pill,
   CheckCircle2,
+  BarChart2,
+  PieChart as PieChartIcon,
 } from "lucide-react";
 import { type Patient, type AppointmentWithDetails, type DashboardMetrics } from "@shared/schema";
 import {
@@ -175,9 +177,11 @@ export default function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No hay datos de citas disponibles
-              </p>
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <BarChart2 className="h-10 w-10 text-muted-foreground mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">Sin datos de citas</p>
+                <p className="text-xs text-muted-foreground mt-1">Los datos aparecerán cuando se registren citas</p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -220,9 +224,11 @@ export default function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No hay datos de citas disponibles
-              </p>
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <PieChartIcon className="h-10 w-10 text-muted-foreground mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">Sin estado de citas</p>
+                <p className="text-xs text-muted-foreground mt-1">El resumen aparecerá cuando haya citas registradas</p>
+              </div>
             )}
           </CardContent>
         </Card>

@@ -39,6 +39,7 @@ import { type Patient, type MedicalNoteWithDetails, type Vitals, type Prescripti
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { printMedicalNote, printLabGabinetOrder } from "@/lib/print-documents";
+import { format } from "date-fns";
 
 function calculateAge(fechaNacimiento: string): number {
   const today = new Date();
@@ -144,6 +145,11 @@ export default function PatientDetail() {
     });
   };
 
+  const { data: allPatientVitals = [] } = useQuery<Vitals[]>({
+    queryKey: ["/api/patients", params.id, "vitals"],
+    enabled: !!params.id,
+  });
+
   const createVitalsMutation = useMutation({
     mutationFn: async (data: any) => {
       const vitalsData: InsertVitals = {
@@ -158,6 +164,22 @@ export default function PatientDetail() {
         talla: data.talla ? parseInt(data.talla) : null,
         glucosa: data.glucosa ? parseInt(data.glucosa) : null,
       };
+
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const recentDuplicate = allPatientVitals.find((v) => {
+        const vitalsDate = new Date(v.fecha);
+        return (
+          vitalsDate >= fiveMinutesAgo &&
+          v.presionSistolica === vitalsData.presionSistolica &&
+          v.presionDiastolica === vitalsData.presionDiastolica &&
+          v.frecuenciaCardiaca === vitalsData.frecuenciaCardiaca &&
+          v.temperatura === vitalsData.temperatura
+        );
+      });
+      if (recentDuplicate) {
+        throw new Error("Ya existe un registro idéntico en los últimos 5 minutos.");
+      }
+
       const response = await apiRequest("POST", "/api/vitals", vitalsData);
       return response.json();
     },
@@ -167,6 +189,13 @@ export default function PatientDetail() {
       toast({
         title: "Signos registrados",
         description: "Los signos vitales han sido registrados.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
       });
     },
   });
@@ -378,7 +407,7 @@ export default function PatientDetail() {
                         id={note.id}
                         tipo={note.tipo}
                         fecha={new Date(note.fecha).toLocaleDateString("es-MX")}
-                        hora={note.hora ? note.hora.substring(0, 5) : new Date(note.fecha).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                        hora={note.hora && /^\d{2}:\d{2}/.test(note.hora) ? note.hora.substring(0, 5) : format(new Date(note.fecha), "HH:mm")}
                         medicoNombre={note.medicoNombre}
                         motivoConsulta={note.motivoConsulta || ""}
                         diagnosticos={note.diagnosticos || []}

@@ -173,7 +173,7 @@ export default function Pacientes() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Badge variant="secondary">{filteredPatients.length} pacientes</Badge>
+        <Badge variant="secondary">{filteredPatients.length} {filteredPatients.length === 1 ? "paciente" : "pacientes"}</Badge>
         {searchQuery && (
           <Badge variant="outline">
             Búsqueda: "{searchQuery}"

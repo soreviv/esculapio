@@ -1,6 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Shield, FileText, UserCheck, Lock, AlertCircle, Phone } from "lucide-react";
+import type { EstablishmentConfig } from "@shared/schema";
 
 export default function AvisoPrivacidad() {
   const currentDate = new Date().toLocaleDateString("es-MX", {
@@ -8,6 +10,14 @@ export default function AvisoPrivacidad() {
     month: "long",
     day: "numeric",
   });
+
+  const { data: config } = useQuery<EstablishmentConfig | null>({
+    queryKey: ["/api/config/establishment"],
+  });
+
+  const establecimiento = config?.nombreEstablecimiento || "MediRecord";
+  const domicilio = config?.domicilio ? `${config.domicilio}${config.ciudad ? `, ${config.ciudad}` : ""}${config.estado ? `, ${config.estado}` : ""}` : null;
+  const telefono = config?.telefono || null;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -34,7 +44,7 @@ export default function AvisoPrivacidad() {
             </CardHeader>
             <CardContent className="text-sm space-y-3">
               <p>
-                <strong>MediRecord</strong> (en adelante "el Responsable") con domicilio en [Dirección del establecimiento], 
+                <strong>{establecimiento}</strong> (en adelante "el Responsable"){domicilio ? ` con domicilio en ${domicilio}` : ""},
                 es el responsable del tratamiento de sus datos personales.
               </p>
               <p>
@@ -156,7 +166,7 @@ export default function AvisoPrivacidad() {
               </p>
               <p>
                 Para el ejercicio de cualquiera de los derechos ARCO, usted deberá presentar la solicitud respectiva 
-                a través del correo electrónico: [correo@establecimiento.com] o directamente en nuestras instalaciones.
+                directamente en nuestras instalaciones{domicilio ? ` ubicadas en ${domicilio}` : ""}.
               </p>
               <p>
                 Su solicitud deberá contener:
@@ -184,8 +194,8 @@ export default function AvisoPrivacidad() {
               <div className="bg-muted p-4 rounded-md">
                 <p><strong>Oficial de Protección de Datos Personales</strong></p>
                 <p>Correo: privacidad@medirecord.com</p>
-                <p>Teléfono: [Número de teléfono]</p>
-                <p>Domicilio: [Dirección completa]</p>
+                {telefono && <p>Teléfono: {telefono}</p>}
+                {domicilio && <p>Domicilio: {domicilio}</p>}
               </div>
               <p className="text-xs text-muted-foreground mt-4">
                 El Responsable se reserva el derecho de efectuar en cualquier momento modificaciones o actualizaciones 

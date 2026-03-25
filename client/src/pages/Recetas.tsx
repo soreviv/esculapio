@@ -6,6 +6,7 @@ import { Pill, Calendar, User, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { PrescriptionWithDetails, Patient, EstablishmentConfig, User as UserType } from "@shared/schema";
+
 import { NewPrescriptionDialog } from "@/components/ehr/NewPrescriptionDialog";
 import { printPrescriptionCOFEPRIS } from "@/lib/print-documents";
 import { apiRequest } from "@/lib/queryClient";
@@ -17,6 +18,7 @@ export default function Recetas() {
   });
   const { data: currentUser } = useQuery<UserType>({ queryKey: ["/api/auth/me"] });
   const { data: establishment } = useQuery<EstablishmentConfig | null>({ queryKey: ["/api/config/establishment"] });
+  const { data: patients = [] } = useQuery<Patient[]>({ queryKey: ["/api/patients"] });
 
   const handlePrint = async (prescription: PrescriptionWithDetails) => {
     const patients = queryClient.getQueryData<Patient[]>(["/api/patients"]);
@@ -121,6 +123,15 @@ export default function Recetas() {
                     <p className="text-sm text-muted-foreground mt-1">
                       {prescription.frecuencia} - {prescription.duracion}
                     </p>
+                    {(() => {
+                      const pat = patients.find(p => p.id === prescription.patientId);
+                      return pat ? (
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {pat.nombre} {pat.apellidoPaterno} {pat.apellidoMaterno ?? ""}
+                        </p>
+                      ) : null;
+                    })()}
                     {prescription.indicaciones && (
                       <p className="text-sm text-muted-foreground mt-1">
                         {prescription.indicaciones}
