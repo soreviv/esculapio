@@ -3,20 +3,18 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "crypt
 // Use an environment variable for the encryption key.
 // In production, ENCRYPTION_KEY is required — the server will refuse to start without it.
 const algorithm = "aes-256-gcm";
-const encryptionKey = process.env.ENCRYPTION_KEY;
-if (!encryptionKey && process.env.NODE_ENV === "production") {
-  throw new Error(
-    "ENCRYPTION_KEY environment variable is required in production. " +
-    "Set it to a secure 32-character string before starting the server."
-  );
+
+let password = process.env.ENCRYPTION_KEY;
+
+if (!password) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("ENCRYPTION_KEY environment variable is required in production to ensure data security.");
+  } else {
+    password = "salud-digital-development-key-default-32";
+    console.warn("WARNING: No ENCRYPTION_KEY provided in development. Using default development key. This is NOT secure for production use.");
+  }
 }
-if (!encryptionKey) {
-  console.warn(
-    "[WARN] ENCRYPTION_KEY not set — using insecure development fallback. " +
-    "This MUST be configured before deploying to production."
-  );
-}
-const password = encryptionKey || "salud-digital-development-key-default-32";
+
 const salt = scryptSync(password, "salt", 32);
 
 export function encrypt(text: string): string {
