@@ -256,10 +256,19 @@ fhirRouter.get("/Encounter", async (req: Request, res: Response) => {
     let notes = await storage.getPatientNotes(patientId);
 
     if (date) {
-      const searchDate = new Date(date as string).toISOString().split("T")[0];
-      notes = notes.filter(
-        (n) => new Date(n.fecha).toISOString().split("T")[0] === searchDate
-      );
+      const searchDateObj = new Date(date as string);
+      const searchYear = searchDateObj.getUTCFullYear();
+      const searchMonth = searchDateObj.getUTCMonth();
+      const searchDay = searchDateObj.getUTCDate();
+
+      notes = notes.filter((n) => {
+        const d = n.fecha;
+        return (
+          d.getUTCFullYear() === searchYear &&
+          d.getUTCMonth() === searchMonth &&
+          d.getUTCDate() === searchDay
+        );
+      });
     }
 
     if (status) {
@@ -370,10 +379,19 @@ fhirRouter.get("/Observation", async (req: Request, res: Response) => {
     let vitals = await storage.getPatientVitals(patientId);
 
     if (date) {
-      const searchDate = new Date(date as string).toISOString().split("T")[0];
-      vitals = vitals.filter(
-        (v) => new Date(v.fecha).toISOString().split("T")[0] === searchDate
-      );
+      const searchDateObj = new Date(date as string);
+      const searchYear = searchDateObj.getUTCFullYear();
+      const searchMonth = searchDateObj.getUTCMonth();
+      const searchDay = searchDateObj.getUTCDate();
+
+      vitals = vitals.filter((v) => {
+        const d = v.fecha;
+        return (
+          d.getUTCFullYear() === searchYear &&
+          d.getUTCMonth() === searchMonth &&
+          d.getUTCDate() === searchDay
+        );
+      });
     }
 
     const observations: FhirResource[] = [];
@@ -572,10 +590,19 @@ fhirRouter.get("/AuditEvent", async (req: Request, res: Response) => {
     let auditLogs = await storage.getAuditLogs(limit);
 
     if (date) {
-      const searchDate = new Date(date as string).toISOString().split("T")[0];
-      auditLogs = auditLogs.filter(
-        (log) => log.fecha.toISOString().split("T")[0] === searchDate
-      );
+      const searchDateObj = new Date(date as string);
+      const searchYear = searchDateObj.getUTCFullYear();
+      const searchMonth = searchDateObj.getUTCMonth();
+      const searchDay = searchDateObj.getUTCDate();
+
+      auditLogs = auditLogs.filter((log) => {
+        const d = log.fecha;
+        return (
+          d.getUTCFullYear() === searchYear &&
+          d.getUTCMonth() === searchMonth &&
+          d.getUTCDate() === searchDay
+        );
+      });
     }
 
     if (agent) {
