@@ -48,7 +48,9 @@ import type {
   LabOrder,
   PatientConsent,
   User as UserType,
-  EstablishmentConfig
+  EstablishmentConfig,
+  MedicalNoteWithDetails,
+  LabOrderWithDetails
 } from "@shared/schema";
 
 interface PrintMenuProps {
@@ -65,7 +67,7 @@ export function PrintMenu({ patient, medico }: PrintMenuProps) {
     queryKey: [`/api/patients/${patient.id}/vitals`],
   });
 
-  const { data: notes } = useQuery<(MedicalNote & { medicoNombre?: string; medicoEspecialidad?: string })[]>({
+  const { data: notes } = useQuery<MedicalNoteWithDetails[]>({
     queryKey: [`/api/patients/${patient.id}/notes`],
   });
 
@@ -77,7 +79,7 @@ export function PrintMenu({ patient, medico }: PrintMenuProps) {
     queryKey: ["/api/config/establishment"],
   });
 
-  const { data: labOrders } = useQuery<LabOrder[]>({
+  const { data: labOrders } = useQuery<LabOrderWithDetails[]>({
     queryKey: [`/api/patients/${patient.id}/lab-orders`],
   });
 
@@ -97,28 +99,23 @@ export function PrintMenu({ patient, medico }: PrintMenuProps) {
     PrintDocuments.clinicalHistory({ patient, medico, latestVitals });
   };
 
-  const handlePrintNote = (note: MedicalNote & { medicoNombre?: string; medicoEspecialidad?: string }) => {
+  const handlePrintNote = (note: MedicalNoteWithDetails) => {
     const noteVitals = vitals?.find(v => {
       const noteDate = new Date(note.fecha).toDateString();
       const vitalsDate = new Date(v.fecha).toDateString();
       return noteDate === vitalsDate;
     });
-    
-    PrintDocuments.medicalNote({ 
-      note: note as any, 
-      patient, 
-      vitals: noteVitals 
+
+    PrintDocuments.medicalNote({
+      note,
+      patient,
+      vitals: noteVitals
     });
   };
 
-  const handlePrintLabOrder = (order: LabOrder, tipo: 'laboratorio' | 'gabinete' = 'laboratorio') => {
+  const handlePrintLabOrder = (order: LabOrderWithDetails, tipo: 'laboratorio' | 'gabinete' = 'laboratorio') => {
     PrintDocuments.labGabinetOrder({
-      order: {
-        ...order,
-        medicoNombre: medico?.nombre,
-        medicoCedula: medico?.cedula,
-        medicoEspecialidad: medico?.especialidad,
-      } as any,
+      order,
       patient,
       tipoEstudio: tipo,
       establishment,

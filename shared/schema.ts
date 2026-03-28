@@ -374,6 +374,7 @@ export type AppointmentWithDetails = Appointment & {
 export type MedicalNoteWithDetails = MedicalNote & {
   medicoNombre: string;
   medicoEspecialidad?: string | null;
+  medicoCedula?: string | null;
   diagnosticos?: { codigo: string; descripcion: string; tipo: string }[];
   anexos?: MedicalNoteAddendum[];
 };
@@ -386,6 +387,8 @@ export type LabOrderWithDetails = LabOrder & {
   patientNombre: string;
   patientApellido: string;
   medicoNombre: string;
+  medicoCedula?: string | null;
+  medicoEspecialidad?: string | null;
 };
 
 // Dashboard metrics types

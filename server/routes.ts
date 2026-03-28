@@ -1717,7 +1717,7 @@ export async function registerRoutes(
 
   app.get("/api/patients/:patientId/lab-orders", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const orders = await storage.getLabOrders(req.params.patientId);
+      const orders = await storage.getLabOrdersWithDetails(req.params.patientId);
       await storage.createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",

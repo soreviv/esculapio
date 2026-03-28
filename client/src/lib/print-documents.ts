@@ -5,14 +5,16 @@
 
 import { format, differenceInYears } from "date-fns";
 import { es } from "date-fns/locale";
-import type { 
-  Patient, 
-  MedicalNote, 
-  Vitals, 
-  Prescription, 
-  LabOrder,
-  PatientConsent,
-  User 
+import {
+  type Patient,
+  type MedicalNote,
+  type Vitals,
+  type Prescription,
+  type LabOrder,
+  type PatientConsent,
+  type User,
+  type MedicalNoteWithDetails,
+  type LabOrderWithDetails
 } from "@shared/schema";
 
 // =====================
@@ -644,12 +646,7 @@ export function printClinicalHistory({ patient, medico, latestVitals }: Clinical
 // =====================
 
 export interface MedicalNoteData {
-  note: MedicalNote & { 
-    medicoNombre?: string; 
-    medicoEspecialidad?: string; 
-    medicoCedula?: string;
-    diagnosticos?: { codigo: string; descripcion: string; tipo: string }[];
-  };
+  note: MedicalNoteWithDetails;
   patient: Patient;
   vitals?: Vitals | null;
 }
@@ -877,13 +874,7 @@ export function printMedicalNote({ note, patient, vitals }: MedicalNoteData): vo
 // =====================
 
 export interface LabOrderData {
-  order: LabOrder & {
-    patientNombre?: string;
-    patientApellido?: string;
-    medicoNombre?: string;
-    medicoCedula?: string;
-    medicoEspecialidad?: string;
-  };
+  order: LabOrderWithDetails;
   patient: Patient;
   diagnosticoCie10?: { codigo: string; descripcion: string }[];
   tipoEstudio?: 'laboratorio' | 'gabinete';

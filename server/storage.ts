@@ -109,7 +109,7 @@ export interface IStorage {
   getLabOrder(id: string): Promise<LabOrder | undefined>;
   createLabOrder(order: InsertLabOrder): Promise<LabOrder>;
   updateLabOrder(id: string, order: Partial<InsertLabOrder>): Promise<LabOrder | undefined>;
-  getLabOrdersWithDetails(): Promise<LabOrderWithDetails[]>;
+  getLabOrdersWithDetails(patientId?: string): Promise<LabOrderWithDetails[]>;
   
   // Dashboard Metrics
   getDashboardMetrics(): Promise<DashboardMetrics>;
@@ -481,6 +481,7 @@ export class DatabaseStorage implements IStorage {
         ...r.medical_notes,
         medicoNombre: r.users?.nombre || "Médico",
         medicoEspecialidad: r.users?.especialidad || null,
+        medicoCedula: r.users?.cedula || null,
         diagnosticos: diagnoses.map(d => ({
           codigo: d.cie10Codigo,
           descripcion: d.cie10.descripcion,
@@ -497,6 +498,7 @@ export class DatabaseStorage implements IStorage {
         medical_note: medicalNotes,
         medicoNombre: users.nombre,
         medicoEspecialidad: users.especialidad,
+        medicoCedula: users.cedula,
         patientNombre: patients.nombre,
         patientApellido: patients.apellidoPaterno,
       })
@@ -516,6 +518,7 @@ export class DatabaseStorage implements IStorage {
         ...r.medical_note,
         medicoNombre: r.medicoNombre || "Médico",
         medicoEspecialidad: r.medicoEspecialidad || null,
+        medicoCedula: r.medicoCedula || null,
         patientNombre: r.patientNombre || "Paciente",
         patientApellido: r.patientApellido || "",
         diagnosticos: diagnoses.map(d => ({
@@ -647,8 +650,8 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getLabOrdersWithDetails(): Promise<LabOrderWithDetails[]> {
-    const result = await db
+  async getLabOrdersWithDetails(patientId?: string): Promise<LabOrderWithDetails[]> {
+    let query = db
       .select({
         id: labOrders.id,
         patientId: labOrders.patientId,
@@ -665,17 +668,28 @@ export class DatabaseStorage implements IStorage {
         patientNombre: patients.nombre,
         patientApellido: patients.apellidoPaterno,
         medicoNombre: users.nombre,
+        medicoCedula: users.cedula,
+        medicoEspecialidad: users.especialidad,
       })
       .from(labOrders)
       .leftJoin(patients, eq(labOrders.patientId, patients.id))
       .leftJoin(users, eq(labOrders.medicoId, users.id))
       .orderBy(desc(labOrders.createdAt));
-    
+
+    if (patientId) {
+      // @ts-ignore - drizzle-orm type complexity with dynamic queries
+      query = query.where(eq(labOrders.patientId, patientId));
+    }
+
+    const result = await query;
+
     return result.map(r => ({
       ...r,
       patientNombre: r.patientNombre || "Paciente",
       patientApellido: r.patientApellido || "",
       medicoNombre: r.medicoNombre || "Médico",
+      medicoCedula: r.medicoCedula || null,
+      medicoEspecialidad: r.medicoEspecialidad || null,
     }));
   }
 
