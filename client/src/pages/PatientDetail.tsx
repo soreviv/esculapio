@@ -35,7 +35,7 @@ import {
   Clock,
   Printer,
 } from "lucide-react";
-import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertVitals, type PatientConsent, type User, type LabOrder } from "@shared/schema";
+import { type Patient, type MedicalNoteWithDetails, type Vitals, type PrescriptionWithDetails, type InsertVitals, type PatientConsent, type User, type LabOrderWithDetails } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { printMedicalNote, printLabGabinetOrder } from "@/lib/print-documents";
@@ -113,7 +113,7 @@ export default function PatientDetail() {
     enabled: !!params.id,
   });
 
-  const { data: labOrders = [] } = useQuery<LabOrder[]>({
+  const { data: labOrders = [] } = useQuery<LabOrderWithDetails[]>({
     queryKey: ["/api/patients", params.id, "lab-orders"],
     enabled: !!params.id,
   });

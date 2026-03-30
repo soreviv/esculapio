@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { AuditLog, User as UserRecord, ClinicHoursDay, EstablishmentConfig } from "@shared/schema";
+import type { AuditLog, User as UserRecord, ClinicHoursDay, PortalSettings } from "@shared/schema";
 import { DEFAULT_CLINIC_HOURS } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -48,6 +48,8 @@ import {
   ShieldCheck,
   ShieldOff,
   Smartphone,
+  Globe,
+  Bot,
 } from "lucide-react";
 
 export default function Configuracion() {
@@ -63,6 +65,21 @@ export default function Configuracion() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
+  // Portal settings state
+  const [portalForm, setPortalForm] = useState({
+    portalEnabled: false,
+    portalTitle: "",
+    portalTagline: "",
+    consultationFee: "" as string,
+    appointmentDurationMin: 30,
+    bookingAdvanceDays: 30,
+    bookingBufferMin: 0,
+    notificationEmail: "",
+    hcaptchaSiteKey: "",
+  });
+  const [geminiKey, setGeminiKey] = useState("");
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+
   const [establishmentForm, setEstablishmentForm] = useState({
     nombreEstablecimiento: "",
     razonSocial: "",
@@ -77,32 +94,45 @@ export default function Configuracion() {
     cedulaResponsable: "",
   });
 
-  const { data: establishmentConfig } = useQuery<EstablishmentConfig | null>({
-    queryKey: ["/api/config/establishment"],
+  const { data: portalSettings } = useQuery<PortalSettings>({
+    queryKey: ["/api/portal-settings"],
   });
 
   useEffect(() => {
-    if (establishmentConfig) {
+    if (portalSettings) {
       setEstablishmentForm({
-        nombreEstablecimiento: establishmentConfig.nombreEstablecimiento ?? "",
-        razonSocial: establishmentConfig.razonSocial ?? "",
-        rfc: establishmentConfig.rfc ?? "",
-        domicilio: establishmentConfig.domicilio ?? "",
-        ciudad: establishmentConfig.ciudad ?? "",
-        estado: establishmentConfig.estado ?? "",
-        codigoPostal: establishmentConfig.codigoPostal ?? "",
-        telefono: establishmentConfig.telefono ?? "",
-        responsableSanitario: establishmentConfig.responsableSanitario ?? "",
-        licenciaSanitaria: establishmentConfig.licenciaSanitaria ?? "",
-        cedulaResponsable: establishmentConfig.cedulaResponsable ?? "",
+        nombreEstablecimiento: portalSettings.nombreEstablecimiento ?? "",
+        razonSocial: portalSettings.razonSocial ?? "",
+        rfc: portalSettings.rfc ?? "",
+        domicilio: portalSettings.domicilio ?? "",
+        ciudad: portalSettings.ciudad ?? "",
+        estado: portalSettings.estado ?? "",
+        codigoPostal: portalSettings.codigoPostal ?? "",
+        telefono: portalSettings.telefono ?? "",
+        responsableSanitario: portalSettings.responsableSanitario ?? "",
+        licenciaSanitaria: portalSettings.licenciaSanitaria ?? "",
+        cedulaResponsable: portalSettings.cedulaResponsable ?? "",
       });
-      if (establishmentConfig.logoUrl) setLogoPreview(establishmentConfig.logoUrl);
+      if (portalSettings.logoUrl) setLogoPreview(portalSettings.logoUrl);
+      if (portalSettings.horarios) setSchedules(portalSettings.horarios);
+      setPortalForm({
+        portalEnabled: portalSettings.portalEnabled ?? false,
+        portalTitle: portalSettings.portalTitle ?? "",
+        portalTagline: portalSettings.portalTagline ?? "",
+        consultationFee: portalSettings.consultationFee ?? "",
+        appointmentDurationMin: portalSettings.appointmentDurationMin ?? 30,
+        bookingAdvanceDays: portalSettings.bookingAdvanceDays ?? 30,
+        bookingBufferMin: portalSettings.bookingBufferMin ?? 0,
+        notificationEmail: portalSettings.notificationEmail ?? "",
+        hcaptchaSiteKey: portalSettings.hcaptchaSiteKey ?? "",
+      });
+      setHasGeminiKey(!!portalSettings.geminiApiKeyEncrypted);
     }
-  }, [establishmentConfig]);
+  }, [portalSettings]);
 
   const saveEstablishmentMutation = useMutation({
     mutationFn: async (data: typeof establishmentForm) => {
-      const res = await apiRequest("PUT", "/api/config/establishment", data);
+      const res = await apiRequest("PATCH", "/api/portal-settings", data);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || "Error al guardar");
@@ -110,7 +140,7 @@ export default function Configuracion() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/config/establishment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portal-settings"] });
       toast({ title: "Configuración guardada", description: "Los datos del establecimiento han sido actualizados." });
     },
     onError: (err: Error) => {
@@ -256,27 +286,79 @@ export default function Configuracion() {
     },
   });
 
-  const { data: clinicHoursData } = useQuery<ClinicHoursDay[]>({
-    queryKey: ["/api/config/clinic-hours"],
-  });
-
-  useEffect(() => {
-    if (clinicHoursData) {
-      setSchedules(clinicHoursData);
-    }
-  }, [clinicHoursData]);
-
   const saveSchedulesMutation = useMutation({
     mutationFn: async (hours: ClinicHoursDay[]) => {
-      const res = await apiRequest("PUT", "/api/config/clinic-hours", hours);
+      const res = await apiRequest("PATCH", "/api/portal-settings", { horarios: hours });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error al guardar");
+      }
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/config/clinic-hours"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portal-settings"] });
       toast({ title: "Horarios guardados", description: "Los horarios de atención han sido actualizados." });
     },
     onError: () => {
       toast({ title: "Error", description: "No se pudieron guardar los horarios.", variant: "destructive" });
+    },
+  });
+
+  const savePortalSettingsMutation = useMutation({
+    mutationFn: async (data: typeof portalForm) => {
+      const res = await apiRequest("PATCH", "/api/portal-settings", {
+        ...data,
+        consultationFee: data.consultationFee || null,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error al guardar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portal-settings"] });
+      toast({ title: "Portal guardado", description: "La configuración del portal fue actualizada." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const saveGeminiKeyMutation = useMutation({
+    mutationFn: async (apiKey: string) => {
+      const res = await apiRequest("PUT", "/api/portal-settings/gemini-key", { apiKey });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error al guardar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setGeminiKey("");
+      setHasGeminiKey(true);
+      toast({ title: "Clave guardada", description: "La clave de Gemini fue actualizada." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteGeminiKeyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/portal-settings/gemini-key");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error al eliminar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setHasGeminiKey(false);
+      toast({ title: "Clave eliminada", description: "La clave de Gemini fue eliminada." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -334,6 +416,10 @@ export default function Configuracion() {
           <TabsTrigger value="seguridad" className="data-[state=active]:bg-muted" data-testid="tab-seguridad">
             <Key className="h-4 w-4 mr-2" />
             Seguridad
+          </TabsTrigger>
+          <TabsTrigger value="portal" className="data-[state=active]:bg-muted" data-testid="tab-portal">
+            <Globe className="h-4 w-4 mr-2" />
+            Portal Web
           </TabsTrigger>
         </TabsList>
 
@@ -1374,6 +1460,204 @@ export default function Configuracion() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="portal" className="space-y-4 mt-0">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Portal de Citas en Línea
+              </CardTitle>
+              <CardDescription>
+                Configura el portal público para que los pacientes puedan agendar citas en línea
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Enable/Disable */}
+              <div className="flex items-center justify-between p-4 rounded-lg border">
+                <div>
+                  <p className="font-medium">Portal habilitado</p>
+                  <p className="text-sm text-muted-foreground">Permite a los pacientes agendar citas desde la web</p>
+                </div>
+                <Switch
+                  checked={portalForm.portalEnabled}
+                  onCheckedChange={(v) => setPortalForm((f) => ({ ...f, portalEnabled: v }))}
+                  data-testid="switch-portal-enabled"
+                />
+              </div>
+
+              <Separator />
+
+              {/* Branding */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="portalTitle">Título del portal</Label>
+                  <Input
+                    id="portalTitle"
+                    placeholder="Clínica San Rafael — Agenda en línea"
+                    value={portalForm.portalTitle}
+                    onChange={(e) => setPortalForm((f) => ({ ...f, portalTitle: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notificationEmail">Correo de notificaciones</Label>
+                  <Input
+                    id="notificationEmail"
+                    type="email"
+                    placeholder="admin@clinica.com"
+                    value={portalForm.notificationEmail}
+                    onChange={(e) => setPortalForm((f) => ({ ...f, notificationEmail: e.target.value }))}
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor="portalTagline">Slogan / descripción corta</Label>
+                  <Input
+                    id="portalTagline"
+                    placeholder="Agenda tu cita fácil y rápido"
+                    value={portalForm.portalTagline}
+                    onChange={(e) => setPortalForm((f) => ({ ...f, portalTagline: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Appointment settings */}
+              <h4 className="font-medium">Configuración de citas</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="consultationFee">Costo de consulta (MXN)</Label>
+                  <Input
+                    id="consultationFee"
+                    type="number"
+                    min="0"
+                    placeholder="500.00"
+                    value={portalForm.consultationFee}
+                    onChange={(e) => setPortalForm((f) => ({ ...f, consultationFee: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="appointmentDurationMin">Duración por cita (minutos)</Label>
+                  <Input
+                    id="appointmentDurationMin"
+                    type="number"
+                    min="5"
+                    max="120"
+                    value={portalForm.appointmentDurationMin}
+                    onChange={(e) => setPortalForm((f) => ({ ...f, appointmentDurationMin: parseInt(e.target.value) || 30 }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bookingAdvanceDays">Días máx. de anticipación</Label>
+                  <Input
+                    id="bookingAdvanceDays"
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={portalForm.bookingAdvanceDays}
+                    onChange={(e) => setPortalForm((f) => ({ ...f, bookingAdvanceDays: parseInt(e.target.value) || 30 }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bookingBufferMin">Buffer entre citas (minutos)</Label>
+                  <Input
+                    id="bookingBufferMin"
+                    type="number"
+                    min="0"
+                    max="60"
+                    value={portalForm.bookingBufferMin}
+                    onChange={(e) => setPortalForm((f) => ({ ...f, bookingBufferMin: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Security */}
+              <h4 className="font-medium">Seguridad del portal</h4>
+              <div className="space-y-2">
+                <Label htmlFor="hcaptchaSiteKey">hCaptcha Site Key</Label>
+                <Input
+                  id="hcaptchaSiteKey"
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  value={portalForm.hcaptchaSiteKey}
+                  onChange={(e) => setPortalForm((f) => ({ ...f, hcaptchaSiteKey: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">Protege el formulario de contacto y el agendado de citas contra bots.</p>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => savePortalSettingsMutation.mutate(portalForm)}
+                  disabled={savePortalSettingsMutation.isPending}
+                  data-testid="button-save-portal"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {savePortalSettingsMutation.isPending ? "Guardando..." : "Guardar Portal"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gemini AI */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5" />
+                Asistente de IA (Gemini)
+              </CardTitle>
+              <CardDescription>
+                Chatbot inteligente integrado en el portal para responder preguntas de pacientes
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3 p-3 rounded-md border">
+                {hasGeminiKey ? (
+                  <>
+                    <ShieldCheck className="h-5 w-5 text-green-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Clave configurada</p>
+                      <p className="text-xs text-muted-foreground">La clave de Gemini está almacenada de forma encriptada.</p>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deleteGeminiKeyMutation.mutate()}
+                      disabled={deleteGeminiKeyMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Eliminar
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <ShieldOff className="h-5 w-5 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground flex-1">Sin clave — el chatbot está desactivado.</p>
+                  </>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="geminiKey">{hasGeminiKey ? "Actualizar clave de Gemini" : "Ingresar clave de Gemini"}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="geminiKey"
+                    type="password"
+                    placeholder="AIza..."
+                    value={geminiKey}
+                    onChange={(e) => setGeminiKey(e.target.value)}
+                  />
+                  <Button
+                    onClick={() => saveGeminiKeyMutation.mutate(geminiKey)}
+                    disabled={!geminiKey.trim() || saveGeminiKeyMutation.isPending}
+                  >
+                    <Key className="h-4 w-4 mr-2" />
+                    {saveGeminiKeyMutation.isPending ? "Guardando..." : "Guardar"}
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

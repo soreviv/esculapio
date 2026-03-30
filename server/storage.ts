@@ -1466,7 +1466,10 @@ export class TenantScopedStorage extends DatabaseStorage {
     return super.updateLabOrder(id, order);
   }
 
-  override async getLabOrdersWithDetails(): Promise<LabOrderWithDetails[]> {
+  override async getLabOrdersWithDetails(patientId?: string): Promise<LabOrderWithDetails[]> {
+    const conditions = [eq(labOrders.tenantId, this.tenantId)];
+    if (patientId) conditions.push(eq(labOrders.patientId, patientId));
+
     const result = await db
       .select({
         id: labOrders.id, tenantId: labOrders.tenantId,
@@ -1482,7 +1485,7 @@ export class TenantScopedStorage extends DatabaseStorage {
       .from(labOrders)
       .leftJoin(patients, eq(labOrders.patientId, patients.id))
       .leftJoin(users, eq(labOrders.medicoId, users.id))
-      .where(eq(labOrders.tenantId, this.tenantId))
+      .where(and(...conditions))
       .orderBy(desc(labOrders.createdAt));
 
     return result.map(r => ({
