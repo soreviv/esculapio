@@ -79,6 +79,7 @@ export interface IStorage {
   getAppointmentsByDateWithDetails(fecha: string): Promise<AppointmentWithDetails[]>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined>;
+  getAppointmentByActionToken(token: string): Promise<Appointment | undefined>;
   
   // Enriched Medical Notes
   getMedicalNotesWithDetails(patientId: string): Promise<MedicalNoteWithDetails[]>;
@@ -177,7 +178,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Patients
-  private encryptPatient(patient: Partial<InsertPatient>) {
+  protected encryptPatient(patient: Partial<InsertPatient>) {
     const p = { ...patient };
     if (p.curp) p.curp = encrypt(p.curp);
     if (p.telefono) p.telefono = encrypt(p.telefono);
@@ -188,7 +189,7 @@ export class DatabaseStorage implements IStorage {
     return p;
   }
 
-  private decryptPatient(patient: Patient): Patient {
+  protected decryptPatient(patient: Patient): Patient {
     return {
       ...patient,
       curp: decrypt(patient.curp),
@@ -398,11 +399,18 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async getAppointmentByActionToken(token: string): Promise<Appointment | undefined> {
+    const [row] = await db.select().from(appointments)
+      .where(eq(appointments.actionToken, token));
+    return row;
+  }
+
   // Enriched appointments with patient and medico details
   async getAppointmentsWithDetails(): Promise<AppointmentWithDetails[]> {
     const result = await db
       .select({
         id: appointments.id,
+        tenantId: appointments.tenantId,
         patientId: appointments.patientId,
         medicoId: appointments.medicoId,
         fecha: appointments.fecha,
@@ -410,6 +418,14 @@ export class DatabaseStorage implements IStorage {
         duracion: appointments.duracion,
         motivo: appointments.motivo,
         status: appointments.status,
+        bookingSource: appointments.bookingSource,
+        patientName: appointments.patientName,
+        patientPhone: appointments.patientPhone,
+        patientEmail: appointments.patientEmail,
+        appointmentType: appointments.appointmentType,
+        actionToken: appointments.actionToken,
+        patientConfirmed: appointments.patientConfirmed,
+        reminderSent: appointments.reminderSent,
         createdAt: appointments.createdAt,
         patientNombre: patients.nombre,
         patientApellido: patients.apellidoPaterno,
@@ -420,12 +436,12 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(patients, eq(appointments.patientId, patients.id))
       .leftJoin(users, eq(appointments.medicoId, users.id))
       .orderBy(desc(appointments.fecha));
-    
+
     return result.map(r => ({
       ...r,
-      patientNombre: r.patientNombre || "Paciente",
-      patientApellido: r.patientApellido || "",
-      medicoNombre: r.medicoNombre || "Médico",
+      patientNombre: r.bookingSource === "portal" ? (r.patientName ?? r.patientNombre) : (r.patientNombre ?? null),
+      patientApellido: r.bookingSource === "portal" ? null : (r.patientApellido ?? null),
+      medicoNombre: r.medicoNombre ?? null,
     }));
   }
 
@@ -433,6 +449,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select({
         id: appointments.id,
+        tenantId: appointments.tenantId,
         patientId: appointments.patientId,
         medicoId: appointments.medicoId,
         fecha: appointments.fecha,
@@ -440,6 +457,14 @@ export class DatabaseStorage implements IStorage {
         duracion: appointments.duracion,
         motivo: appointments.motivo,
         status: appointments.status,
+        bookingSource: appointments.bookingSource,
+        patientName: appointments.patientName,
+        patientPhone: appointments.patientPhone,
+        patientEmail: appointments.patientEmail,
+        appointmentType: appointments.appointmentType,
+        actionToken: appointments.actionToken,
+        patientConfirmed: appointments.patientConfirmed,
+        reminderSent: appointments.reminderSent,
         createdAt: appointments.createdAt,
         patientNombre: patients.nombre,
         patientApellido: patients.apellidoPaterno,
@@ -451,12 +476,12 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(appointments.medicoId, users.id))
       .where(eq(appointments.fecha, fecha))
       .orderBy(appointments.hora);
-    
+
     return result.map(r => ({
       ...r,
-      patientNombre: r.patientNombre || "Paciente",
-      patientApellido: r.patientApellido || "",
-      medicoNombre: r.medicoNombre || "Médico",
+      patientNombre: r.bookingSource === "portal" ? (r.patientName ?? r.patientNombre) : (r.patientNombre ?? null),
+      patientApellido: r.bookingSource === "portal" ? null : (r.patientApellido ?? null),
+      medicoNombre: r.medicoNombre ?? null,
     }));
   }
 
@@ -536,6 +561,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select({
         id: prescriptions.id,
+        tenantId: prescriptions.tenantId,
         patientId: prescriptions.patientId,
         medicoId: prescriptions.medicoId,
         medicamento: prescriptions.medicamento,
@@ -654,6 +680,7 @@ export class DatabaseStorage implements IStorage {
     let query = db
       .select({
         id: labOrders.id,
+        tenantId: labOrders.tenantId,
         patientId: labOrders.patientId,
         medicoId: labOrders.medicoId,
         estudios: labOrders.estudios,
@@ -1068,7 +1095,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Update user profile
-  async updateUser(userId: string, data: Partial<Pick<InsertUser, "email" | "nombre" | "especialidad" | "cedula">>): Promise<User | undefined> {
+  async updateUser(userId: string, data: Partial<Pick<InsertUser, "email" | "nombre" | "especialidad" | "cedula" | "cedulaEspecialidad" | "universidad" | "logoUniversidadUrl">>): Promise<User | undefined> {
     const [user] = await db.update(users).set(data).where(eq(users.id, userId)).returning();
     return user;
   }
@@ -1103,3 +1130,480 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+// ─── TenantScopedStorage ──────────────────────────────────────────────────────
+// Extends DatabaseStorage and adds WHERE tenant_id = ? to all clinical queries.
+// Use createTenantStorage(tenantId) in route handlers instead of the global
+// `storage` instance.
+
+import { nursingNotes, portalSettings, contactMessages } from "@shared/schema";
+import type { NursingNote, PortalSettings, ContactMessage, InsertContactMessage } from "@shared/schema";
+import { withTenantContext } from "./tenant";
+
+export class TenantScopedStorage extends DatabaseStorage {
+  constructor(private tenantId: string) {
+    super();
+  }
+
+  // ── Patients ────────────────────────────────────────────────────────────────
+
+  override async getPatients(): Promise<Patient[]> {
+    const rows = await db.select().from(patients).where(eq(patients.tenantId, this.tenantId));
+    return rows.map(this.decryptPatient.bind(this));
+  }
+
+  override async getPatient(id: string): Promise<Patient | undefined> {
+    const [row] = await db.select().from(patients)
+      .where(and(eq(patients.id, id), eq(patients.tenantId, this.tenantId)));
+    return row ? this.decryptPatient(row) : undefined;
+  }
+
+  override async createPatient(patient: InsertPatient): Promise<Patient> {
+    return super.createPatient({ ...patient, tenantId: this.tenantId });
+  }
+
+  override async updatePatient(id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined> {
+    const [row] = await db.update(patients).set(this.encryptPatient(patient as Patient))
+      .where(and(eq(patients.id, id), eq(patients.tenantId, this.tenantId)))
+      .returning();
+    return row ? this.decryptPatient(row) : undefined;
+  }
+
+  override async deletePatient(id: string): Promise<Patient | undefined> {
+    const [row] = await db.delete(patients)
+      .where(and(eq(patients.id, id), eq(patients.tenantId, this.tenantId)))
+      .returning();
+    return row ? this.decryptPatient(row) : undefined;
+  }
+
+  override async searchPatients(query: string): Promise<Patient[]> {
+    const rows = await db.select().from(patients)
+      .where(and(
+        eq(patients.tenantId, this.tenantId),
+        or(
+          ilike(patients.nombre, `%${query}%`),
+          ilike(patients.apellidoPaterno, `%${query}%`),
+          ilike(patients.numeroExpediente, `%${query}%`),
+        )
+      ));
+    return rows.map(this.decryptPatient.bind(this));
+  }
+
+  override async searchPatientsAdvanced(filters: PatientSearchFilters): Promise<Patient[]> {
+    const conditions = [eq(patients.tenantId, this.tenantId)];
+    if (filters.query) {
+      conditions.push(or(
+        ilike(patients.nombre, `%${filters.query}%`),
+        ilike(patients.apellidoPaterno, `%${filters.query}%`),
+        ilike(patients.numeroExpediente, `%${filters.query}%`),
+      ) as any);
+    }
+    if (filters.status) conditions.push(eq(patients.status, filters.status));
+    const rows = await db.select().from(patients).where(and(...conditions)).orderBy(patients.apellidoPaterno);
+    return rows.map(this.decryptPatient.bind(this));
+  }
+
+  // ── Medical Notes ────────────────────────────────────────────────────────────
+
+  override async getMedicalNotes(patientId: string): Promise<MedicalNote[]> {
+    return db.select().from(medicalNotes)
+      .where(and(eq(medicalNotes.patientId, patientId), eq(medicalNotes.tenantId, this.tenantId)))
+      .orderBy(desc(medicalNotes.fecha));
+  }
+
+  override async getMedicalNote(id: string): Promise<MedicalNote | undefined> {
+    const [note] = await db.select().from(medicalNotes)
+      .where(and(eq(medicalNotes.id, id), eq(medicalNotes.tenantId, this.tenantId)));
+    return note;
+  }
+
+  override async getNote(id: string): Promise<MedicalNote | undefined> {
+    return this.getMedicalNote(id);
+  }
+
+  override async createMedicalNote(note: InsertMedicalNote, diagnoses?: { codigo: string; tipo: string }[]): Promise<MedicalNote> {
+    return super.createMedicalNote({ ...note, tenantId: this.tenantId }, diagnoses);
+  }
+
+  override async updateMedicalNote(id: string, note: Partial<InsertMedicalNote>): Promise<MedicalNote | undefined> {
+    const existing = await this.getMedicalNote(id);
+    if (!existing) return undefined;
+    return super.updateMedicalNote(id, note);
+  }
+
+  override async createAddendum(addendum: InsertMedicalNoteAddendum): Promise<MedicalNoteAddendum> {
+    return super.createAddendum({ ...addendum, tenantId: this.tenantId });
+  }
+
+  override async getMedicalNotesWithDetails(patientId: string): Promise<MedicalNoteWithDetails[]> {
+    // The base implementation already uses leftJoin — we add tenant filter
+    const notesResults = await db
+      .select({
+        medical_note: medicalNotes,
+        medicoNombre: users.nombre,
+        medicoEspecialidad: users.especialidad,
+        patientNombre: patients.nombre,
+        patientApellido: patients.apellidoPaterno,
+      })
+      .from(medicalNotes)
+      .leftJoin(users, eq(medicalNotes.medicoId, users.id))
+      .leftJoin(patients, eq(medicalNotes.patientId, patients.id))
+      .where(and(eq(medicalNotes.patientId, patientId), eq(medicalNotes.tenantId, this.tenantId)))
+      .orderBy(desc(medicalNotes.fecha));
+
+    return Promise.all(notesResults.map(async (r) => {
+      const noteId = r.medical_note.id;
+      const [diagnoses, addendums] = await Promise.all([
+        this.getNoteDiagnoses(noteId),
+        this.getAddendums(noteId),
+      ]);
+      return {
+        ...r.medical_note,
+        medicoNombre: r.medicoNombre || "Médico",
+        medicoEspecialidad: r.medicoEspecialidad || null,
+        patientNombre: r.patientNombre || "Paciente",
+        patientApellido: r.patientApellido || "",
+        diagnosticos: diagnoses.map(d => ({
+          codigo: d.cie10Codigo,
+          descripcion: d.cie10.descripcion,
+          tipo: d.tipoDiagnostico || "presuntivo",
+        })),
+        anexos: addendums,
+      };
+    }));
+  }
+
+  // ── Vitals ───────────────────────────────────────────────────────────────────
+
+  override async getVitals(patientId: string): Promise<Vitals[]> {
+    return db.select().from(vitals)
+      .where(and(eq(vitals.patientId, patientId), eq(vitals.tenantId, this.tenantId)))
+      .orderBy(desc(vitals.fecha));
+  }
+
+  override async getLatestVitals(patientId: string): Promise<Vitals | undefined> {
+    const [row] = await db.select().from(vitals)
+      .where(and(eq(vitals.patientId, patientId), eq(vitals.tenantId, this.tenantId)))
+      .orderBy(desc(vitals.fecha))
+      .limit(1);
+    return row;
+  }
+
+  override async createVitals(vitalsData: InsertVitals): Promise<Vitals> {
+    return super.createVitals({ ...vitalsData, tenantId: this.tenantId });
+  }
+
+  // ── Prescriptions ─────────────────────────────────────────────────────────
+
+  override async getPrescriptions(patientId: string): Promise<Prescription[]> {
+    return db.select().from(prescriptions)
+      .where(and(eq(prescriptions.patientId, patientId), eq(prescriptions.tenantId, this.tenantId)))
+      .orderBy(desc(prescriptions.createdAt));
+  }
+
+  override async getPrescription(id: string): Promise<Prescription | undefined> {
+    const [row] = await db.select().from(prescriptions)
+      .where(and(eq(prescriptions.id, id), eq(prescriptions.tenantId, this.tenantId)));
+    return row;
+  }
+
+  override async createPrescription(prescription: InsertPrescription): Promise<Prescription> {
+    return super.createPrescription({ ...prescription, tenantId: this.tenantId });
+  }
+
+  override async updatePrescription(id: string, prescription: Partial<InsertPrescription>): Promise<Prescription | undefined> {
+    const existing = await this.getPrescription(id);
+    if (!existing) return undefined;
+    return super.updatePrescription(id, prescription);
+  }
+
+  override async getPrescriptionsWithDetails(patientId: string): Promise<PrescriptionWithDetails[]> {
+    const result = await db
+      .select({
+        id: prescriptions.id,
+        tenantId: prescriptions.tenantId,
+        patientId: prescriptions.patientId,
+        medicoId: prescriptions.medicoId,
+        medicamento: prescriptions.medicamento,
+        presentacion: prescriptions.presentacion,
+        dosis: prescriptions.dosis,
+        via: prescriptions.via,
+        frecuencia: prescriptions.frecuencia,
+        duracion: prescriptions.duracion,
+        indicaciones: prescriptions.indicaciones,
+        instruccionesGenerales: prescriptions.instruccionesGenerales,
+        recetaId: prescriptions.recetaId,
+        status: prescriptions.status,
+        createdAt: prescriptions.createdAt,
+        medicoNombre: users.nombre,
+      })
+      .from(prescriptions)
+      .leftJoin(users, eq(prescriptions.medicoId, users.id))
+      .where(and(eq(prescriptions.patientId, patientId), eq(prescriptions.tenantId, this.tenantId)))
+      .orderBy(desc(prescriptions.createdAt));
+
+    return result.map(r => ({ ...r, medicoNombre: r.medicoNombre || "Médico" }));
+  }
+
+  // ── Appointments ──────────────────────────────────────────────────────────
+
+  override async getAppointments(): Promise<Appointment[]> {
+    return db.select().from(appointments).where(eq(appointments.tenantId, this.tenantId));
+  }
+
+  override async getAppointment(id: string): Promise<Appointment | undefined> {
+    const [row] = await db.select().from(appointments)
+      .where(and(eq(appointments.id, id), eq(appointments.tenantId, this.tenantId)));
+    return row;
+  }
+
+  override async getAppointmentsByPatient(patientId: string): Promise<Appointment[]> {
+    return db.select().from(appointments)
+      .where(and(eq(appointments.patientId, patientId), eq(appointments.tenantId, this.tenantId)))
+      .orderBy(desc(appointments.fecha));
+  }
+
+  override async getAppointmentsByDate(fecha: string): Promise<Appointment[]> {
+    return db.select().from(appointments)
+      .where(and(eq(appointments.fecha, fecha), eq(appointments.tenantId, this.tenantId)));
+  }
+
+  override async getAppointmentsWithDetails(): Promise<AppointmentWithDetails[]> {
+    const result = await db
+      .select({
+        id: appointments.id, tenantId: appointments.tenantId,
+        patientId: appointments.patientId, medicoId: appointments.medicoId,
+        fecha: appointments.fecha, hora: appointments.hora, duracion: appointments.duracion,
+        motivo: appointments.motivo, status: appointments.status,
+        bookingSource: appointments.bookingSource, patientName: appointments.patientName,
+        patientPhone: appointments.patientPhone, patientEmail: appointments.patientEmail,
+        appointmentType: appointments.appointmentType, actionToken: appointments.actionToken,
+        patientConfirmed: appointments.patientConfirmed, reminderSent: appointments.reminderSent,
+        createdAt: appointments.createdAt,
+        patientNombre: patients.nombre, patientApellido: patients.apellidoPaterno,
+        medicoNombre: users.nombre, medicoEspecialidad: users.especialidad,
+      })
+      .from(appointments)
+      .leftJoin(patients, eq(appointments.patientId, patients.id))
+      .leftJoin(users, eq(appointments.medicoId, users.id))
+      .where(eq(appointments.tenantId, this.tenantId))
+      .orderBy(desc(appointments.fecha));
+
+    return result.map(r => ({
+      ...r,
+      patientNombre: r.bookingSource === "portal" ? (r.patientName ?? r.patientNombre) : (r.patientNombre ?? null),
+      patientApellido: r.bookingSource === "portal" ? null : (r.patientApellido ?? null),
+      medicoNombre: r.medicoNombre ?? null,
+    }));
+  }
+
+  override async getAppointmentsByDateWithDetails(fecha: string): Promise<AppointmentWithDetails[]> {
+    const result = await db
+      .select({
+        id: appointments.id, tenantId: appointments.tenantId,
+        patientId: appointments.patientId, medicoId: appointments.medicoId,
+        fecha: appointments.fecha, hora: appointments.hora, duracion: appointments.duracion,
+        motivo: appointments.motivo, status: appointments.status,
+        bookingSource: appointments.bookingSource, patientName: appointments.patientName,
+        patientPhone: appointments.patientPhone, patientEmail: appointments.patientEmail,
+        appointmentType: appointments.appointmentType, actionToken: appointments.actionToken,
+        patientConfirmed: appointments.patientConfirmed, reminderSent: appointments.reminderSent,
+        createdAt: appointments.createdAt,
+        patientNombre: patients.nombre, patientApellido: patients.apellidoPaterno,
+        medicoNombre: users.nombre, medicoEspecialidad: users.especialidad,
+      })
+      .from(appointments)
+      .leftJoin(patients, eq(appointments.patientId, patients.id))
+      .leftJoin(users, eq(appointments.medicoId, users.id))
+      .where(and(eq(appointments.fecha, fecha), eq(appointments.tenantId, this.tenantId)))
+      .orderBy(appointments.hora);
+
+    return result.map(r => ({
+      ...r,
+      patientNombre: r.bookingSource === "portal" ? (r.patientName ?? r.patientNombre) : (r.patientNombre ?? null),
+      patientApellido: r.bookingSource === "portal" ? null : (r.patientApellido ?? null),
+      medicoNombre: r.medicoNombre ?? null,
+    }));
+  }
+
+  override async createAppointment(appointment: InsertAppointment): Promise<Appointment> {
+    return super.createAppointment({ ...appointment, tenantId: this.tenantId });
+  }
+
+  override async updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined> {
+    const existing = await this.getAppointment(id);
+    if (!existing) return undefined;
+    return super.updateAppointment(id, appointment);
+  }
+
+  override async getAppointmentByActionToken(token: string): Promise<Appointment | undefined> {
+    const [row] = await db.select().from(appointments)
+      .where(and(eq(appointments.actionToken, token), eq(appointments.tenantId, this.tenantId)));
+    return row;
+  }
+
+  // ── Lab Orders ────────────────────────────────────────────────────────────
+
+  override async getLabOrders(patientId: string): Promise<LabOrder[]> {
+    return db.select().from(labOrders)
+      .where(and(eq(labOrders.patientId, patientId), eq(labOrders.tenantId, this.tenantId)))
+      .orderBy(desc(labOrders.createdAt));
+  }
+
+  override async getLabOrder(id: string): Promise<LabOrder | undefined> {
+    const [row] = await db.select().from(labOrders)
+      .where(and(eq(labOrders.id, id), eq(labOrders.tenantId, this.tenantId)));
+    return row;
+  }
+
+  override async createLabOrder(order: InsertLabOrder): Promise<LabOrder> {
+    return super.createLabOrder({ ...order, tenantId: this.tenantId });
+  }
+
+  override async updateLabOrder(id: string, order: Partial<InsertLabOrder>): Promise<LabOrder | undefined> {
+    const existing = await this.getLabOrder(id);
+    if (!existing) return undefined;
+    return super.updateLabOrder(id, order);
+  }
+
+  override async getLabOrdersWithDetails(): Promise<LabOrderWithDetails[]> {
+    const result = await db
+      .select({
+        id: labOrders.id, tenantId: labOrders.tenantId,
+        patientId: labOrders.patientId, medicoId: labOrders.medicoId,
+        estudios: labOrders.estudios, diagnosticoPresuntivo: labOrders.diagnosticoPresuntivo,
+        indicacionesClinicas: labOrders.indicacionesClinicas, urgente: labOrders.urgente,
+        ayuno: labOrders.ayuno, status: labOrders.status,
+        resultados: labOrders.resultados, fechaResultados: labOrders.fechaResultados,
+        createdAt: labOrders.createdAt,
+        patientNombre: patients.nombre, patientApellido: patients.apellidoPaterno,
+        medicoNombre: users.nombre,
+      })
+      .from(labOrders)
+      .leftJoin(patients, eq(labOrders.patientId, patients.id))
+      .leftJoin(users, eq(labOrders.medicoId, users.id))
+      .where(eq(labOrders.tenantId, this.tenantId))
+      .orderBy(desc(labOrders.createdAt));
+
+    return result.map(r => ({
+      ...r,
+      patientNombre: r.patientNombre || "Paciente",
+      patientApellido: r.patientApellido || "",
+      medicoNombre: r.medicoNombre || "Médico",
+    }));
+  }
+
+  // ── Patient Consents ──────────────────────────────────────────────────────
+
+  override async getPatientConsents(patientId: string): Promise<PatientConsent[]> {
+    return db.select().from(patientConsents)
+      .where(and(eq(patientConsents.patientId, patientId), eq(patientConsents.tenantId, this.tenantId)));
+  }
+
+  override async createPatientConsent(consent: InsertPatientConsent): Promise<PatientConsent> {
+    return super.createPatientConsent({ ...consent, tenantId: this.tenantId });
+  }
+
+  // ── All-records methods (tenant-scoped) ───────────────────────────────────
+
+  override async getAllVitals(): Promise<Vitals[]> {
+    return db.select().from(vitals).where(eq(vitals.tenantId, this.tenantId)).orderBy(desc(vitals.fecha));
+  }
+
+  override async getAllPrescriptions(): Promise<Prescription[]> {
+    return db.select().from(prescriptions).where(eq(prescriptions.tenantId, this.tenantId)).orderBy(desc(prescriptions.createdAt));
+  }
+
+  override async getAllLabOrders(): Promise<LabOrder[]> {
+    return db.select().from(labOrders).where(eq(labOrders.tenantId, this.tenantId)).orderBy(desc(labOrders.createdAt));
+  }
+
+  override async signMedicalNote(id: string, userId: string, hash: string): Promise<MedicalNote | undefined> {
+    const existing = await this.getMedicalNote(id);
+    if (!existing) return undefined;
+    return super.signMedicalNote(id, userId, hash);
+  }
+
+  override async getVitalsById(id: string): Promise<Vitals | undefined> {
+    const [row] = await db.select().from(vitals)
+      .where(and(eq(vitals.id, id), eq(vitals.tenantId, this.tenantId)));
+    return row;
+  }
+
+  // ── Audit Logs ────────────────────────────────────────────────────────────
+
+  override async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    return super.createAuditLog({ ...log, tenantId: this.tenantId });
+  }
+
+  override async getAuditLogs(limit = 100): Promise<AuditLog[]> {
+    return db.select().from(auditLogs)
+      .where(eq(auditLogs.tenantId, this.tenantId))
+      .orderBy(desc(auditLogs.fecha))
+      .limit(limit);
+  }
+
+  override async getAuditLogsByEntity(entidad: string, entidadId: string): Promise<AuditLog[]> {
+    return db.select().from(auditLogs)
+      .where(and(
+        eq(auditLogs.tenantId, this.tenantId),
+        eq(auditLogs.entidad, entidad),
+        eq(auditLogs.entidadId, entidadId),
+      ))
+      .orderBy(desc(auditLogs.fecha));
+  }
+
+  // ── Users (tenant-scoped list) ────────────────────────────────────────────
+
+  override async getUsers(): Promise<User[]> {
+    return db.select().from(users).where(eq(users.tenantId, this.tenantId));
+  }
+
+  // ── Portal Settings ───────────────────────────────────────────────────────
+
+  async getPortalSettings(): Promise<PortalSettings | undefined> {
+    const [row] = await db.select().from(portalSettings)
+      .where(eq(portalSettings.tenantId, this.tenantId));
+    return row;
+  }
+
+  async updatePortalSettings(data: Partial<PortalSettings>): Promise<PortalSettings | undefined> {
+    const [row] = await db.update(portalSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(portalSettings.tenantId, this.tenantId))
+      .returning();
+    return row;
+  }
+
+  // ── Contact Messages ──────────────────────────────────────────────────────
+
+  async getContactMessages(): Promise<ContactMessage[]> {
+    return db.select().from(contactMessages)
+      .where(eq(contactMessages.tenantId, this.tenantId))
+      .orderBy(desc(contactMessages.createdAt));
+  }
+
+  async createContactMessage(msg: InsertContactMessage): Promise<ContactMessage> {
+    const [row] = await db.insert(contactMessages)
+      .values({ ...msg, tenantId: this.tenantId })
+      .returning();
+    return row;
+  }
+
+  async markContactMessageRead(id: string, replied = false): Promise<void> {
+    const update: Record<string, unknown> = { read: true };
+    if (replied) update.repliedAt = new Date();
+    await db.update(contactMessages)
+      .set(update as any)
+      .where(and(eq(contactMessages.id, id), eq(contactMessages.tenantId, this.tenantId)));
+  }
+}
+
+// ─── Factory ──────────────────────────────────────────────────────────────────
+// Use in route handlers:
+//   const ts = createTenantStorage(req.tenantId!);
+//   const patients = await ts.getPatients();
+
+export function createTenantStorage(tenantId: string): TenantScopedStorage {
+  return new TenantScopedStorage(tenantId);
+}

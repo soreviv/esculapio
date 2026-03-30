@@ -138,6 +138,7 @@ export function PrintMenu({ patient, medico }: PrintMenuProps) {
   const handlePrintConsent = (tipo: string) => {
     const consent: PatientConsent = {
       id: crypto.randomUUID(),
+      tenantId: null,
       patientId: patient.id,
       tipoConsentimiento: tipo,
       version: '1.0',

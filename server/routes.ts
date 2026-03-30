@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { storage } from "./storage";
+import { storage, createTenantStorage, type TenantScopedStorage } from "./storage";
 import {
   patientToFhir,
   userToPractitioner,
@@ -44,11 +44,20 @@ import { isTokenReplayed, markTokenUsed, getLockoutExpiry, recordFailure, clearF
  * @param app - Instancia de Express sobre la que se montan los endpoints y middleware
  * @returns El mismo objeto `Server` pasado como `httpServer`
  */
+// Helper: returns a TenantScopedStorage for the current request.
+// Falls back to the global (unscoped) storage for pre-login or system-level calls.
+import type { Request } from "express";
+function ts(req: Request): TenantScopedStorage {
+  const tenantId = (req as any).tenantId ?? req.session?.tenantId;
+  if (!tenantId) return storage as unknown as TenantScopedStorage;
+  return createTenantStorage(tenantId);
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
   /**
    * @swagger
    * /login:
@@ -92,7 +101,7 @@ export async function registerRoutes(
       
       const user = await storage.getUserByUsername(username);
       if (!user) {
-        await storage.createAuditLog({
+        await ts(req).createAuditLog({
           userId: null,
           accion: "login_fallido",
           entidad: "auth",
@@ -107,7 +116,7 @@ export async function registerRoutes(
       
       const isValidPassword = await verifyPassword(password, user.password);
       if (!isValidPassword) {
-        await storage.createAuditLog({
+        await ts(req).createAuditLog({
           userId: user.id,
           accion: "login_fallido",
           entidad: "auth",
@@ -139,6 +148,7 @@ export async function registerRoutes(
         req.session.userId = user.id;
         req.session.role = user.role;
         req.session.nombre = user.nombre;
+        req.session.tenantId = user.tenantId ?? "";
         req.session.pendingTwoFactor = true;
         req.session.pendingTwoFactorExpiry = Date.now() + 5 * 60 * 1000; // 5-minute window
 
@@ -153,6 +163,7 @@ export async function registerRoutes(
       req.session.userId = user.id;
       req.session.role = user.role;
       req.session.nombre = user.nombre;
+      req.session.tenantId = user.tenantId ?? "";
 
       await new Promise<void>((resolve, reject) => {
         req.session.save((err) => {
@@ -168,7 +179,7 @@ export async function registerRoutes(
 
       if (res.headersSent) return;
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: user.id,
         accion: "login",
         entidad: "auth",
@@ -218,7 +229,7 @@ export async function registerRoutes(
       }
 
       if (!user.email) {
-        await storage.createAuditLog({
+        await ts(req).createAuditLog({
           userId: user.id,
           accion: "password_reset_request_no_email",
           entidad: "auth",
@@ -237,7 +248,7 @@ export async function registerRoutes(
 
       await storage.createPasswordResetToken({ userId: user.id, token: hashedToken, expiresAt, usedAt: null });
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: user.id,
         accion: "password_reset_request",
         entidad: "auth",
@@ -301,7 +312,7 @@ export async function registerRoutes(
 
       if (!record || record.usedAt || new Date() > record.expiresAt) {
         if (record?.userId) {
-          await storage.createAuditLog({
+          await ts(req).createAuditLog({
             userId: record.userId,
             accion: "password_reset_confirm_failed",
             entidad: "auth",
@@ -319,7 +330,7 @@ export async function registerRoutes(
       await storage.updateUserPassword(record.userId, newHash);
       await storage.markPasswordResetTokenUsed(record.id);
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: record.userId,
         accion: "password_reset_confirm",
         entidad: "auth",
@@ -436,7 +447,7 @@ export async function registerRoutes(
       const delta = totp.validate({ token, window: 1 });
       if (delta === null) {
         const failCount = recordFailure(userId);
-        await storage.createAuditLog({
+        await ts(req).createAuditLog({
           userId: user.id,
           accion: "login_2fa_fallido",
           entidad: "auth",
@@ -460,7 +471,7 @@ export async function registerRoutes(
         req.session.save((err) => (err ? reject(err) : resolve()));
       });
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: user.id,
         accion: "login",
         entidad: "auth",
@@ -547,7 +558,7 @@ export async function registerRoutes(
 
       await storage.enableTotp(user.id);
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: user.id,
         accion: "2fa_activado",
         entidad: "auth",
@@ -590,7 +601,7 @@ export async function registerRoutes(
 
       await storage.disableTotp(user.id);
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: user.id,
         accion: "2fa_desactivado",
         entidad: "auth",
@@ -653,7 +664,7 @@ export async function registerRoutes(
         email: email || null,
       });
       
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "crear",
         entidad: "users",
@@ -695,7 +706,7 @@ export async function registerRoutes(
    */
   app.get("/api/dashboard/metrics", isAuthenticated, async (req, res) => {
     try {
-      const metrics = await storage.getDashboardMetrics();
+      const metrics = await ts(req).getDashboardMetrics();
       res.json(metrics);
     } catch (error) {
       console.error("Dashboard metrics error:", error);
@@ -758,7 +769,7 @@ export async function registerRoutes(
         medicoId: req.query.medicoId as string | undefined,
         status: req.query.status as string | undefined,
       };
-      const patients = await storage.searchPatientsAdvanced(filters);
+      const patients = await ts(req).searchPatientsAdvanced(filters);
       res.json(patients);
     } catch (error) {
       console.error("Advanced search error:", error);
@@ -791,8 +802,8 @@ export async function registerRoutes(
    */
   app.get("/api/patients", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const patients = await storage.getPatients();
-      await storage.createAuditLog({
+      const patients = await ts(req).getPatients();
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "patients",
@@ -827,8 +838,8 @@ export async function registerRoutes(
   app.get("/api/patients/search", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const query = req.query.q as string || "";
-      const patients = await storage.searchPatients(query);
-      await storage.createAuditLog({
+      const patients = await ts(req).searchPatients(query);
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "patients",
@@ -846,12 +857,12 @@ export async function registerRoutes(
 
   app.get("/api/patients/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const patient = await storage.getPatient(req.params.id);
+      const patient = await ts(req).getPatient(req.params.id);
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "patients",
@@ -896,15 +907,15 @@ export async function registerRoutes(
    */
   app.get("/api/patients/:id/timeline", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const patient = await storage.getPatient(req.params.id);
+      const patient = await ts(req).getPatient(req.params.id);
       if (!patient) {
         return res.status(404).json({ error: "Paciente no encontrado" });
       }
       
-      const timeline = await storage.getPatientTimeline(req.params.id);
+      const timeline = await ts(req).getPatientTimeline(req.params.id);
       
       // Audit log for accessing patient timeline (NOM-024)
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "patient_timeline",
@@ -953,12 +964,12 @@ export async function registerRoutes(
       
       const parsed = insertPatientSchema.safeParse(patientData);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
-      const patient = await storage.createPatient(parsed.data);
+      const patient = await ts(req).createPatient(parsed.data);
       
       // Create audit log for patient creation (NOM-024 compliance)
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "crear",
         entidad: "patients",
@@ -971,7 +982,7 @@ export async function registerRoutes(
       
       // Create consent records if provided (LFPDPPP compliance)
       if (req.body.consentimientoPrivacidad) {
-        await storage.createPatientConsent({
+        await ts(req).createPatientConsent({
           patientId: patient.id,
           tipoConsentimiento: "privacidad",
           version: "1.0",
@@ -981,7 +992,7 @@ export async function registerRoutes(
         });
       }
       if (req.body.consentimientoExpediente) {
-        await storage.createPatientConsent({
+        await ts(req).createPatientConsent({
           patientId: patient.id,
           tipoConsentimiento: "expediente_electronico",
           version: "1.0",
@@ -999,12 +1010,12 @@ export async function registerRoutes(
 
   app.patch("/api/patients/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const patient = await storage.updatePatient(req.params.id, req.body);
+      const patient = await ts(req).updatePatient(req.params.id, req.body);
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
       
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "actualizar",
         entidad: "patients",
@@ -1023,12 +1034,12 @@ export async function registerRoutes(
 
   app.delete("/api/patients/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const patient = await storage.deletePatient(req.params.id);
+      const patient = await ts(req).deletePatient(req.params.id);
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "eliminar",
         entidad: "patients",
@@ -1048,7 +1059,7 @@ export async function registerRoutes(
   // Medical Notes (Protected - staff can read, doctors can write)
   app.get("/api/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const notes = await storage.getAllMedicalNotesWithDetails();
+      const notes = await ts(req).getAllMedicalNotesWithDetails();
       res.json(notes);
     } catch (error) {
       res.status(500).json({ error: "Error fetching notes" });
@@ -1057,8 +1068,8 @@ export async function registerRoutes(
 
   app.get("/api/patients/:patientId/notes", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const notes = await storage.getMedicalNotesWithDetails(req.params.patientId);
-      await storage.createAuditLog({
+      const notes = await ts(req).getMedicalNotesWithDetails(req.params.patientId);
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "medical_notes",
@@ -1076,12 +1087,12 @@ export async function registerRoutes(
 
   app.get("/api/notes/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const note = await storage.getMedicalNote(req.params.id);
+      const note = await ts(req).getMedicalNote(req.params.id);
       if (!note) {
         return res.status(404).json({ error: "Note not found" });
       }
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "medical_notes",
@@ -1100,7 +1111,7 @@ export async function registerRoutes(
 
   app.post("/api/notes/:id/addendums", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const note = await storage.getMedicalNote(req.params.id);
+      const note = await ts(req).getMedicalNote(req.params.id);
       if (!note) {
         return res.status(404).json({ error: "Nota médica no encontrada" });
       }
@@ -1113,12 +1124,12 @@ export async function registerRoutes(
 
       const parsed = insertMedicalNoteAddendumSchema.safeParse(addendumData);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
 
-      const addendum = await storage.createAddendum(parsed.data);
+      const addendum = await ts(req).createAddendum(parsed.data);
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "crear",
         entidad: "medical_note_addendums",
@@ -1149,13 +1160,13 @@ export async function registerRoutes(
 
       const parsed = insertMedicalNoteSchema.safeParse(noteData);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
 
-      const note = await storage.createMedicalNote(parsed.data, diagnoses);
+      const note = await ts(req).createMedicalNote(parsed.data, diagnoses);
       
       // Create audit log for note creation (NOM-024 compliance)
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "crear",
         entidad: "medical_notes",
@@ -1175,7 +1186,7 @@ export async function registerRoutes(
 
   app.patch("/api/notes/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const existingNote = await storage.getMedicalNote(req.params.id);
+      const existingNote = await ts(req).getMedicalNote(req.params.id);
       if (!existingNote) {
         return res.status(404).json({ error: "Note not found" });
       }
@@ -1191,12 +1202,12 @@ export async function registerRoutes(
         });
       }
       
-      const note = await storage.updateMedicalNote(req.params.id, req.body);
+      const note = await ts(req).updateMedicalNote(req.params.id, req.body);
       if (!note) {
         return res.status(404).json({ error: "Note not found" });
       }
       
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "actualizar",
         entidad: "medical_notes",
@@ -1216,7 +1227,7 @@ export async function registerRoutes(
   // Vitals (Protected - requires medical/nursing staff)
   app.get("/api/vitals", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const vitalsList = await storage.getAllVitals();
+      const vitalsList = await ts(req).getAllVitals();
       res.json(vitalsList);
     } catch (error) {
       res.status(500).json({ error: "Error fetching vitals" });
@@ -1225,8 +1236,8 @@ export async function registerRoutes(
 
   app.get("/api/patients/:patientId/vitals", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const vitalsList = await storage.getVitals(req.params.patientId);
-      await storage.createAuditLog({
+      const vitalsList = await ts(req).getVitals(req.params.patientId);
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "vitals",
@@ -1244,8 +1255,8 @@ export async function registerRoutes(
 
   app.get("/api/patients/:patientId/vitals/latest", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const latest = await storage.getLatestVitals(req.params.patientId);
-      await storage.createAuditLog({
+      const latest = await ts(req).getLatestVitals(req.params.patientId);
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "vitals",
@@ -1265,15 +1276,15 @@ export async function registerRoutes(
     try {
       const parsed = insertVitalsSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
 
       // Enforce the current user as the one who registered the vitals
       parsed.data.registradoPorId = req.session.userId!;
 
-      const vitals = await storage.createVitals(parsed.data);
+      const vitals = await ts(req).createVitals(parsed.data);
       
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "crear",
         entidad: "vitals",
@@ -1293,7 +1304,7 @@ export async function registerRoutes(
   // Prescriptions (Protected - staff can read, doctors can write)
   app.get("/api/prescriptions", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const allPrescriptions = await storage.getAllPrescriptions();
+      const allPrescriptions = await ts(req).getAllPrescriptions();
       res.json(allPrescriptions);
     } catch (error) {
       res.status(500).json({ error: "Error fetching prescriptions" });
@@ -1302,8 +1313,8 @@ export async function registerRoutes(
 
   app.get("/api/patients/:patientId/prescriptions", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const prescriptions = await storage.getPrescriptionsWithDetails(req.params.patientId);
-      await storage.createAuditLog({
+      const prescriptions = await ts(req).getPrescriptionsWithDetails(req.params.patientId);
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "prescriptions",
@@ -1344,14 +1355,14 @@ export async function registerRoutes(
 
       const invalid = itemSchemas.find((r) => !r.success);
       if (invalid && !invalid.success) {
-        return res.status(400).json({ error: invalid.error.errors });
+        return res.status(400).json({ error: invalid.error.issues });
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const items = itemSchemas.map((r) => (r as any).data);
-      const created = await storage.createPrescriptionBatch(items);
+      const created = await ts(req).createPrescriptionBatch(items);
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: medicoId,
         accion: "crear_receta",
         entidad: "prescriptions",
@@ -1372,15 +1383,15 @@ export async function registerRoutes(
     try {
       const parsed = insertPrescriptionSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
 
       // Enforce the current user as the author
       parsed.data.medicoId = req.session.userId!;
 
-      const prescription = await storage.createPrescription(parsed.data);
+      const prescription = await ts(req).createPrescription(parsed.data);
       
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "crear",
         entidad: "prescriptions",
@@ -1399,7 +1410,7 @@ export async function registerRoutes(
 
   app.patch("/api/prescriptions/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const existingPrescription = await storage.getPrescription(req.params.id);
+      const existingPrescription = await ts(req).getPrescription(req.params.id);
       if (!existingPrescription) {
         return res.status(404).json({ error: "Prescription not found" });
       }
@@ -1412,13 +1423,13 @@ export async function registerRoutes(
       // Inmutabilidad de campos críticos (medicoId y patientId no deben cambiar)
       const { medicoId, patientId, id, ...updateData } = req.body;
 
-      const updatedPrescription = await storage.updatePrescription(req.params.id, updateData);
+      const updatedPrescription = await ts(req).updatePrescription(req.params.id, updateData);
 
       if (!updatedPrescription) {
         return res.status(404).json({ error: "Prescription not found" });
       }
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "actualizar",
         entidad: "prescriptions",
@@ -1440,10 +1451,10 @@ export async function registerRoutes(
     try {
       const fecha = req.query.fecha as string;
       if (fecha) {
-        const appointments = await storage.getAppointmentsByDateWithDetails(fecha);
+        const appointments = await ts(req).getAppointmentsByDateWithDetails(fecha);
         res.json(appointments);
       } else {
-        const appointments = await storage.getAppointmentsWithDetails();
+        const appointments = await ts(req).getAppointmentsWithDetails();
         res.json(appointments);
       }
     } catch (error) {
@@ -1453,8 +1464,8 @@ export async function registerRoutes(
 
   app.get("/api/patients/:patientId/appointments", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const appointments = await storage.getAppointmentsByPatient(req.params.patientId);
-      await storage.createAuditLog({
+      const appointments = await ts(req).getAppointmentsByPatient(req.params.patientId);
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "appointments",
@@ -1474,11 +1485,11 @@ export async function registerRoutes(
     try {
       const parsed = insertAppointmentSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
-      const appointment = await storage.createAppointment(parsed.data);
+      const appointment = await ts(req).createAppointment(parsed.data);
       
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "crear",
         entidad: "appointments",
@@ -1497,7 +1508,7 @@ export async function registerRoutes(
 
   app.patch("/api/appointments/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const existingAppointment = await storage.getAppointment(req.params.id);
+      const existingAppointment = await ts(req).getAppointment(req.params.id);
       if (!existingAppointment) {
         return res.status(404).json({ error: "Appointment not found" });
       }
@@ -1512,19 +1523,19 @@ export async function registerRoutes(
 
       const parsed = insertAppointmentSchema.partial().safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
 
       if (Object.keys(parsed.data).length === 0) {
         return res.status(400).json({ error: "No valid fields to update" });
       }
 
-      const updatedAppointment = await storage.updateAppointment(req.params.id, parsed.data);
+      const updatedAppointment = await ts(req).updateAppointment(req.params.id, parsed.data);
       if (!updatedAppointment) {
         return res.status(404).json({ error: "Appointment not found during update" });
       }
       
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "actualizar",
         entidad: "appointments",
@@ -1595,7 +1606,7 @@ export async function registerRoutes(
   app.get("/api/audit-logs", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 100;
-      const logs = await storage.getAuditLogs(limit);
+      const logs = await ts(req).getAuditLogs(limit);
       res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Error fetching audit logs" });
@@ -1604,7 +1615,7 @@ export async function registerRoutes(
 
   app.get("/api/audit-logs/:entidad/:entidadId", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const logs = await storage.getAuditLogsByEntity(req.params.entidad, req.params.entidadId);
+      const logs = await ts(req).getAuditLogsByEntity(req.params.entidad, req.params.entidadId);
       res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Error fetching audit logs" });
@@ -1620,9 +1631,9 @@ export async function registerRoutes(
       };
       const parsed = insertAuditLogSchema.safeParse(logData);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
-      const log = await storage.createAuditLog(parsed.data);
+      const log = await ts(req).createAuditLog(parsed.data);
       res.status(201).json(log);
     } catch (error) {
       res.status(500).json({ error: "Error creating audit log" });
@@ -1647,7 +1658,7 @@ export async function registerRoutes(
         return res.status(404).json({ error: "CIE-10 code not found" });
       }
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "cie10_catalog",
@@ -1668,7 +1679,7 @@ export async function registerRoutes(
     try {
       const parsed = insertCie10Schema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
       const code = await storage.createCie10Code(parsed.data);
       res.status(201).json(code);
@@ -1680,7 +1691,7 @@ export async function registerRoutes(
   // Patient Consents (Protected - staff access)
   app.get("/api/patients/:patientId/consents", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const consents = await storage.getPatientConsents(req.params.patientId);
+      const consents = await ts(req).getPatientConsents(req.params.patientId);
       res.json(consents);
     } catch (error) {
       res.status(500).json({ error: "Error fetching consents" });
@@ -1696,9 +1707,9 @@ export async function registerRoutes(
       };
       const parsed = insertPatientConsentSchema.safeParse(consentData);
       if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.errors });
+        return res.status(400).json({ error: parsed.error.issues });
       }
-      const consent = await storage.createPatientConsent(parsed.data);
+      const consent = await ts(req).createPatientConsent(parsed.data);
       res.status(201).json(consent);
     } catch (error) {
       res.status(500).json({ error: "Error creating consent" });
@@ -1708,7 +1719,7 @@ export async function registerRoutes(
   // Lab Orders (Protected - staff can read, doctors can write)
   app.get("/api/lab-orders", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const orders = await storage.getLabOrdersWithDetails();
+      const orders = await ts(req).getLabOrdersWithDetails();
       res.json(orders);
     } catch (error) {
       res.status(500).json({ error: "Error fetching lab orders" });
@@ -1717,8 +1728,8 @@ export async function registerRoutes(
 
   app.get("/api/patients/:patientId/lab-orders", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const orders = await storage.getLabOrdersWithDetails(req.params.patientId);
-      await storage.createAuditLog({
+      const orders = await ts(req).getLabOrdersWithDetails(req.params.patientId);
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "lab_orders",
@@ -1736,11 +1747,11 @@ export async function registerRoutes(
 
   app.get("/api/lab-orders/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const order = await storage.getLabOrder(req.params.id);
+      const order = await ts(req).getLabOrder(req.params.id);
       if (!order) {
         return res.status(404).json({ error: "Lab order not found" });
       }
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "lab_orders",
@@ -1758,9 +1769,9 @@ export async function registerRoutes(
 
   app.post("/api/lab-orders", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const order = await storage.createLabOrder({ ...req.body, medicoId: req.session.userId });
+      const order = await ts(req).createLabOrder({ ...req.body, medicoId: req.session.userId });
       
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "crear",
         entidad: "lab_order",
@@ -1779,7 +1790,7 @@ export async function registerRoutes(
 
   app.patch("/api/lab-orders/:id", isAuthenticated, isMedico, async (req, res) => {
     try {
-      const existingOrder = await storage.getLabOrder(req.params.id);
+      const existingOrder = await ts(req).getLabOrder(req.params.id);
       if (!existingOrder) {
         return res.status(404).json({ error: "Lab order not found" });
       }
@@ -1789,12 +1800,12 @@ export async function registerRoutes(
         return res.status(403).json({ error: "No autorizado. Solo el médico que creó la orden puede modificarla." });
       }
 
-      const order = await storage.updateLabOrder(req.params.id, req.body);
+      const order = await ts(req).updateLabOrder(req.params.id, req.body);
       if (!order) {
         return res.status(404).json({ error: "Lab order not found" });
       }
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "actualizar",
         entidad: "lab_order",
@@ -1815,7 +1826,7 @@ export async function registerRoutes(
   async function getNoteCanonicalContent(id: string) {
     const note = await storage.getMedicalNote(id);
     if (!note) return null;
-    
+
     const diagnoses = await storage.getNoteDiagnoses(id);
     
     return JSON.stringify({
@@ -1837,7 +1848,7 @@ export async function registerRoutes(
   app.post("/api/notes/:id/sign", isAuthenticated, isMedico, async (req, res) => {
     try {
       const userId = req.session.userId;
-      const note = await storage.getMedicalNote(req.params.id);
+      const note = await ts(req).getMedicalNote(req.params.id);
       
       if (!note) return res.status(404).json({ error: "Note not found" });
       if (note.medicoId !== userId) return res.status(403).json({ error: "Solo el autor de la nota puede firmarla" });
@@ -1847,9 +1858,9 @@ export async function registerRoutes(
       if (!contentToSign) return res.status(404).json({ error: "Error al reconstruir contenido" });
       
       const hash = createHash("sha256").update(contentToSign).digest("hex");
-      const signedNote = await storage.signMedicalNote(req.params.id, userId!, hash);
+      const signedNote = await ts(req).signMedicalNote(req.params.id, userId!, hash);
       
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: userId!,
         accion: "firmar",
         entidad: "medical_notes",
@@ -1869,7 +1880,7 @@ export async function registerRoutes(
   // Integrity Verification - Admin Only
   app.post("/api/notes/:id/verify", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const note = await storage.getMedicalNote(req.params.id);
+      const note = await ts(req).getMedicalNote(req.params.id);
       if (!note) return res.status(404).json({ error: "Nota no encontrada" });
       if (!note.firmada || !note.firmaHash) {
         return res.status(400).json({ error: "La nota no ha sido firmada aún" });
@@ -1881,7 +1892,7 @@ export async function registerRoutes(
       const currentHash = createHash("sha256").update(currentContent).digest("hex");
       const isIntegrityValid = currentHash === note.firmaHash;
 
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId!,
         accion: "verificar_integridad",
         entidad: "medical_notes",
@@ -1927,7 +1938,7 @@ export async function registerRoutes(
         Object.entries(req.body).filter(([k]) => allowed.includes(k))
       );
       const config = await storage.updateEstablishmentConfig(data);
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId!,
         accion: "actualizar",
         entidad: "establishment_config",
@@ -1972,7 +1983,7 @@ export async function registerRoutes(
       }
       const logoUrl = `/uploads/${req.file.filename}`;
       await storage.updateLogoUrl(logoUrl);
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId!,
         accion: "actualizar_logo",
         entidad: "establishment_config",
@@ -2006,7 +2017,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "El cuerpo debe ser un array de horarios" });
       }
       const updated = await storage.updateClinicHours(hours);
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId!,
         accion: "actualizar_horarios",
         entidad: "establishment_config",
@@ -2039,11 +2050,11 @@ export async function registerRoutes(
   // Patient resource
   app.get("/fhir/Patient/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const patient = await storage.getPatient(req.params.id);
+      const patient = await ts(req).getPatient(req.params.id);
       if (!patient) {
         return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Patient not found" }] });
       }
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "patients",
@@ -2064,7 +2075,7 @@ export async function registerRoutes(
   app.get("/fhir/Patient", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
       const query = (req.query.name || req.query.identifier || "") as string;
-      const patients = query ? await storage.searchPatients(query) : await storage.getPatients();
+      const patients = query ? await ts(req).searchPatients(query) : await ts(req).getPatients();
       const bundle = {
         resourceType: "Bundle",
         type: "searchset",
@@ -2095,15 +2106,15 @@ export async function registerRoutes(
   // Encounter resource (Nota Médica)
   app.get("/fhir/Encounter/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const note = await storage.getMedicalNote(req.params.id);
+      const note = await ts(req).getMedicalNote(req.params.id);
       if (!note) {
         return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Encounter not found" }] });
       }
-      const patient = await storage.getPatient(note.patientId);
+      const patient = await ts(req).getPatient(note.patientId);
       if (!patient) {
         return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Associated patient not found" }] });
       }
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "medical_notes",
@@ -2123,7 +2134,7 @@ export async function registerRoutes(
   // Observation resource (Signos Vitales)
   app.get("/fhir/Observation/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const vitals = await storage.getVitalsById(req.params.id);
+      const vitals = await ts(req).getVitalsById(req.params.id);
       if (!vitals) {
         return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Observation not found" }] });
       }
@@ -2139,7 +2150,7 @@ export async function registerRoutes(
   // MedicationRequest resource (Receta)
   app.get("/fhir/MedicationRequest/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const prescription = await storage.getPrescription(req.params.id);
+      const prescription = await ts(req).getPrescription(req.params.id);
       if (!prescription) {
         return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "MedicationRequest not found" }] });
       }
@@ -2153,7 +2164,7 @@ export async function registerRoutes(
   // ServiceRequest resource (Orden de Laboratorio)
   app.get("/fhir/ServiceRequest/:id", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const order = await storage.getLabOrder(req.params.id);
+      const order = await ts(req).getLabOrder(req.params.id);
       if (!order) {
         return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "ServiceRequest not found" }] });
       }
@@ -2167,7 +2178,7 @@ export async function registerRoutes(
   // Patient $everything — Bundle completo del expediente
   app.get("/fhir/Patient/:id/\\$everything", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const patient = await storage.getPatient(req.params.id);
+      const patient = await ts(req).getPatient(req.params.id);
       if (!patient) {
         return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Patient not found" }] });
       }
@@ -2178,7 +2189,7 @@ export async function registerRoutes(
         storage.getLabOrders(patient.id),
         storage.getPatientConsents(patient.id),
       ]);
-      await storage.createAuditLog({
+      await ts(req).createAuditLog({
         userId: req.session.userId || null,
         accion: "leer",
         entidad: "patients",
@@ -2192,6 +2203,156 @@ export async function registerRoutes(
       res.json(createPatientBundle(patient, notes, vitals, prescriptions, labOrders, consents));
     } catch (error) {
       res.status(500).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "exception", diagnostics: "Internal server error" }] });
+    }
+  });
+
+  // ── Link portal appointment to EHR patient ────────────────────────────────
+  // POST /api/appointments/:id/link-patient
+  // Sets patientId on a portal-sourced appointment, converting it into an EHR appointment.
+
+  app.post("/api/appointments/:id/link-patient", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
+    try {
+      const { patientId } = req.body as { patientId?: string };
+      if (!patientId || typeof patientId !== "string") {
+        return res.status(400).json({ error: "patientId requerido" });
+      }
+
+      const tenantStorage = ts(req);
+      const appointment = await tenantStorage.getAppointment(req.params.id);
+      if (!appointment) return res.status(404).json({ error: "Cita no encontrada" });
+
+      if (appointment.bookingSource !== "portal") {
+        return res.status(400).json({ error: "Solo se pueden vincular citas originadas en el portal" });
+      }
+
+      // Verify patient belongs to the same tenant
+      const patient = await tenantStorage.getPatient(patientId);
+      if (!patient) return res.status(404).json({ error: "Paciente no encontrado" });
+
+      const updated = await tenantStorage.updateAppointment(appointment.id, { patientId });
+      if (!updated) return res.status(500).json({ error: "Error al actualizar la cita" });
+
+      await tenantStorage.createAuditLog({
+        userId: req.session.userId || null,
+        accion: "vincular",
+        entidad: "appointments",
+        entidadId: appointment.id,
+        detalles: JSON.stringify({ patientId, portalName: appointment.patientName }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+
+      res.json(updated);
+    } catch {
+      res.status(500).json({ error: "Error al vincular cita con paciente" });
+    }
+  });
+
+  // ── Contact Messages inbox ────────────────────────────────────────────────
+  // GET    /api/contact-messages              — list all messages for the tenant
+  // PATCH  /api/contact-messages/:id/read    — mark as read
+  // POST   /api/contact-messages/:id/reply   — send reply email and mark replied
+
+  app.get("/api/contact-messages", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const messages = await ts(req).getContactMessages();
+      res.json(messages);
+    } catch {
+      res.status(500).json({ error: "Error al obtener mensajes de contacto" });
+    }
+  });
+
+  app.patch("/api/contact-messages/:id/read", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const tenantStorage = ts(req);
+      await tenantStorage.markContactMessageRead(req.params.id);
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ error: "Error al marcar mensaje como leído" });
+    }
+  });
+
+  app.post("/api/contact-messages/:id/reply", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { replyBody } = req.body as { replyBody?: string };
+      if (!replyBody || typeof replyBody !== "string" || !replyBody.trim()) {
+        return res.status(400).json({ error: "replyBody requerido" });
+      }
+      const tenantStorage = ts(req);
+      const messages = await tenantStorage.getContactMessages();
+      const msg = messages.find((m) => m.id === req.params.id);
+      if (!msg) return res.status(404).json({ error: "Mensaje no encontrado" });
+
+      const ps = await tenantStorage.getPortalSettings();
+      if (ps) {
+        const { sendContactReply } = await import("./mailer");
+        await sendContactReply({ name: msg.name, email: msg.email, subject: msg.subject }, replyBody.trim(), ps);
+      }
+
+      await tenantStorage.markContactMessageRead(msg.id, true);
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ error: "Error al enviar respuesta" });
+    }
+  });
+
+  // ── Portal Settings — admin CRUD ─────────────────────────────────────────
+  // GET    /api/portal-settings         — get settings for the current tenant
+  // PATCH  /api/portal-settings         — update settings (partial)
+  // DELETE /api/portal-settings/gemini-key — remove encrypted Gemini API key
+
+  app.get("/api/portal-settings", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const settings = await ts(req).getPortalSettings();
+      if (!settings) return res.status(404).json({ error: "Configuración de portal no encontrada" });
+      // Never expose the encrypted key to the client
+      const { geminiApiKeyEncrypted, ...safe } = settings;
+      res.json({ ...safe, hasGeminiKey: !!geminiApiKeyEncrypted });
+    } catch {
+      res.status(500).json({ error: "Error al obtener configuración del portal" });
+    }
+  });
+
+  app.patch("/api/portal-settings", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const body = req.body as Record<string, unknown>;
+
+      // Prevent clients from directly setting the encrypted column
+      delete body.geminiApiKeyEncrypted;
+      // Gemini key changes go through PUT /api/portal-settings/gemini-key
+      delete body.geminiApiKey;
+
+      const updated = await ts(req).updatePortalSettings(body as any);
+      if (!updated) return res.status(404).json({ error: "Configuración no encontrada" });
+
+      const { geminiApiKeyEncrypted, ...safe } = updated;
+      res.json({ ...safe, hasGeminiKey: !!geminiApiKeyEncrypted });
+    } catch {
+      res.status(500).json({ error: "Error al actualizar configuración del portal" });
+    }
+  });
+
+  // Separate endpoint so the client can store a new Gemini key without exposing the old one
+  app.put("/api/portal-settings/gemini-key", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { apiKey } = req.body as { apiKey?: string };
+      if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
+        return res.status(400).json({ error: "apiKey requerido" });
+      }
+      await ts(req).updatePortalSettings({ geminiApiKeyEncrypted: encrypt(apiKey.trim()) } as any);
+      res.json({ message: "Clave de Gemini actualizada correctamente", hasGeminiKey: true });
+    } catch {
+      res.status(500).json({ error: "Error al actualizar la clave de Gemini" });
+    }
+  });
+
+  app.delete("/api/portal-settings/gemini-key", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await ts(req).updatePortalSettings({ geminiApiKeyEncrypted: null } as any);
+      res.json({ message: "Clave de Gemini eliminada", hasGeminiKey: false });
+    } catch {
+      res.status(500).json({ error: "Error al eliminar la clave de Gemini" });
     }
   });
 

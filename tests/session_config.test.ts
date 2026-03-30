@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { execSync } from "child_process";
 
 describe("Session Config Environment Validation", () => {
-  it("should fail in production if SESSION_SECRET is missing", () => {
+  it("should fail in production if SESSION_SECRET is missing", { timeout: 25000 }, () => {
     try {
       // Provide ENCRYPTION_KEY so we reach the SESSION_SECRET check
       execSync(

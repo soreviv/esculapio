@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppointmentCard } from "@/components/ehr/AppointmentCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -14,17 +15,56 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { Plus, ChevronLeft, ChevronRight, Link2, Globe } from "lucide-react";
 import { type AppointmentWithDetails } from "@shared/schema";
+import type { Patient } from "@shared/schema";
 
 export default function Citas() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [viewFilter, setViewFilter] = useState("todas");
+  const [linkingAppt, setLinkingAppt] = useState<AppointmentWithDetails | null>(null);
+  const [patientSearch, setPatientSearch] = useState("");
 
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery<AppointmentWithDetails[]>({
     queryKey: ["/api/appointments"],
   });
+
+  const { data: patients = [] } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+    enabled: !!linkingAppt,
+  });
+
+  const linkMutation = useMutation({
+    mutationFn: ({ apptId, patientId }: { apptId: string; patientId: string }) =>
+      apiRequest("POST", `/api/appointments/${apptId}/link-patient`, { patientId }),
+    onSuccess: () => {
+      toast({ title: "Cita vinculada al paciente correctamente" });
+      setLinkingAppt(null);
+      void queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+    },
+    onError: () => toast({ title: "Error al vincular la cita", variant: "destructive" }),
+  });
+
+  const filteredPatients = patients.filter((p) => {
+    const q = patientSearch.toLowerCase();
+    return (
+      p.nombre.toLowerCase().includes(q) ||
+      p.apellidoPaterno.toLowerCase().includes(q) ||
+      (p.curp ?? "").toLowerCase().includes(q)
+    );
+  }).slice(0, 10);
 
   const selectedDateStr = date?.toISOString().split('T')[0] || "";
   
@@ -163,19 +203,43 @@ export default function Citas() {
                   <Skeleton key={i} className="h-[80px] rounded-lg" />
                 ))
               ) : filteredAppointments.length > 0 ? (
-                filteredAppointments.map((apt) => (
-                  <AppointmentCard
-                    key={apt.id}
-                    id={apt.id}
-                    pacienteNombre={`${apt.patientNombre} ${apt.patientApellido}`}
-                    hora={apt.hora}
-                    duracion={apt.duracion}
-                    motivo={apt.motivo || undefined}
-                    status={apt.status as "pendiente" | "en_curso" | "completada" | "no_asistio"}
-                    onStartConsult={() => setLocation(`/pacientes/${apt.patientId}`)}
-                    onViewPatient={() => setLocation(`/pacientes/${apt.patientId}`)}
-                  />
-                ))
+                filteredAppointments.map((apt) => {
+                  const isPortal = apt.bookingSource === "portal" && !apt.patientId;
+                  const displayName = isPortal
+                    ? (apt.patientName ?? "Paciente del portal")
+                    : `${apt.patientNombre ?? ""} ${apt.patientApellido ?? ""}`.trim();
+                  return (
+                    <div key={apt.id} className="relative">
+                      <AppointmentCard
+                        id={apt.id}
+                        pacienteNombre={displayName}
+                        hora={apt.hora}
+                        duracion={apt.duracion}
+                        motivo={apt.motivo || undefined}
+                        status={apt.status as "pendiente" | "en_curso" | "completada" | "no_asistio"}
+                        onStartConsult={isPortal ? undefined : () => setLocation(`/pacientes/${apt.patientId}`)}
+                        onViewPatient={isPortal ? undefined : () => setLocation(`/pacientes/${apt.patientId}`)}
+                      />
+                      {isPortal && (
+                        <div className="absolute top-2 right-2 flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs gap-1">
+                            <Globe className="h-3 w-3" />
+                            Portal
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1"
+                            onClick={() => { setLinkingAppt(apt); setPatientSearch(""); }}
+                          >
+                            <Link2 className="h-3 w-3" />
+                            Vincular paciente
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               ) : (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">No hay citas para mostrar</p>
@@ -185,6 +249,46 @@ export default function Citas() {
           </Card>
         </div>
       </div>
+      {/* Link portal appointment to EHR patient */}
+      <Dialog open={!!linkingAppt} onOpenChange={(open) => !open && setLinkingAppt(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Vincular cita a paciente EHR</DialogTitle>
+            <DialogDescription>
+              Cita del portal: <strong>{linkingAppt?.patientName}</strong>
+              {linkingAppt?.fecha && ` — ${linkingAppt.fecha} ${linkingAppt.hora}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="Buscar por nombre o CURP…"
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+              autoFocus
+            />
+            <ul className="divide-y border rounded-md max-h-64 overflow-auto">
+              {filteredPatients.length === 0 ? (
+                <li className="p-3 text-sm text-muted-foreground text-center">
+                  {patientSearch ? "Sin resultados" : "Escriba para buscar"}
+                </li>
+              ) : (
+                filteredPatients.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      className="w-full text-left px-3 py-2 hover:bg-muted/60 text-sm"
+                      onClick={() => linkMutation.mutate({ apptId: linkingAppt!.id, patientId: p.id })}
+                      disabled={linkMutation.isPending}
+                    >
+                      <span className="font-medium">{p.nombre} {p.apellidoPaterno}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{p.curp}</span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

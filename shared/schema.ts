@@ -1,11 +1,28 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, real, date, time, index, uuid, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, real, date, time, index, uuid, jsonb, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Users (doctors, nurses, admin)
+// ─── Multi-tenancy ────────────────────────────────────────────────────────────
+
+export const tenants = pgTable("tenants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),          // URL identifier: "viveros", "clinica-xyz"
+  nombre: text("nombre").notNull(),               // "Consultorio Dr. Viveros"
+  plan: text("plan").notNull().default("basic"),  // "basic" | "pro" | "enterprise"
+  activo: boolean("activo").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_tenants_slug").on(table.slug),
+]);
+
+// ─── Users (doctors, nurses, admin) ──────────────────────────────────────────
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+  isTenantOwner: boolean("is_tenant_owner").notNull().default(false),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("medico"), // medico, enfermera, admin
@@ -19,7 +36,9 @@ export const users = pgTable("users", {
   totpEnabled: boolean("totp_enabled").notNull().default(false),
   email: text("email"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_users_tenant_id").on(table.tenantId),
+]);
 
 // Password Reset Tokens
 export const passwordResetTokens = pgTable("password_reset_tokens", {
@@ -37,6 +56,7 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
 // Patients (NOM-004-SSA3-2012 compliant)
 export const patients = pgTable("patients", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   numeroExpediente: text("numero_expediente").notNull().unique(), // NOM-004: Número de expediente obligatorio
   nombre: text("nombre").notNull(),
   apellidoPaterno: text("apellido_paterno").notNull(),
@@ -61,9 +81,10 @@ export const patients = pgTable("patients", {
   alergias: text("alergias").array(),
   contactoEmergencia: text("contacto_emergencia"), // SENSITIVE
   telefonoEmergencia: text("telefono_emergencia"), // SENSITIVE
-  status: text("status").notNull().default("activo"), 
+  status: text("status").notNull().default("activo"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
+  index("idx_patients_tenant_id").on(table.tenantId),
   index("idx_patients_nombre").on(table.nombre),
   index("idx_patients_apellido_paterno").on(table.apellidoPaterno),
   index("idx_patients_status").on(table.status),
@@ -72,6 +93,7 @@ export const patients = pgTable("patients", {
 // Medical Notes (NOM-004-SSA3-2012 compliant)
 export const medicalNotes = pgTable("medical_notes", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   patientId: uuid("patient_id").notNull().references(() => patients.id),
   medicoId: uuid("medico_id").notNull().references(() => users.id),
   tipo: text("tipo").notNull(), 
@@ -105,14 +127,16 @@ export const medicalNotes = pgTable("medical_notes", {
   fechaFirma: timestamp("fecha_firma"), 
   firmaUserId: uuid("firma_user_id").references(() => users.id), 
   createdAt: timestamp("created_at").defaultNow(),
-}, (table) => ({
-  patientIdIdx: index("medical_notes_patient_id_idx").on(table.patientId),
-  fechaIdx: index("idx_medical_notes_fecha").on(table.fecha.desc()),
-}));
+}, (table) => [
+  index("idx_medical_notes_tenant_id").on(table.tenantId),
+  index("medical_notes_patient_id_idx").on(table.patientId),
+  index("idx_medical_notes_fecha").on(table.fecha.desc()),
+]);
 
 // Medical Note Addendums (Anexos - NOM-024 Requirement)
 export const medicalNoteAddendums = pgTable("medical_note_addendums", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   originalNoteId: uuid("original_note_id").notNull().references(() => medicalNotes.id),
   medicoId: uuid("medico_id").notNull().references(() => users.id),
   contenido: text("contenido").notNull(),
@@ -132,6 +156,7 @@ export const cie10Catalog = pgTable("cie10_catalog", {
 // Junction table for Medical Note Diagnoses (Relational approach for CIE-10)
 export const medicalNoteDiagnoses = pgTable("medical_note_diagnoses", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   noteId: uuid("note_id").notNull().references(() => medicalNotes.id),
   cie10Codigo: varchar("cie10_codigo").notNull().references(() => cie10Catalog.codigo),
   tipoDiagnostico: text("tipo_diagnostico").default("presuntivo"), // presuntivo, definitivo
@@ -141,6 +166,7 @@ export const medicalNoteDiagnoses = pgTable("medical_note_diagnoses", {
 // Vitals
 export const vitals = pgTable("vitals", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   patientId: uuid("patient_id").notNull().references(() => patients.id),
   registradoPorId: uuid("registrado_por_id").references(() => users.id),
   fecha: timestamp("fecha").notNull().defaultNow(),
@@ -154,14 +180,16 @@ export const vitals = pgTable("vitals", {
   talla: integer("talla"),
   glucosa: integer("glucosa"),
   createdAt: timestamp("created_at").defaultNow(),
-}, (table) => ({
-  patientIdIdx: index("vitals_patient_id_idx").on(table.patientId),
-  fechaIdx: index("idx_vitals_fecha").on(table.fecha.desc()),
-}));
+}, (table) => [
+  index("idx_vitals_tenant_id").on(table.tenantId),
+  index("vitals_patient_id_idx").on(table.patientId),
+  index("idx_vitals_fecha").on(table.fecha.desc()),
+]);
 
 // Prescriptions
 export const prescriptions = pgTable("prescriptions", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   recetaId: uuid("receta_id"),                         // groups multiple meds under one receta
   patientId: uuid("patient_id").notNull().references(() => patients.id),
   medicoId: uuid("medico_id").notNull().references(() => users.id),
@@ -175,14 +203,16 @@ export const prescriptions = pgTable("prescriptions", {
   instruccionesGenerales: text("instrucciones_generales"), // shared instructions for the whole receta
   status: text("status").notNull().default("activa"),
   createdAt: timestamp("created_at").defaultNow(),
-}, (table) => ({
-  patientIdIdx: index("prescriptions_patient_id_idx").on(table.patientId),
-  recetaIdIdx: index("prescriptions_receta_id_idx").on(table.recetaId),
-}));
+}, (table) => [
+  index("idx_prescriptions_tenant_id").on(table.tenantId),
+  index("prescriptions_patient_id_idx").on(table.patientId),
+  index("prescriptions_receta_id_idx").on(table.recetaId),
+]);
 
 // Audit Logs
 export const auditLogs = pgTable("audit_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   userId: uuid("user_id").references(() => users.id),
   accion: text("accion").notNull(), 
   entidad: text("entidad").notNull(), 
@@ -191,13 +221,15 @@ export const auditLogs = pgTable("audit_logs", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   fecha: timestamp("fecha").notNull().defaultNow(),
-}, (table) => ({
-  fechaIdx: index("idx_audit_logs_fecha").on(table.fecha.desc()),
-}));
+}, (table) => [
+  index("idx_audit_logs_tenant_id").on(table.tenantId),
+  index("idx_audit_logs_fecha").on(table.fecha.desc()),
+]);
 
 // Patient Consent Records
 export const patientConsents = pgTable("patient_consents", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   patientId: uuid("patient_id").notNull().references(() => patients.id),
   medicoId: uuid("medico_id").references(() => users.id),
   tipoConsentimiento: text("tipo_consentimiento").notNull(), 
@@ -216,28 +248,44 @@ export const patientConsents = pgTable("patient_consents", {
   lugarFirma: text("lugar_firma"), 
   ipAddress: text("ip_address"),
   createdAt: timestamp("created_at").defaultNow(),
-}, (table) => ({
-  patientIdIdx: index("patient_consents_patient_id_idx").on(table.patientId),
-}));
+}, (table) => [
+  index("idx_patient_consents_tenant_id").on(table.tenantId),
+  index("patient_consents_patient_id_idx").on(table.patientId),
+]);
 
-// Appointments
+// Appointments (unified: EHR internal + public portal bookings)
 export const appointments = pgTable("appointments", {
   id: uuid("id").primaryKey().defaultRandom(),
-  patientId: uuid("patient_id").notNull().references(() => patients.id),
-  medicoId: uuid("medico_id").notNull().references(() => users.id),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+  // EHR fields (internal bookings)
+  patientId: uuid("patient_id").references(() => patients.id), // nullable: portal bookings have no patient record yet
+  medicoId: uuid("medico_id").references(() => users.id),
   fecha: date("fecha").notNull(),
   hora: time("hora").notNull(),
   duracion: text("duracion").notNull().default("30 min"),
   motivo: text("motivo"),
-  status: text("status").notNull().default("pendiente"), 
+  status: text("status").notNull().default("pendiente"), // pendiente | confirmada | cancelada | completada | portal_pendiente
+  // Portal fields (public bookings)
+  bookingSource: text("booking_source").notNull().default("internal"), // "internal" | "portal"
+  patientName: text("patient_name"),    // portal: free-text name
+  patientPhone: text("patient_phone"),  // portal: free-text phone
+  patientEmail: text("patient_email"),  // portal: free-text email
+  appointmentType: text("appointment_type"), // portal: "primera_vez" | "subsecuente" | "urgencia"
+  actionToken: uuid("action_token").defaultRandom(), // portal: token for confirm/cancel email links
+  patientConfirmed: boolean("patient_confirmed").notNull().default(false),
+  reminderSent: boolean("reminder_sent").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
-}, (table) => ({
-  patientIdIdx: index("appointments_patient_id_idx").on(table.patientId),
-}));
+}, (table) => [
+  index("idx_appointments_tenant_id").on(table.tenantId),
+  index("appointments_patient_id_idx").on(table.patientId),
+  index("idx_appointments_tenant_fecha").on(table.tenantId, table.fecha),
+  index("idx_appointments_action_token").on(table.actionToken),
+]);
 
 // Lab Orders
 export const labOrders = pgTable("lab_orders", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   patientId: uuid("patient_id").notNull().references(() => patients.id),
   medicoId: uuid("medico_id").notNull().references(() => users.id),
   estudios: text("estudios").array().notNull(), 
@@ -249,13 +297,15 @@ export const labOrders = pgTable("lab_orders", {
   resultados: text("resultados"),
   fechaResultados: timestamp("fecha_resultados"),
   createdAt: timestamp("created_at").defaultNow(),
-}, (table) => ({
-  patientIdIdx: index("lab_orders_patient_id_idx").on(table.patientId),
-}));
+}, (table) => [
+  index("idx_lab_orders_tenant_id").on(table.tenantId),
+  index("lab_orders_patient_id_idx").on(table.patientId),
+]);
 
 // Nursing Notes
 export const nursingNotes = pgTable("nursing_notes", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   patientId: uuid("patient_id").notNull().references(() => patients.id),
   enfermeraId: uuid("enfermera_id").notNull().references(() => users.id),
   fecha: timestamp("fecha").notNull().defaultNow(),
@@ -268,23 +318,24 @@ export const nursingNotes = pgTable("nursing_notes", {
   firmada: boolean("firmada").notNull().default(false),
   fechaFirma: timestamp("fecha_firma"),
   createdAt: timestamp("created_at").defaultNow(),
-}, (table) => ({
-  patientIdIdx: index("nursing_notes_patient_id_idx").on(table.patientId),
-  fechaIdx: index("idx_nursing_notes_fecha").on(table.fecha.desc()),
-}));
+}, (table) => [
+  index("idx_nursing_notes_tenant_id").on(table.tenantId),
+  index("nursing_notes_patient_id_idx").on(table.patientId),
+  index("idx_nursing_notes_fecha").on(table.fecha.desc()),
+]);
 
-// Establishment Configuration
+// Establishment Configuration (legacy — kept for compatibility during migration)
 export const establishmentConfig = pgTable("establishment_config", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tipoEstablecimiento: text("tipo_establecimiento").notNull(), 
+  tipoEstablecimiento: text("tipo_establecimiento").notNull(),
   nombreEstablecimiento: text("nombre_establecimiento").notNull(),
   domicilio: text("domicilio").notNull(),
   ciudad: text("ciudad").notNull(),
   estado: text("estado").notNull(),
   codigoPostal: text("codigo_postal"),
   telefono: text("telefono"),
-  nombreInstitucion: text("nombre_institucion"), 
-  razonSocial: text("razon_social"), 
+  nombreInstitucion: text("nombre_institucion"),
+  razonSocial: text("razon_social"),
   rfc: text("rfc"),
   licenciaSanitaria: text("licencia_sanitaria"),
   responsableSanitario: text("responsable_sanitario"),
@@ -296,7 +347,64 @@ export const establishmentConfig = pgTable("establishment_config", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Portal Settings (replaces establishment_config — one row per tenant)
+// Unifies EHR branding + public portal configuration
+export const portalSettings = pgTable("portal_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().unique().references(() => tenants.id, { onDelete: "cascade" }),
+  // Clinic identity (from establishment_config)
+  tipoEstablecimiento: text("tipo_establecimiento").notNull().default("Consultorio"),
+  nombreEstablecimiento: text("nombre_establecimiento").notNull().default(""),
+  domicilio: text("domicilio").notNull().default(""),
+  ciudad: text("ciudad").notNull().default(""),
+  estado: text("estado").notNull().default(""),
+  codigoPostal: text("codigo_postal"),
+  telefono: text("telefono"),
+  nombreInstitucion: text("nombre_institucion"),
+  razonSocial: text("razon_social"),
+  rfc: text("rfc"),
+  licenciaSanitaria: text("licencia_sanitaria"),
+  responsableSanitario: text("responsable_sanitario"),
+  cedulaResponsable: text("cedula_responsable"),
+  logoUrl: text("logo_url"),
+  // Portal-specific settings
+  portalEnabled: boolean("portal_enabled").notNull().default(false),
+  portalTitle: text("portal_title"),
+  portalTagline: text("portal_tagline"),
+  consultationFee: numeric("consultation_fee", { precision: 10, scale: 2 }),
+  appointmentDurationMin: integer("appointment_duration_min").notNull().default(30),
+  bookingAdvanceDays: integer("booking_advance_days").notNull().default(30),
+  bookingBufferMin: integer("booking_buffer_min").notNull().default(0),
+  horarios: jsonb("horarios").$type<ClinicHoursDay[]>(),
+  diasFeriados: jsonb("dias_feriados").$type<string[]>(), // ISO date strings
+  notificationEmail: text("notification_email"),
+  geminiApiKeyEncrypted: text("gemini_api_key_encrypted"),
+  hcaptchaSiteKey: text("hcaptcha_site_key"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Contact Messages (from public portal contact form)
+export const contactMessages = pgTable("contact_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  read: boolean("read").notNull().default(false),
+  repliedAt: timestamp("replied_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_contact_messages_tenant_id").on(table.tenantId),
+  index("idx_contact_messages_tenant_read").on(table.tenantId, table.read),
+]);
+
 // Insert schemas and types
+export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPortalSettingsSchema = createInsertSchema(portalSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertContactMessageSchema = createInsertSchema(contactMessages).omit({ id: true, createdAt: true, repliedAt: true, read: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPatientSchema = createInsertSchema(patients).omit({ id: true, createdAt: true });
 export const insertMedicalNoteSchema = createInsertSchema(medicalNotes)
@@ -345,6 +453,12 @@ export type InsertEstablishmentConfig = z.infer<typeof insertEstablishmentConfig
 export type EstablishmentConfig = typeof establishmentConfig.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertTenant = z.infer<typeof insertTenantSchema>;
+export type Tenant = typeof tenants.$inferSelect;
+export type InsertPortalSettings = z.infer<typeof insertPortalSettingsSchema>;
+export type PortalSettings = typeof portalSettings.$inferSelect;
+export type InsertContactMessage = z.infer<typeof insertContactMessageSchema>;
+export type ContactMessage = typeof contactMessages.$inferSelect;
 
 export interface ClinicHoursDay {
   dia: string;
@@ -365,9 +479,9 @@ export const DEFAULT_CLINIC_HOURS: ClinicHoursDay[] = [
 
 // Enriched types with joined data
 export type AppointmentWithDetails = Appointment & {
-  patientNombre: string;
-  patientApellido: string;
-  medicoNombre: string;
+  patientNombre: string | null;  // null for portal bookings without linked patient
+  patientApellido: string | null;
+  medicoNombre: string | null;
   medicoEspecialidad?: string | null;
 };
 

@@ -23,6 +23,7 @@ const SignosVitales = lazy(() => import("@/pages/SignosVitales"));
 const AvisoPrivacidad = lazy(() => import("@/pages/AvisoPrivacidad"));
 const Ayuda = lazy(() => import("@/pages/Ayuda"));
 const Configuracion = lazy(() => import("@/pages/Configuracion"));
+const MensajesContacto = lazy(() => import("@/pages/MensajesContacto"));
 const Login = lazy(() => import("@/pages/Login"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -59,6 +60,7 @@ function Router() {
         <Route path="/aviso-privacidad" component={AvisoPrivacidad} />
         <Route path="/ayuda" component={Ayuda} />
         <Route path="/configuracion" component={Configuracion} />
+        <Route path="/mensajes-contacto" component={MensajesContacto} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

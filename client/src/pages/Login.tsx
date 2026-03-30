@@ -313,7 +313,7 @@ export default function Login({ onLogin }: LoginProps) {
                 <div className="text-center">
                   <Button
                     type="button"
-                    variant="link"
+                    variant="ghost"
                     className="text-sm text-muted-foreground hover:text-primary p-0 h-auto"
                     onClick={() => {
                       setRecoveryUsername("");

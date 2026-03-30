@@ -24,6 +24,7 @@ import {
   Activity,
   Building2,
   Shield,
+  Inbox,
 } from "lucide-react";
 
 const menuItems = [
@@ -72,6 +73,12 @@ const systemItems = [
     title: "Configuración",
     url: "/configuracion",
     icon: Settings,
+  },
+  {
+    title: "Mensajes del Portal",
+    url: "/mensajes-contacto",
+    icon: Inbox,
+    adminOnly: true,
   },
   {
     title: "Aviso de Privacidad",
@@ -155,20 +162,22 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarGroupLabel>Sistema</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {systemItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url}
-                    data-testid={`nav-${item.title.toLowerCase()}`}
-                  >
-                    <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {systemItems
+                .filter((item) => !("adminOnly" in item && item.adminOnly) || user.role === "admin")
+                .map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === item.url}
+                      data-testid={`nav-${item.title.toLowerCase()}`}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

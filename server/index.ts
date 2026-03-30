@@ -10,6 +10,8 @@ import compression from "compression";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./swagger";
 import { registerRoutes } from "./routes";
+import { registerPortalRoutes } from "./portal-routes";
+import { resolveTenant } from "./tenant";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import "./auth";
@@ -180,7 +182,12 @@ app.use((req, res, next) => {
       throw new Error("DATABASE_URL environment variable is required");
     }
 
+    // Tenant resolution — populates req.tenantId / req.tenantSlug
+    // Must run after session middleware so session fallback works
+    app.use(resolveTenant);
+
     log("Registering routes...");
+    registerPortalRoutes(app);
     await registerRoutes(httpServer, app);
 
     // Error handling middleware
