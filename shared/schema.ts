@@ -380,6 +380,8 @@ export const portalSettings = pgTable("portal_settings", {
   notificationEmail: text("notification_email"),
   geminiApiKeyEncrypted: text("gemini_api_key_encrypted"),
   hcaptchaSiteKey: text("hcaptcha_site_key"),
+  hcaptchaSecretKey: text("hcaptcha_secret_key"),  // server-side verification
+  chatbotInfoExtra: text("chatbot_info_extra"),     // additional info for Gemini system prompt
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -23,6 +23,7 @@ import {
   sendAppointmentConfirmationToPatient,
   sendAppointmentNotificationToDoctor,
   sendAppointmentCancellation,
+  sendAppointmentReschedule,
   sendContactNotification,
 } from "./mailer";
 import type { PortalSettings, ClinicHoursDay } from "@shared/schema";
@@ -74,8 +75,11 @@ function generateSlots(inicio: string, fin: string, slotMin: number, bufferMin: 
 
 /** Strip sensitive fields before returning portal_settings to public clients */
 function publicPortalInfo(ps: PortalSettings) {
-  const { geminiApiKeyEncrypted, hcaptchaSiteKey, ...rest } = ps;
-  return { ...rest, hcaptchaSiteKey }; // include hcaptchaSiteKey (public), not the encrypted API key
+  const { geminiApiKeyEncrypted, hcaptchaSecretKey, ...rest } = ps;
+  return {
+    ...rest,
+    chatEnabled: !!geminiApiKeyEncrypted, // expose boolean, not the encrypted key
+  };
 }
 
 /** Resolves tenantId or returns 404 */
@@ -207,7 +211,7 @@ export function registerPortalRoutes(app: Express): void {
     patientEmail:    z.string().email(),
     fecha:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     hora:            z.string().regex(/^\d{2}:\d{2}$/),
-    appointmentType: z.enum(["primera_vez", "subsecuente", "urgencia"]),
+    appointmentType: z.enum(["primera_vez", "subsecuente", "urgencia", "lavado_oidos"]),
     motivo:          z.string().max(500).optional(),
   });
 
@@ -421,6 +425,7 @@ export function registerPortalRoutes(app: Express): void {
         ps.domicilio ? `El consultorio está ubicado en: ${ps.domicilio}, ${ps.ciudad ?? ""}.` : "",
         ps.telefono  ? `Teléfono: ${ps.telefono}.` : "",
         ps.consultationFee ? `El costo de consulta es $${ps.consultationFee} MXN.` : "",
+        ps.chatbotInfoExtra ? ps.chatbotInfoExtra : "",
         "Responde únicamente preguntas relacionadas con el consultorio, servicios, horarios y citas.",
         "Si el paciente necesita una cita, indícale que puede agendarla desde el portal.",
         "No des diagnósticos médicos ni consejos de tratamiento.",
@@ -442,6 +447,150 @@ export function registerPortalRoutes(app: Express): void {
       res.json({ reply });
     } catch {
       res.status(500).json({ error: "Error al procesar la solicitud del chatbot" });
+    }
+  });
+
+  // ── GET /p/:slug/api/appointments/by-token/:token ─────────────────────────
+  // Returns public appointment info by action token (for cancel/reschedule pages)
+
+  app.get("/p/:slug/api/appointments/by-token/:token", async (req: Request, res: Response) => {
+    try {
+      const tenantId = requirePortalTenant(req, res);
+      if (!tenantId) return;
+
+      const ts = createTenantStorage(tenantId);
+      const ps = await ts.getPortalSettings();
+      if (!requirePortalEnabled(ps, res)) return;
+
+      const appt = await ts.getAppointmentByActionToken(req.params.token);
+      if (!appt) return res.status(404).json({ error: "Cita no encontrada o token inválido" });
+
+      // Return only public fields — no medical details
+      res.json({
+        id:               appt.id,
+        patientName:      appt.patientName,
+        fecha:            appt.fecha,
+        hora:             appt.hora,
+        appointmentType:  appt.appointmentType,
+        status:           appt.status,
+        patientConfirmed: appt.patientConfirmed,
+      });
+    } catch {
+      res.status(500).json({ error: "Error interno del servidor" });
+    }
+  });
+
+  // ── POST /p/:slug/api/appointments/reschedule/:token ──────────────────────
+  // Cancel existing appointment and create a new one with the same patient info
+
+  const rescheduleSchema = z.object({
+    fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    hora:  z.string().regex(/^\d{2}:\d{2}$/),
+  });
+
+  app.post("/p/:slug/api/appointments/reschedule/:token", bookingLimiter, async (req: Request, res: Response) => {
+    try {
+      const tenantId = requirePortalTenant(req, res);
+      if (!tenantId) return;
+
+      const parsed = rescheduleSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Datos inválidos", detalles: parsed.error.flatten() });
+      }
+      const { fecha, hora } = parsed.data;
+
+      const ts = createTenantStorage(tenantId);
+      const ps = await ts.getPortalSettings();
+      if (!requirePortalEnabled(ps, res)) return;
+
+      const appt = await ts.getAppointmentByActionToken(req.params.token);
+      if (!appt) return res.status(404).json({ error: "Cita no encontrada o token inválido" });
+      if (appt.status === "cancelada") {
+        return res.status(409).json({ error: "No se puede reagendar una cita cancelada" });
+      }
+
+      // Check new slot is available (excluding current appointment)
+      const booked = await ts.getAppointmentsByDate(fecha);
+      const conflict = booked.find((a) => a.hora?.substring(0, 5) === hora && a.id !== appt.id);
+      if (conflict) {
+        return res.status(409).json({ error: "El horario seleccionado no está disponible" });
+      }
+
+      // Cancel old, create new with same patient info
+      await ts.updateAppointment(appt.id, { status: "cancelada" });
+
+      const newAppt = await ts.createAppointment({
+        tenantId,
+        bookingSource:    "portal",
+        patientName:      appt.patientName,
+        patientPhone:     appt.patientPhone,
+        patientEmail:     appt.patientEmail,
+        fecha,
+        hora,
+        appointmentType:  appt.appointmentType,
+        motivo:           appt.motivo,
+        status:           "programada",
+        patientConfirmed: false,
+        reminderSent:     false,
+      } as any);
+
+      // Send reschedule confirmation email (fire-and-forget)
+      const tenantSlug = (req as any).tenantSlug as string ?? req.params.slug;
+      if (appt.patientEmail && newAppt.actionToken) {
+        sendAppointmentReschedule(
+          {
+            patientName:     appt.patientName ?? "Paciente",
+            patientEmail:    appt.patientEmail,
+            fecha,
+            hora,
+            appointmentType: appt.appointmentType ?? "primera_vez",
+            actionToken:     newAppt.actionToken,
+            tenantSlug,
+          },
+          ps,
+        ).catch(() => {});
+      }
+
+      res.status(201).json({
+        id:      newAppt.id,
+        fecha:   newAppt.fecha,
+        hora:    newAppt.hora,
+        message: "Cita reagendada exitosamente. Recibirá un correo de confirmación.",
+      });
+    } catch {
+      res.status(500).json({ error: "Error interno del servidor" });
+    }
+  });
+
+  // ── POST /p/:slug/api/appointments/confirm-attendance/:token ─────────────
+  // Patient confirms they will attend (idempotent)
+
+  app.post("/p/:slug/api/appointments/confirm-attendance/:token", async (req: Request, res: Response) => {
+    try {
+      const tenantId = requirePortalTenant(req, res);
+      if (!tenantId) return;
+
+      const ts = createTenantStorage(tenantId);
+      const ps = await ts.getPortalSettings();
+      if (!requirePortalEnabled(ps, res)) return;
+
+      const appt = await ts.getAppointmentByActionToken(req.params.token);
+      if (!appt) return res.status(404).json({ error: "Cita no encontrada o token inválido" });
+      if (appt.status === "cancelada") return res.status(409).json({ error: "Esta cita ya fue cancelada" });
+
+      const alreadyConfirmed = appt.patientConfirmed;
+      if (!alreadyConfirmed) {
+        await ts.updateAppointment(appt.id, { patientConfirmed: true });
+      }
+
+      res.json({
+        success:          true,
+        alreadyConfirmed,
+        fecha:            appt.fecha,
+        hora:             appt.hora,
+      });
+    } catch {
+      res.status(500).json({ error: "Error interno del servidor" });
     }
   });
 }

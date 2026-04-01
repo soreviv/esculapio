@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
+const PortalRouter = lazy(() => import("@/pages/portal/PortalRouter"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Pacientes = lazy(() => import("@/pages/Pacientes"));
 const PatientDetail = lazy(() => import("@/pages/PatientDetail"));
@@ -121,6 +122,15 @@ function AuthenticatedApp({ user, onLogout }: { user: AuthUser; onLogout: () => 
 }
 
 function AppContent() {
+  // Public portal routes — no authentication required
+  if (window.location.pathname.startsWith("/p/")) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <PortalRouter />
+      </Suspense>
+    );
+  }
+
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 

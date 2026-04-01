@@ -288,6 +288,49 @@ export async function sendContactNotification(
   });
 }
 
+// ─── Portal: appointment reschedule confirmation to patient ───────────────────
+
+export async function sendAppointmentReschedule(
+  data: AppointmentEmailData,
+  ps: PortalSettings,
+): Promise<void> {
+  if (process.env.NODE_ENV === "test") return;
+
+  const base = portalBaseUrl(data.tenantSlug);
+  const confirmUrl = `${base}/cita/confirmar?token=${data.actionToken}`;
+  const cancelUrl  = `${base}/cita/cancelar?token=${data.actionToken}`;
+  const typeLabel  = APPOINTMENT_TYPE_LABEL[data.appointmentType] ?? data.appointmentType;
+  const dateFormatted = new Date(data.fecha + "T00:00:00").toLocaleDateString("es-MX", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+
+  const content = `
+    <p>Estimado/a <strong>${data.patientName}</strong>,</p>
+    <p>Su cita ha sido <strong>reagendada</strong> exitosamente. Los nuevos detalles son:</p>
+    <table style="border-collapse:collapse;width:100%;margin:16px 0">
+      <tr><td style="padding:8px 12px;background:#f9fafb;border:1px solid #e5e7eb;font-weight:600;width:40%">Tipo de consulta</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${typeLabel}</td></tr>
+      <tr><td style="padding:8px 12px;background:#f9fafb;border:1px solid #e5e7eb;font-weight:600">Nueva fecha</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${dateFormatted}</td></tr>
+      <tr><td style="padding:8px 12px;background:#f9fafb;border:1px solid #e5e7eb;font-weight:600">Nueva hora</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${data.hora}</td></tr>
+      ${ps.domicilio ? `<tr><td style="padding:8px 12px;background:#f9fafb;border:1px solid #e5e7eb;font-weight:600">Lugar</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${ps.domicilio}, ${ps.ciudad ?? ""}</td></tr>` : ""}
+      ${ps.consultationFee ? `<tr><td style="padding:8px 12px;background:#f9fafb;border:1px solid #e5e7eb;font-weight:600">Costo</td><td style="padding:8px 12px;border:1px solid #e5e7eb">$${ps.consultationFee} MXN</td></tr>` : ""}
+    </table>
+    <p>Confirme su asistencia a la nueva cita:</p>
+    <p>
+      <a href="${confirmUrl}" style="display:inline-block;padding:10px 20px;background:#16a34a;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;margin-right:12px">Confirmar cita</a>
+      <a href="${cancelUrl}" style="display:inline-block;padding:10px 20px;background:#dc2626;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Cancelar cita</a>
+    </p>
+    <p style="color:#6b7280;font-size:0.875em">Si tiene dudas llámenos al ${ps.telefono ?? "consultorio"}.</p>
+  `;
+
+  await getClient().transactionalEmails.sendTransacEmail({
+    sender: senderFor(ps),
+    to: [{ email: data.patientEmail, name: data.patientName }],
+    subject: `Cita reagendada — ${dateFormatted} a las ${data.hora}`,
+    htmlContent: emailLayout(content, ps),
+    textContent: `Cita reagendada: ${typeLabel} el ${dateFormatted} a las ${data.hora}.\nConfirmar: ${confirmUrl}\nCancelar: ${cancelUrl}`,
+  });
+}
+
 // ─── Portal: reply from doctor to patient ────────────────────────────────────
 
 export async function sendContactReply(
