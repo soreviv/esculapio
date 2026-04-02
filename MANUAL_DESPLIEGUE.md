@@ -2,7 +2,7 @@
 
 Este documento consolida las instrucciones para desplegar el sistema "Salud Digital" en un servidor Linux (Ubuntu 22.04/24.04) desde cero.
 
-**Versión del Documento:** 1.0 (Basada en PRD Feb-2026)
+**Versión del Documento:** 1.1 (Actualizado Apr-2026)
 **Stack:** Node.js, Nginx, PostgreSQL, PM2.
 
 ---
@@ -98,10 +98,12 @@ Este es el paso más crítico. El sistema necesita variables de entorno para fun
    DATABASE_URL=postgresql://salud_digital:TU_PASSWORD_SEGURA@localhost:5432/salud_digital
 
    # --- SEGURIDAD ---
-   # Genera SESSION_SECRET con: openssl rand -hex 64
+   # Genera SESSION_SECRET con:      openssl rand -hex 64
    SESSION_SECRET=cambiar_por_cadena_larga_y_aleatoria_min_64_chars
-   # Genera ENCRYPTION_KEY con: openssl rand -hex 32  (OBLIGATORIA — el servidor no arranca sin ella)
+   # Genera ENCRYPTION_KEY con:      openssl rand -hex 32  (OBLIGATORIA)
    ENCRYPTION_KEY=cambiar_por_cadena_aleatoria_de_exactamente_64_chars_hex
+   # Genera ENCRYPTION_KDF_SALT con: openssl rand -hex 32  (OBLIGATORIA — el servidor no arranca sin ella)
+   ENCRYPTION_KDF_SALT=cambiar_por_cadena_aleatoria_de_exactamente_64_chars_hex
 
    # --- CONFIGURACIÓN INICIAL ---
    # Contraseña para el usuario 'admin' que se creará en el paso de seed
@@ -156,23 +158,21 @@ ls -la dist/
 
 Usaremos PM2 para mantener la aplicación viva siempre.
 
+El archivo `ecosystem.config.cjs` incluido en el proyecto lee el `.env` automáticamente — no hay que copiar variables a mano.
+
 ```bash
 # 1. Instalar PM2 globalmente
 sudo npm install -g pm2
 
-# 2. Copiar las variables del .env al ecosystem.config.cjs
-# Abre el archivo y actualiza los valores de DATABASE_URL, SESSION_SECRET,
-# ENCRYPTION_KEY, ADMIN_PASSWORD y SMTP_* con los mismos del .env
-nano ecosystem.config.cjs
+# 2. Iniciar la aplicación (lee .env automáticamente)
+pm2 start ecosystem.config.cjs
 
-# 3. Iniciar la aplicación con el ecosystem config
-pm2 start ecosystem.config.cjs --env production
+# 3. Configurar inicio automático al reiniciar el servidor
+pm2 startup systemd
+# Ejecuta el comando sudo que te devuelva la terminal, por ejemplo:
+#   sudo env PATH=... pm2 startup systemd -u root --hp /root
 
-# 4. Configurar inicio automático al reiniciar servidor
-pm2 startup
-# (Ejecuta el comando que te devuelva la terminal)
-
-# 5. Guardar la lista de procesos
+# 4. Guardar la lista de procesos
 pm2 save
 ```
 
@@ -184,10 +184,14 @@ Configuraremos Nginx como proxy inverso para que la app sea accesible por el pue
 
 1. Crear configuración de Nginx:
    ```bash
-   sudo nano /etc/nginx/sites-available/salud-digital
+   sudo nano /etc/nginx/conf.d/tu-dominio.conf
    ```
 
-2. Contenido (reemplaza `tu-dominio.com`):
+   > **Nota:** Usar `conf.d/` y no `sites-available/sites-enabled/`. El `nginx.conf`
+   > de este servidor solo incluye `conf.d/*.conf`. El enfoque de symlink no funciona
+   > a menos que `nginx.conf` tenga `include /etc/nginx/sites-enabled/*;`.
+
+2. Contenido inicial HTTP (reemplaza `tu-dominio.com`):
    ```nginx
    server {
        listen 80;
@@ -204,12 +208,10 @@ Configuraremos Nginx como proxy inverso para que la app sea accesible por el pue
    }
    ```
 
-3. Activar sitio y reiniciar Nginx:
+3. Verificar y recargar Nginx:
    ```bash
-   sudo ln -s /etc/nginx/sites-available/salud-digital /etc/nginx/sites-enabled/
-   sudo rm /etc/nginx/sites-enabled/default  # Solo si es el único sitio
    sudo nginx -t
-   sudo systemctl restart nginx
+   sudo systemctl reload nginx
    ```
 
 4. Instalar Certificado SSL (HTTPS):
@@ -217,13 +219,46 @@ Configuraremos Nginx como proxy inverso para que la app sea accesible por el pue
    sudo certbot --nginx -d tu-dominio.com -d www.tu-dominio.com
    ```
 
+   Certbot modifica automáticamente el archivo en `conf.d/` y agrega el bloque HTTPS
+   con redirect 301 de HTTP → HTTPS. Si la instalación automática falla, agrega el
+   bloque SSL manualmente:
+
+   ```nginx
+   server {
+       listen 80;
+       server_name tu-dominio.com www.tu-dominio.com;
+       return 301 https://$host$request_uri;
+   }
+
+   server {
+       listen 443 ssl;
+       server_name tu-dominio.com www.tu-dominio.com;
+
+       ssl_certificate /etc/letsencrypt/live/tu-dominio.com/fullchain.pem;
+       ssl_certificate_key /etc/letsencrypt/live/tu-dominio.com/privkey.pem;
+       include /etc/letsencrypt/options-ssl-nginx.conf;
+       ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+       location / {
+           proxy_pass http://127.0.0.1:5000;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
+   ```
+
+   Luego: `sudo nginx -t && sudo systemctl reload nginx`
+
 ---
 
 ## ✅ Verificación Final
 
 1. Navega a `https://tu-dominio.com`.
 2. Inicia sesión con usuario: `admin` y la contraseña que definiste en `ADMIN_PASSWORD`.
-3. Revisa los logs si algo falla: `pm2 logs salud-digital`.
+3. Revisa los logs si algo falla: `pm2 logs esculapio`.
 
 ---
 
@@ -232,7 +267,7 @@ Configuraremos Nginx como proxy inverso para que la app sea accesible por el pue
 Para desplegar nuevos cambios después de la instalación inicial, usa siempre:
 
 ```bash
-cd /var/www/Salud-Digital
+cd /var/www/esculapio
 git pull
 npm run deploy
 ```
