@@ -349,12 +349,13 @@ export async function registerRoutes(
 
   app.post("/api/logout", (req, res) => {
     const userId = req.session?.userId;
+    const tenantId = req.session?.tenantId;
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ error: "Error al cerrar sesión" });
       }
-      if (userId) {
-        storage.createAuditLog({
+      if (userId && tenantId) {
+        createTenantStorage(tenantId).createAuditLog({
           userId,
           accion: "logout",
           entidad: "auth",
@@ -1555,7 +1556,7 @@ export async function registerRoutes(
   // Users/Doctors (Protected - staff can view, admin for modification)
   app.get("/api/users", isAuthenticated, isMedicoOrEnfermeria, async (req, res) => {
     try {
-      const users = await storage.getUsers();
+      const users = await ts(req).getUsers();
       res.json(users);
     } catch (error) {
       res.status(500).json({ error: "Error fetching users" });
@@ -2182,12 +2183,13 @@ export async function registerRoutes(
       if (!patient) {
         return res.status(404).json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code: "not-found", diagnostics: "Patient not found" }] });
       }
+      const tenantStorage = ts(req);
       const [notes, vitals, prescriptions, labOrders, consents] = await Promise.all([
-        storage.getMedicalNotes(patient.id),
-        storage.getVitals(patient.id),
-        storage.getPrescriptions(patient.id),
-        storage.getLabOrders(patient.id),
-        storage.getPatientConsents(patient.id),
+        tenantStorage.getMedicalNotes(patient.id),
+        tenantStorage.getVitals(patient.id),
+        tenantStorage.getPrescriptions(patient.id),
+        tenantStorage.getLabOrders(patient.id),
+        tenantStorage.getPatientConsents(patient.id),
       ]);
       await ts(req).createAuditLog({
         userId: req.session.userId || null,
