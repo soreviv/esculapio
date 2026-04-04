@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { applyColorTheme } from "@/hooks/use-preferences";
+import type { ColorTheme } from "@/hooks/use-preferences";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
@@ -178,6 +180,13 @@ function AppContent() {
 
   return <AuthenticatedApp user={user} onLogout={handleLogout} />;
 }
+
+// Apply saved color theme before first render to avoid flash
+try {
+  const raw = localStorage.getItem("medirecord-preferences");
+  const colorTheme = (raw ? JSON.parse(raw).colorTheme : null) as ColorTheme | null;
+  if (colorTheme && colorTheme !== "azul") applyColorTheme(colorTheme);
+} catch {}
 
 function App() {
   return (

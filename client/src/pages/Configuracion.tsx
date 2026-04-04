@@ -14,11 +14,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, eachDayOfInterval, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import type { AuditLog, User as UserRecord, ClinicHoursDay, PortalSettings } from "@shared/schema";
 import { DEFAULT_CLINIC_HOURS } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { usePreferences } from "@/hooks/use-preferences";
+import { useTheme } from "@/components/ThemeProvider";
 import {
   Settings,
   Building2,
@@ -53,10 +55,16 @@ import {
   UserCheck,
   Globe,
   Bot,
+  CalendarOff,
+  X,
 } from "lucide-react";
+
+type BlockedPeriod = { label: string; start: string; end: string };
 
 export default function Configuracion() {
   const { toast } = useToast();
+  const { prefs, update: updatePrefs } = usePreferences();
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("establecimiento");
 
   // 2FA state
@@ -118,6 +126,25 @@ export default function Configuracion() {
       });
       if (portalSettings.logoUrl) setLogoPreview(portalSettings.logoUrl);
       if (portalSettings.horarios) setSchedules(portalSettings.horarios);
+      if (portalSettings.diasFeriados && portalSettings.diasFeriados.length > 0) {
+        // Reconstruct ranges from consecutive date sequences
+        const sorted = [...portalSettings.diasFeriados].sort();
+        const ranges: BlockedPeriod[] = [];
+        let rangeStart = sorted[0];
+        let prev = sorted[0];
+        for (let i = 1; i < sorted.length; i++) {
+          const prevDate = parseISO(prev);
+          const curDate = parseISO(sorted[i]);
+          const diff = (curDate.getTime() - prevDate.getTime()) / 86400000;
+          if (diff > 1) {
+            ranges.push({ label: "", start: rangeStart, end: prev });
+            rangeStart = sorted[i];
+          }
+          prev = sorted[i];
+        }
+        ranges.push({ label: "", start: rangeStart, end: prev });
+        setBlockedPeriods(ranges);
+      }
       setPortalForm({
         portalEnabled: portalSettings.portalEnabled ?? false,
         portalTitle: portalSettings.portalTitle ?? "",
@@ -171,6 +198,12 @@ export default function Configuracion() {
     }
   };
   const [schedules, setSchedules] = useState<ClinicHoursDay[]>(DEFAULT_CLINIC_HOURS);
+
+  // Períodos de bloqueo (vacaciones, etc.)
+  const [blockedPeriods, setBlockedPeriods] = useState<BlockedPeriod[]>([]);
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [blockForm, setBlockForm] = useState({ label: "", start: "", end: "" });
+
   const [isNewUserDialogOpen, setIsNewUserDialogOpen] = useState(false);
   const [newUserForm, setNewUserForm] = useState({
     username: "",
@@ -341,6 +374,32 @@ export default function Configuracion() {
     },
   });
 
+  const saveBlockedPeriodsMutation = useMutation({
+    mutationFn: async (periods: BlockedPeriod[]) => {
+      const dias: string[] = [];
+      for (const p of periods) {
+        if (!p.start || !p.end) continue;
+        const start = parseISO(p.start);
+        const end = parseISO(p.end);
+        if (end < start) continue;
+        eachDayOfInterval({ start, end }).forEach((d) => dias.push(format(d, "yyyy-MM-dd")));
+      }
+      const res = await apiRequest("PATCH", "/api/portal-settings", { diasFeriados: dias });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error al guardar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portal-settings"] });
+      toast({ title: "Períodos guardados", description: "Los períodos de bloqueo han sido actualizados." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const savePortalSettingsMutation = useMutation({
     mutationFn: async (data: typeof portalForm) => {
       const res = await apiRequest("PATCH", "/api/portal-settings", {
@@ -404,10 +463,7 @@ export default function Configuracion() {
   };
 
   const handleSave = (section: string) => {
-    toast({
-      title: "Configuración guardada",
-      description: `Los cambios en ${section} han sido guardados.`,
-    });
+    toast({ title: "Configuración guardada", description: `Los cambios en ${section} han sido guardados.` });
   };
 
   return (
@@ -1045,28 +1101,6 @@ export default function Configuracion() {
                 ))}
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <h4 className="font-medium flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Días Festivos / No Laborables
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">25 Dic - Navidad</Badge>
-                  <Badge variant="secondary">1 Ene - Año Nuevo</Badge>
-                  <Badge variant="secondary">5 Feb - Constitución</Badge>
-                  <Badge variant="secondary">21 Mar - Benito Juárez</Badge>
-                  <Badge variant="secondary">1 May - Día del Trabajo</Badge>
-                  <Badge variant="secondary">16 Sep - Independencia</Badge>
-                  <Badge variant="secondary">20 Nov - Revolución</Badge>
-                  <Button variant="outline" size="sm" data-testid="button-add-holiday">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Agregar
-                  </Button>
-                </div>
-              </div>
-
               <div className="flex justify-end">
                 <Button
                   onClick={() => saveSchedulesMutation.mutate(schedules)}
@@ -1074,11 +1108,121 @@ export default function Configuracion() {
                   data-testid="button-save-horarios"
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {saveSchedulesMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                  {saveSchedulesMutation.isPending ? "Guardando..." : "Guardar Horarios"}
                 </Button>
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarOff className="h-5 w-5" />
+                Períodos Bloqueados
+              </CardTitle>
+              <CardDescription>
+                Bloquea rangos de fechas completos (vacaciones, permisos, etc.) para que no se agenden citas en el portal
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {blockedPeriods.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay períodos bloqueados configurados.</p>
+              ) : (
+                <div className="space-y-2">
+                  {blockedPeriods.map((period, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-md border">
+                      <div className="flex items-center gap-3">
+                        <CalendarOff className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div>
+                          {period.label && <p className="text-sm font-medium">{period.label}</p>}
+                          <p className="text-sm text-muted-foreground">
+                            {format(parseISO(period.start), "d MMM yyyy", { locale: es })}
+                            {period.start !== period.end && (
+                              <> — {format(parseISO(period.end), "d MMM yyyy", { locale: es })}</>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const updated = blockedPeriods.filter((_, i) => i !== idx);
+                          setBlockedPeriods(updated);
+                          saveBlockedPeriodsMutation.mutate(updated);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button variant="outline" size="sm" onClick={() => { setBlockForm({ label: "", start: "", end: "" }); setShowBlockDialog(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar período bloqueado
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Dialog para agregar período bloqueado */}
+          <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Bloquear período</DialogTitle>
+                <DialogDescription>
+                  Define un rango de fechas en que no se permitirán citas (vacaciones, permisos, etc.)
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label htmlFor="block-label">Etiqueta (opcional)</Label>
+                  <Input
+                    id="block-label"
+                    placeholder="Ej. Vacaciones, Congreso, Permiso..."
+                    value={blockForm.label}
+                    onChange={(e) => setBlockForm((f) => ({ ...f, label: e.target.value }))}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="block-start">Fecha inicio</Label>
+                    <Input
+                      id="block-start"
+                      type="date"
+                      value={blockForm.start}
+                      onChange={(e) => setBlockForm((f) => ({ ...f, start: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="block-end">Fecha fin</Label>
+                    <Input
+                      id="block-end"
+                      type="date"
+                      value={blockForm.end}
+                      min={blockForm.start}
+                      onChange={(e) => setBlockForm((f) => ({ ...f, end: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowBlockDialog(false)}>Cancelar</Button>
+                <Button
+                  disabled={!blockForm.start || !blockForm.end || saveBlockedPeriodsMutation.isPending}
+                  onClick={() => {
+                    const updated = [...blockedPeriods, { label: blockForm.label, start: blockForm.start, end: blockForm.end }];
+                    setBlockedPeriods(updated);
+                    saveBlockedPeriodsMutation.mutate(updated);
+                    setShowBlockDialog(false);
+                  }}
+                >
+                  {saveBlockedPeriodsMutation.isPending ? "Guardando..." : "Guardar bloqueo"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="personalizacion" className="space-y-4 mt-0">
@@ -1098,7 +1242,7 @@ export default function Configuracion() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Tema de Color</Label>
-                    <Select defaultValue="azul">
+                    <Select value={prefs.colorTheme} onValueChange={(v) => updatePrefs({ colorTheme: v as any })}>
                       <SelectTrigger data-testid="select-tema-color">
                         <SelectValue />
                       </SelectTrigger>
@@ -1113,7 +1257,11 @@ export default function Configuracion() {
                   <div className="space-y-2">
                     <Label>Modo Oscuro</Label>
                     <div className="flex items-center gap-2">
-                      <Switch data-testid="switch-dark-mode" />
+                      <Switch
+                        data-testid="switch-dark-mode"
+                        checked={theme === "dark"}
+                        onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                      />
                       <span className="text-sm text-muted-foreground">Activar modo oscuro</span>
                     </div>
                   </div>
@@ -1133,28 +1281,28 @@ export default function Configuracion() {
                       <p className="text-sm font-medium">Recordatorios de citas</p>
                       <p className="text-xs text-muted-foreground">Notificar antes de cada cita programada</p>
                     </div>
-                    <Switch defaultChecked data-testid="switch-notif-citas" />
+                    <Switch checked={prefs.notifCitas} onCheckedChange={(v) => updatePrefs({ notifCitas: v })} data-testid="switch-notif-citas" />
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium">Alertas de laboratorio</p>
                       <p className="text-xs text-muted-foreground">Notificar cuando lleguen resultados</p>
                     </div>
-                    <Switch defaultChecked data-testid="switch-notif-lab" />
+                    <Switch checked={prefs.notifLab} onCheckedChange={(v) => updatePrefs({ notifLab: v })} data-testid="switch-notif-lab" />
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium">Alertas de alergias</p>
                       <p className="text-xs text-muted-foreground">Mostrar alertas al recetar medicamentos</p>
                     </div>
-                    <Switch defaultChecked data-testid="switch-notif-alergias" />
+                    <Switch checked={prefs.notifAlergias} onCheckedChange={(v) => updatePrefs({ notifAlergias: v })} data-testid="switch-notif-alergias" />
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium">Sonidos del sistema</p>
                       <p className="text-xs text-muted-foreground">Reproducir sonidos en notificaciones</p>
                     </div>
-                    <Switch data-testid="switch-sounds" />
+                    <Switch checked={prefs.sounds} onCheckedChange={(v) => updatePrefs({ sounds: v })} data-testid="switch-sounds" />
                   </div>
                 </div>
               </div>
@@ -1166,7 +1314,7 @@ export default function Configuracion() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Formato de Fecha</Label>
-                    <Select defaultValue="dd-mm-yyyy">
+                    <Select value={prefs.dateFormat} onValueChange={(v) => updatePrefs({ dateFormat: v as any })}>
                       <SelectTrigger data-testid="select-formato-fecha">
                         <SelectValue />
                       </SelectTrigger>
@@ -1179,7 +1327,7 @@ export default function Configuracion() {
                   </div>
                   <div className="space-y-2">
                     <Label>Formato de Hora</Label>
-                    <Select defaultValue="24h">
+                    <Select value={prefs.timeFormat} onValueChange={(v) => updatePrefs({ timeFormat: v as any })}>
                       <SelectTrigger data-testid="select-formato-hora">
                         <SelectValue />
                       </SelectTrigger>
