@@ -194,11 +194,12 @@ export default function MensajesContacto() {
 
                 {/* Reply form */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-1">
+                  <label htmlFor="reply-textarea" className="text-sm font-medium flex items-center gap-1">
                     <Reply className="h-4 w-4" />
                     Responder a {selected.email}
                   </label>
                   <Textarea
+                    id="reply-textarea"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Escriba su respuesta aquí…"

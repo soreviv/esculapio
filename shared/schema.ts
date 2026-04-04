@@ -35,6 +35,7 @@ export const users = pgTable("users", {
   totpSecret: text("totp_secret"),       // encrypted TOTP secret
   totpEnabled: boolean("totp_enabled").notNull().default(false),
   email: text("email"),
+  activo: boolean("activo").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_users_tenant_id").on(table.tenantId),

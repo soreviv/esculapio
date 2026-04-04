@@ -30,6 +30,8 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getUsers(): Promise<User[]>;
+  deleteUser(id: string): Promise<User | undefined>;
+  setUserActivo(id: string, activo: boolean): Promise<User | undefined>;
   setTotpSecret(userId: string, secret: string): Promise<void>;
   enableTotp(userId: string): Promise<void>;
   disableTotp(userId: string): Promise<void>;
@@ -1097,6 +1099,16 @@ export class DatabaseStorage implements IStorage {
   // Update user profile
   async updateUser(userId: string, data: Partial<Pick<InsertUser, "email" | "nombre" | "especialidad" | "cedula" | "cedulaEspecialidad" | "universidad" | "logoUniversidadUrl">>): Promise<User | undefined> {
     const [user] = await db.update(users).set(data).where(eq(users.id, userId)).returning();
+    return user;
+  }
+
+  async deleteUser(id: string): Promise<User | undefined> {
+    const [user] = await db.delete(users).where(eq(users.id, id)).returning();
+    return user;
+  }
+
+  async setUserActivo(id: string, activo: boolean): Promise<User | undefined> {
+    const [user] = await db.update(users).set({ activo }).where(eq(users.id, id)).returning();
     return user;
   }
 

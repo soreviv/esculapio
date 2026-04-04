@@ -359,10 +359,11 @@ export default function Login({ onLogin }: LoginProps) {
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Usuario</label>
+                <label htmlFor="recovery-username" className="text-sm font-medium">Usuario</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="recovery-username"
                     placeholder="Ingrese su usuario"
                     className="pl-10"
                     value={recoveryUsername}

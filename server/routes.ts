@@ -129,6 +129,20 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Credenciales inválidas" });
       }
 
+      if (user.activo === false) {
+        await ts(req).createAuditLog({
+          userId: user.id,
+          accion: "login_fallido",
+          entidad: "auth",
+          entidadId: user.id,
+          detalles: JSON.stringify({ reason: "cuenta_suspendida" }),
+          ipAddress: req.ip || req.socket.remoteAddress || null,
+          userAgent: req.get("User-Agent") || null,
+          fecha: new Date(),
+        });
+        return res.status(403).json({ error: "Esta cuenta ha sido suspendida. Contacte al administrador." });
+      }
+
       await new Promise<void>((resolve, reject) => {
         req.session.regenerate((err) => {
           if (err) {
@@ -1571,6 +1585,67 @@ export async function registerRoutes(
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Error al actualizar el usuario" });
+    }
+  });
+
+  app.patch("/api/users/:id/activo", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      if (req.params.id === req.session.userId) {
+        return res.status(400).json({ error: "No puedes suspender tu propia cuenta." });
+      }
+      const { activo } = req.body;
+      if (typeof activo !== "boolean") {
+        return res.status(400).json({ error: "El campo activo debe ser booleano." });
+      }
+      const updated = await storage.setUserActivo(req.params.id, activo);
+      if (!updated) return res.status(404).json({ error: "Usuario no encontrado" });
+      await ts(req).createAuditLog({
+        userId: req.session.userId!,
+        accion: activo ? "activar_usuario" : "suspender_usuario",
+        entidad: "users",
+        entidadId: req.params.id,
+        detalles: JSON.stringify({ targetUsername: updated.username }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Error al actualizar el estado del usuario" });
+    }
+  });
+
+  app.delete("/api/users/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      if (req.params.id === req.session.userId) {
+        return res.status(400).json({ error: "No puedes eliminar tu propia cuenta." });
+      }
+      const target = await storage.getUser(req.params.id);
+      if (!target) return res.status(404).json({ error: "Usuario no encontrado" });
+      if (target.isTenantOwner) {
+        return res.status(400).json({ error: "No se puede eliminar al propietario del tenant." });
+      }
+      const deleted = await storage.deleteUser(req.params.id);
+      if (!deleted) return res.status(404).json({ error: "Usuario no encontrado" });
+      await ts(req).createAuditLog({
+        userId: req.session.userId!,
+        accion: "eliminar_usuario",
+        entidad: "users",
+        entidadId: req.params.id,
+        detalles: JSON.stringify({ username: deleted.username, role: deleted.role }),
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.get("User-Agent") || null,
+        fecha: new Date(),
+      });
+      res.json({ message: "Usuario eliminado exitosamente" });
+    } catch (error: any) {
+      // FK violation: user has clinical records (notes, prescriptions, appointments, etc.)
+      if (error?.code === "23503") {
+        return res.status(409).json({
+          error: "No se puede eliminar este usuario porque tiene registros clínicos asociados (notas, recetas, citas u otros). Puedes suspender la cuenta en su lugar."
+        });
+      }
+      res.status(500).json({ error: "Error al eliminar el usuario" });
     }
   });
 

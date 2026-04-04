@@ -11,7 +11,8 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -48,6 +49,8 @@ import {
   ShieldCheck,
   ShieldOff,
   Smartphone,
+  UserX,
+  UserCheck,
   Globe,
   Bot,
 } from "lucide-react";
@@ -180,6 +183,7 @@ export default function Configuracion() {
   });
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [editUserForm, setEditUserForm] = useState({ email: "", nombre: "", especialidad: "", cedula: "", cedulaEspecialidad: "", universidad: "" });
+  const [userToDelete, setUserToDelete] = useState<UserRecord | null>(null);
 
   const { data: users = [], isLoading: usersLoading } = useQuery<UserRecord[]>({
     queryKey: ["/api/users"],
@@ -226,6 +230,39 @@ export default function Configuracion() {
     },
     onError: () => {
       toast({ title: "Error", description: "No se pudo actualizar el usuario.", variant: "destructive" });
+    },
+  });
+
+  const toggleActivoMutation = useMutation({
+    mutationFn: async ({ id, activo }: { id: string; activo: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/users/${id}/activo`, { activo });
+      return res.json();
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: vars.activo ? "Usuario activado" : "Usuario suspendido", description: vars.activo ? "El usuario puede iniciar sesión nuevamente." : "El usuario no podrá iniciar sesión." });
+    },
+    onError: (err: Error) => {
+      let message = "No se pudo cambiar el estado del usuario";
+      try { const b = JSON.parse(err.message.replace(/^\d+: /, "")); message = b.error || message; } catch {}
+      toast({ title: "Error", description: message, variant: "destructive" });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/users/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setUserToDelete(null);
+      toast({ title: "Usuario eliminado", description: "El usuario fue eliminado permanentemente." });
+    },
+    onError: (err: Error) => {
+      let message = "No se pudo eliminar el usuario";
+      try { const b = JSON.parse(err.message.replace(/^\d+: /, "")); message = b.error || message; } catch {}
+      toast({ title: "Error", description: message, variant: "destructive" });
     },
   });
 
@@ -632,11 +669,12 @@ export default function Configuracion() {
                       .slice(0, 2)
                       .toUpperCase();
                     const roleLabel = u.role === "medico" ? "Médico" : u.role === "enfermeria" ? "Enfermería" : "Administrador";
+                    const isActivo = u.activo !== false;
                     return (
-                      <div key={u.id} className="flex items-center justify-between gap-4 p-4 rounded-md border" data-testid={`user-item-${u.id}`}>
+                      <div key={u.id} className={`flex items-center justify-between gap-4 p-4 rounded-md border ${!isActivo ? "opacity-60 bg-muted/30" : ""}`} data-testid={`user-item-${u.id}`}>
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-sm font-medium text-primary">{initials}</span>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isActivo ? "bg-primary/10" : "bg-muted"}`}>
+                            <span className={`text-sm font-medium ${isActivo ? "text-primary" : "text-muted-foreground"}`}>{initials}</span>
                           </div>
                           <div>
                             <p className="font-medium">{u.nombre}</p>
@@ -650,6 +688,7 @@ export default function Configuracion() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary">{roleLabel}</Badge>
+                          {!isActivo && <Badge variant="outline" className="text-orange-600 border-orange-300">Suspendido</Badge>}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -666,6 +705,25 @@ export default function Configuracion() {
                             }}
                           >
                             Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={isActivo ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50" : "text-green-600 hover:text-green-700 hover:bg-green-50"}
+                            onClick={() => toggleActivoMutation.mutate({ id: u.id, activo: !isActivo })}
+                            disabled={toggleActivoMutation.isPending}
+                            title={isActivo ? "Suspender usuario" : "Activar usuario"}
+                          >
+                            {isActivo ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setUserToDelete(u)}
+                            title="Eliminar usuario"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -703,6 +761,30 @@ export default function Configuracion() {
           </Card>
 
           {/* Dialog: Editar Usuario */}
+          {/* AlertDialog: Confirmar eliminación de usuario */}
+          <AlertDialog open={!!userToDelete} onOpenChange={(open) => { if (!open) setUserToDelete(null); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción es <strong>permanente e irreversible</strong>. Se eliminará la cuenta de <strong>{userToDelete?.nombre}</strong> ({userToDelete?.username}) junto con todos sus datos de acceso.
+                  <br /><br />
+                  Los registros clínicos (notas, recetas, etc.) creados por este usuario <strong>no se eliminarán</strong> para mantener la integridad del expediente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => userToDelete && deleteUserMutation.mutate(userToDelete.id)}
+                  disabled={deleteUserMutation.isPending}
+                >
+                  {deleteUserMutation.isPending ? "Eliminando..." : "Eliminar permanentemente"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
             <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>

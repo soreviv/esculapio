@@ -48,13 +48,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: process.env.NODE_ENV === "production"
-        ? ["'self'", "'unsafe-inline'"]
-        : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
     },
   },
   crossOriginEmbedderPolicy: false,
