@@ -397,7 +397,7 @@ export async function registerRoutes(
    *         description: No autenticado
    */
   app.get("/api/auth/me", (req, res) => {
-    if (req.session?.userId) {
+    if (req.session?.userId && !req.session?.pendingTwoFactor) {
       res.json({
         id: req.session.userId,
         role: req.session.role,
@@ -669,6 +669,7 @@ export async function registerRoutes(
       }
       
       const hashedPassword = await hashPassword(password);
+      const tenantId = (req as any).tenantId ?? req.session?.tenantId ?? null;
       const user = await storage.createUser({
         username,
         password: hashedPassword,
@@ -677,6 +678,7 @@ export async function registerRoutes(
         especialidad,
         cedula,
         email: email || null,
+        tenantId,
       });
       
       await ts(req).createAuditLog({
