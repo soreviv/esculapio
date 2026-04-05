@@ -196,7 +196,7 @@ export default function PortalAppointment() {
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row">
             {/* Calendar sidebar */}
-            <div className="p-4 sm:p-6 md:p-8 bg-slate-50 md:w-1/3 border-b md:border-b-0 md:border-r border-slate-200">
+            <div className="p-4 sm:p-6 md:p-6 bg-slate-50 md:w-5/12 border-b md:border-b-0 md:border-r border-slate-200">
               <div className="mb-6">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                   <CalendarIcon className="h-5 w-5 text-primary" />
@@ -206,7 +206,7 @@ export default function PortalAppointment() {
                   mode="single"
                   selected={selectedDate}
                   onSelect={onDateSelect}
-                  className="rounded-md border bg-white mx-auto [--cell-size:2.5rem] sm:[--cell-size:2.75rem] md:[--cell-size:2rem]"
+                  className="rounded-md border bg-white mx-auto"
                   disabled={isDisabledDay}
                   initialFocus
                 />
@@ -219,7 +219,7 @@ export default function PortalAppointment() {
             </div>
 
             {/* Form */}
-            <div className="p-4 sm:p-6 md:p-8 md:w-2/3">
+            <div className="p-4 sm:p-6 md:p-8 md:w-7/12">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
