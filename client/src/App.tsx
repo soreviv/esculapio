@@ -52,7 +52,7 @@ function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
-        <Route path="/" component={Dashboard} />
+        <Route path="/dashboard" component={Dashboard} />
         <Route path="/pacientes" component={Pacientes} />
         <Route path="/pacientes/:id" component={PatientDetail} />
         <Route path="/expedientes" component={Expedientes} />
@@ -123,9 +123,24 @@ function AuthenticatedApp({ user, onLogout }: { user: AuthUser; onLogout: () => 
   );
 }
 
+// Portal paths served at the domain root (no /p/:slug prefix)
+const PORTAL_ROOT_PATHS = ["/cita", "/servicios", "/contacto", "/privacidad", "/terminos"];
+
+function isPortalRoute(pathname: string): boolean {
+  if (pathname.startsWith("/p/")) return true;
+  if (pathname === "/") return true;
+  return PORTAL_ROOT_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
 function AppContent() {
+  const pathname = window.location.pathname;
+
+  // Login route — always show EHR login regardless of domain
+  const isLoginRoute = pathname === "/login";
+  const isResetRoute = pathname === "/reset-password";
+
   // Public portal routes — no authentication required
-  if (window.location.pathname.startsWith("/p/")) {
+  if (!isLoginRoute && !isResetRoute && isPortalRoute(pathname)) {
     return (
       <Suspense fallback={<PageLoader />}>
         <PortalRouter />
@@ -170,7 +185,6 @@ function AppContent() {
   }
 
   if (!user) {
-    const isResetRoute = window.location.pathname === "/reset-password";
     return (
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-background"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
         {isResetRoute ? <ResetPassword /> : <Login onLogin={handleLogin} />}

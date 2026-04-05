@@ -2,7 +2,9 @@ import { useParams } from "wouter";
 
 export function usePortalSlug(): string {
   const params = useParams<{ slug: string }>();
-  return params.slug ?? "";
+  if (params.slug) return params.slug;
+  // Derive slug from hostname: "otorrinonet.com" → "otorrinonet"
+  return window.location.hostname.split(".")[0];
 }
 
 export async function portalFetch<T>(

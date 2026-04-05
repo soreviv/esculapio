@@ -28,6 +28,17 @@ export default function PortalRouter() {
     <QueryClientProvider client={queryClient}>
       <Suspense fallback={<PageLoader />}>
         <Switch>
+          {/* Domain-root routes: otorrinonet.com/cita, otorrinonet.com/, etc. */}
+          <Route path="/cita/cancelar"   component={PortalCitaCancelar} />
+          <Route path="/cita/reagendar"  component={PortalCitaReagendar} />
+          <Route path="/cita/confirmar"  component={PortalCitaConfirmar} />
+          <Route path="/cita/asistencia" component={PortalCitaAsistencia} />
+          <Route path="/cita"            component={PortalAppointment} />
+          <Route path="/contacto"        component={PortalContact} />
+          <Route path="/servicios"       component={PortalServices} />
+          <Route path="/privacidad"      component={PortalPrivacy} />
+          <Route path="/terminos"        component={PortalTerms} />
+          {/* Legacy slug routes: /p/:slug/* — backwards compat & dev environment */}
           <Route path="/p/:slug/cita/cancelar"   component={PortalCitaCancelar} />
           <Route path="/p/:slug/cita/reagendar"  component={PortalCitaReagendar} />
           <Route path="/p/:slug/cita/confirmar"  component={PortalCitaConfirmar} />
@@ -39,6 +50,7 @@ export default function PortalRouter() {
           <Route path="/p/:slug/terminos"        component={PortalTerms} />
           <Route path="/p/:slug"                 component={PortalHome} />
           <Route path="/p/:slug/"                component={PortalHome} />
+          <Route path="/"                        component={PortalHome} />
         </Switch>
       </Suspense>
       <Toaster />

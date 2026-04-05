@@ -16,7 +16,10 @@ Automates the full git publish flow with an AI-generated commit message.
    - `git add .`
    - `git commit -m "<message>\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"`
    - `git push`
-6. Report the result. If push fails (e.g. diverged branch), show the exact error and suggest the fix without running destructive commands.
+   - `npm install`
+   - `npm run build`
+   - `pm2 restart all`
+6. Report the result of each step. If push fails (e.g. diverged branch), show the exact error and suggest the fix without running destructive commands. If build or pm2 fails, show the error and stop.
 
 ## Rules
 

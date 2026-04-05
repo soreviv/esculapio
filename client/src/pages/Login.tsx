@@ -90,7 +90,7 @@ export default function Login({ onLogin }: LoginProps) {
         description: `Bienvenido, ${data.nombre}`,
       });
       onLogin(data as LoginResponse);
-      setLocation("/");
+      setLocation("/dashboard");
     },
     onError: () => {
       setShowError(true);
@@ -112,7 +112,7 @@ export default function Login({ onLogin }: LoginProps) {
         description: `Bienvenido, ${data.nombre}`,
       });
       onLogin(data);
-      setLocation("/");
+      setLocation("/dashboard");
     },
     onError: (error: Error) => {
       toast({
