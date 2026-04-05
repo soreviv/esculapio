@@ -6,11 +6,29 @@
 
 - **Gestión de Pacientes**: Registro, búsqueda y actualización de la información demográfica de los pacientes.
 - **Expediente Clínico Electrónico (ECE)**: Creación y consulta de notas médicas, signos vitales, recetas y estudios de laboratorio.
+- **Portal Público para Pacientes**: Portal web accesible desde el dominio raíz (`/`) con agendamiento de citas en línea, información de servicios, formulario de contacto y chatbot con IA (Gemini).
 - **Seguridad y Cumplimiento**: Autenticación basada en roles, registros de auditoría (bitácoras) y firma electrónica de documentos, en apego a la **NOM-024**, **NOM-004** y la **Ley Federal de Protección de Datos Personales (LFPDPPP)**.
-- **Citas Médicas**: Agendamiento y administración de citas.
+- **Citas Médicas**: Agendamiento y administración de citas, con soporte para bloqueo de períodos (vacaciones, permisos).
 - **Catálogo CIE-10**: Búsqueda y asociación de diagnósticos estandarizados.
 - **Interoperabilidad HL7 FHIR R4**: API compatible con el estándar internacional de interoperabilidad en salud.
 - **Interfaz Moderna**: Diseño responsivo y amigable, construido con las últimas tecnologías web.
+
+## 🌐 Estructura de URLs
+
+| URL | Descripción | Acceso |
+| :-- | :---------- | :----- |
+| `/` | Portal público para pacientes | Público |
+| `/cita` | Agendar cita en línea | Público |
+| `/servicios` | Servicios del consultorio | Público |
+| `/contacto` | Formulario de contacto | Público |
+| `/login` | Acceso al EHR (médicos y staff) | Staff |
+| `/dashboard` | Panel principal del EHR | Autenticado |
+| `/pacientes` | Gestión de pacientes | Autenticado |
+| `/citas` | Administración de citas | Autenticado |
+| `/configuracion` | Configuración del sistema | Admin |
+| `/api-docs` | Documentación Swagger de la API | Autenticado |
+
+> Las rutas `/p/:slug/*` siguen funcionando para compatibilidad y entornos de desarrollo.
 
 ## 🚀 Tecnologías Utilizadas
 
@@ -48,15 +66,19 @@ El monorepo está organizado de la siguiente manera para una clara separación d
 │   │   ├── components/
 │   │   │   ├── ui/         # Componentes shadcn/ui (60+)
 │   │   │   └── ehr/        # Componentes especializados de salud
-│   │   ├── pages/          # Vistas principales (Dashboard, Pacientes, Citas...)
+│   │   ├── pages/
+│   │   │   ├── portal/     # Portal público para pacientes
+│   │   │   └── ...         # Páginas del EHR
 │   │   ├── hooks/          # Custom React hooks
 │   │   └── lib/            # Utilidades y configuración
 │   └── public/             # Archivos estáticos (robots.txt, sitemap.xml)
 ├── server/                 # Aplicación backend (Node.js + Express)
 │   ├── index.ts            # Configuración del servidor y middleware
-│   ├── routes.ts           # Definición de rutas de la API
+│   ├── routes.ts           # Rutas del EHR
+│   ├── portal-routes.ts    # Rutas públicas del portal (/p/:slug/api/*)
 │   ├── storage.ts          # Capa de acceso a datos (patrón Repository)
 │   ├── auth.ts             # Autenticación y middleware RBAC
+│   ├── tenant.ts           # Resolución multi-tenant por slug/subdominio
 │   ├── db.ts               # Conexión a la base de datos
 │   └── crypto.ts           # Cifrado de campos sensibles
 ├── shared/                 # Código compartido cliente/servidor
@@ -88,8 +110,8 @@ El monorepo está organizado de la siguiente manera para una clara separación d
 
 1. **Clonar el repositorio**:
     ```bash
-    git clone https://github.com/soreviv/Salud-Digital.git
-    cd Salud-Digital
+    git clone https://github.com/soreviv/esculapio.git
+    cd esculapio
     ```
 
 2. **Instalar dependencias**:
@@ -99,7 +121,6 @@ El monorepo está organizado de la siguiente manera para una clara separación d
 
 3. **Configurar variables de entorno**:
     ```bash
-    # Crear archivo .env con las variables necesarias
     DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/salud_digital
     SESSION_SECRET=tu-secreto-seguro-aqui
     NODE_ENV=development
@@ -117,7 +138,8 @@ El monorepo está organizado de la siguiente manera para una clara separación d
     npm run dev
     ```
     - La aplicación estará disponible en `http://localhost:5000`.
-    - El frontend se sirve con Hot Module Replacement (HMR) vía Vite.
+    - Portal del paciente: `http://localhost:5000/p/<slug>`
+    - EHR: `http://localhost:5000/login`
 
 ### Comandos Disponibles
 
@@ -125,7 +147,6 @@ El monorepo está organizado de la siguiente manera para una clara separación d
 | :------ | :---------- |
 | `npm run dev` | Inicia el servidor de desarrollo (backend + Vite HMR) |
 | `npm run build` | Genera el build de producción (frontend Vite + backend esbuild) |
-| `npm run deploy` | Build + reinicio correcto del servidor en producción |
 | `npm run start` | Inicia el servidor en modo producción desde `dist/` |
 | `npm run check` | Verificación de tipos TypeScript (`tsc --noEmit`) |
 | `npm run db:push` | Aplica migraciones de base de datos con Drizzle Kit |
@@ -138,6 +159,7 @@ La plataforma ha sido desarrollada teniendo en cuenta los estrictos requisitos d
 
 - **NOM-024-SSA3-2012**: Se implementan mecanismos de seguridad como:
   - **Control de Acceso**: Autenticación por usuario y contraseña, con roles (`admin`, `medico`, `enfermeria`).
+  - **Autenticación de Dos Factores (2FA)**: TOTP compatible con Google Authenticator y apps similares.
   - **Bitácoras de Auditoría**: Registro detallado de todas las acciones críticas (creación, modificación, eliminación y consulta de datos sensibles), con IP y User-Agent.
   - **Inmutabilidad de Registros**: Las notas médicas firmadas no pueden ser alteradas. Solo se pueden agregar addenda.
   - **Firma Electrónica**: Se genera un hash SHA-256 único para firmar digitalmente las notas médicas, garantizando su integridad.
@@ -157,7 +179,7 @@ El proyecto incluye configuración optimizada para motores de búsqueda:
 
 ## 📄 API Endpoints
 
-El servidor expone una API REST para interactuar con los datos. Todos los endpoints requieren autenticación. La documentación interactiva está disponible en `/api-docs` (Swagger UI).
+El servidor expone una API REST para interactuar con los datos. Todos los endpoints del EHR requieren autenticación. La documentación interactiva está disponible en `/api-docs` (Swagger UI).
 
 | Método | Ruta                         | Descripción                                     | Rol Requerido        |
 | :----- | :--------------------------- | :---------------------------------------------- | :------------------- |
@@ -167,13 +189,28 @@ El servidor expone una API REST para interactuar con los datos. Todos los endpoi
 | `POST` | `/api/patients`              | Registra un nuevo paciente.                     | `medico`, `enfermeria` |
 | `GET`  | `/api/patients/:id`          | Obtiene los detalles de un paciente específico. | `medico`, `enfermeria` |
 | `PATCH`| `/api/patients/:id`          | Actualiza la información de un paciente.        | `medico`, `enfermeria` |
-| `DELETE`| `/api/patients/:id`        | Elimina un paciente del sistema.                | `medico`, `enfermeria` |
 | `GET`  | `/api/patients/:id/notes`    | Obtiene todas las notas médicas de un paciente. | `medico`, `enfermeria` |
 | `POST` | `/api/notes`                 | Crea una nueva nota médica.                     | `medico`             |
 | `POST` | `/api/notes/:id/sign`        | Firma electrónicamente una nota médica.         | `medico`             |
+| `GET`  | `/api/portal-settings`       | Configuración del portal (horarios, bloqueos).  | `admin`              |
+| `PATCH`| `/api/portal-settings`       | Actualiza configuración del portal.             | `admin`              |
 | `GET`  | `/api/audit-logs`            | Consulta la bitácora de auditoría del sistema.  | `admin`              |
 
 *Esta es una lista parcial. Consulta `server/routes.ts` para ver todos los endpoints disponibles o visita `/api-docs` en la aplicación.*
+
+### API Pública del Portal
+
+Los siguientes endpoints son públicos (sin autenticación) y están disponibles para el portal de pacientes:
+
+| Método | Ruta | Descripción |
+| :----- | :--- | :---------- |
+| `GET`  | `/p/:slug/api/portal-info` | Información pública del consultorio |
+| `GET`  | `/p/:slug/api/slots?fecha=YYYY-MM-DD` | Horarios disponibles para una fecha |
+| `POST` | `/p/:slug/api/appointments` | Crear cita desde el portal |
+| `GET`  | `/p/:slug/api/appointments/confirm?token=` | Confirmar cita por email |
+| `GET`  | `/p/:slug/api/appointments/cancel?token=` | Cancelar cita por email |
+| `POST` | `/p/:slug/api/contact` | Enviar mensaje de contacto |
+| `POST` | `/p/:slug/api/chat` | Chatbot IA (requiere clave Gemini) |
 
 ## 🔗 API HL7 FHIR R4
 
@@ -220,52 +257,16 @@ El sistema implementa **HL7 FHIR R4** para interoperabilidad con otros sistemas 
 
 ```bash
 # Obtener capacidades del servidor
-curl https://tu-dominio.com/fhir/metadata
+curl https://otorrinonet.com/fhir/metadata
 
 # Buscar paciente por CURP
-curl "https://tu-dominio.com/fhir/Patient?identifier=CURP123456789"
+curl "https://otorrinonet.com/fhir/Patient?identifier=CURP123456789"
 
 # Obtener expediente completo en formato FHIR
-curl "https://tu-dominio.com/fhir/Patient/uuid-del-paciente/\$everything"
-
-# Exportar expediente para interoperabilidad
-curl "https://tu-dominio.com/fhir/\$export?patient=uuid-del-paciente"
+curl "https://otorrinonet.com/fhir/Patient/uuid-del-paciente/\$everything"
 ```
 
 ## 🚢 Despliegue
-
-### Archivos Relacionados con el Despliegue
-
-| Archivo | Tipo | Descripción |
-| :------ | :--- | :---------- |
-| `package.json` | Configuración de build | Scripts de npm: `build`, `start`, `dev`, `db:push` |
-| `script/build.ts` | Script de build | Build de producción: Vite (frontend) + esbuild (backend) |
-| `vite.config.ts` | Configuración Vite | Empaquetado del frontend; salida en `dist/public/` |
-| `tsconfig.json` | Configuración TypeScript | Opciones del compilador para cliente, servidor y shared |
-| `postcss.config.js` | Configuración CSS | PostCSS con Tailwind CSS 4 |
-| `.eslintrc.json` | Linting | Reglas de calidad y seguridad del código |
-| `vitest.config.ts` | Pruebas | Umbrales de cobertura: 80% líneas/funciones, 70% ramas |
-| `.github/workflows/codacy.yml` | CI/CD | Escaneo de seguridad con Codacy en cada push a `main` |
-| `.github/dependabot.yml` | Actualizaciones automáticas | Gestión automática de dependencias npm y GitHub Actions |
-| `.codacy.yaml` | Calidad de código | Configuración de Trivy, ESLint, Semgrep y detección de secretos |
-| `migrations/` | Base de datos | Migraciones de esquema gestionadas por Drizzle Kit |
-
-### Proceso de Build de Producción
-
-El script `script/build.ts` ejecuta dos pasos en secuencia:
-
-1. **Frontend (Vite)**: Compila React + TypeScript → `dist/public/`
-2. **Backend (esbuild)**: Empaqueta `server/index.ts` → `dist/index.cjs` (CJS, minificado)
-
-```bash
-# Generar build de producción
-npm run build
-
-# Iniciar en producción
-npm run start
-```
-
-El servidor en producción sirve el frontend estático desde `dist/public/` y expone la API en el mismo puerto (por defecto: `5000`).
 
 ### Variables de Entorno
 
@@ -278,12 +279,46 @@ El servidor en producción sirve el frontend estático desde `dist/public/` y ex
 | `NODE_ENV` | No | Entorno de ejecución | `production` / `development` |
 | `PORT` | No | Puerto del servidor (default: 5000) | `5000` |
 | `LOG_LEVEL` | No | Nivel de logging Pino | `info` / `debug` / `warn` |
+| `BASE_DOMAIN` | No | Dominio base para resolución multi-tenant por subdominio | `salud-digital.mx` |
 | `SMTP_HOST` | No | Servidor SMTP para emails | `smtp.mailgun.org` |
 | `SMTP_PORT` | No | Puerto SMTP | `587` |
 | `SMTP_USER` | No | Usuario SMTP | `user@dominio.com` |
 | `SMTP_PASS` | No | Contraseña SMTP | — |
 | `SMTP_FROM` | No | Dirección de envío | `noreply@dominio.com` |
-| `APP_BASE_URL` | No | URL base de la app (para links en emails) | `https://tu-dominio.com` |
+| `APP_BASE_URL` | No | URL base de la app (para links en emails) | `https://otorrinonet.com` |
+
+### Proceso de Build y Deploy
+
+```bash
+# Generar build de producción
+npm run build
+
+# Iniciar / reiniciar con PM2
+pm2 restart all
+
+# O todo en un paso (desde Claude Code con /push):
+# git add + commit + push → npm install → npm run build → pm2 restart all
+```
+
+El servidor en producción sirve el frontend estático desde `dist/public/` y expone la API en el mismo puerto (por defecto: `5000`).
+
+### Lista de Verificación para Producción
+
+- [x] PostgreSQL configurado como base de datos principal
+- [x] Rate limiting implementado (1000 req/15min general, 10 req/15min en auth)
+- [x] Bcrypt con 12 rondas de sal para contraseñas
+- [x] Autenticación de dos factores (2FA) con TOTP
+- [x] Auditoría completa de operaciones críticas (NOM-024)
+- [x] Campos sensibles cifrados en reposo (CURP, teléfonos)
+- [x] Redacción automática de campos sensibles en logs (Pino)
+- [x] Helmet.js configurado para cabeceras HTTP de seguridad
+- [x] Documentación Swagger en `/api-docs`
+- [x] HTTPS con certificados SSL/TLS (Let's Encrypt + Nginx)
+- [x] `SESSION_SECRET` y `ENCRYPTION_KEY` con valores aleatorios seguros
+- [x] Respaldos automáticos de la base de datos PostgreSQL (`scripts/backup-db.sh`)
+- [x] Sistema de recuperación de contraseñas (email)
+- [x] Proxy inverso Nginx con compresión gzip
+- [ ] Configurar monitoreo y alertas (ej. Sentry, Grafana, UptimeRobot)
 
 ### CI/CD
 
@@ -295,142 +330,49 @@ El servidor en producción sirve el frontend estático desde `dist/public/` y ex
 
 #### Dependabot (`.github/dependabot.yml`)
 
-Actualizaciones automáticas de dependencias con las siguientes reglas:
-
 - **npm**: Revisión semanal (lunes, 6:00 AM, hora Ciudad de México)
-  - Agrupa actualizaciones de `@radix-ui/*`, librerías de testing y tipos TypeScript
-  - Ignora actualizaciones _major_ de React, Express y Drizzle (requieren validación manual)
-  - Máximo 10 PRs abiertos simultáneos
-- **GitHub Actions**: Revisión mensual, máximo 5 PRs
-- Revisor asignado: `soreviv`
+- **GitHub Actions**: Revisión mensual
 
-### Despliegue en Producción
+## 📊 Estado del Proyecto
 
-#### Pasos Básicos
+### Funcionalidades Implementadas
 
-```bash
-# 1. Instalar dependencias
-npm install
+**EHR (Sistema de Expediente Clínico)**
+- Gestión completa de pacientes (registro, búsqueda, historial)
+- Notas médicas con diagnósticos CIE-10, firma electrónica e immutabilidad
+- Signos vitales con visualización histórica
+- Recetas médicas con medicamentos, dosis y vías de administración
+- Órdenes de laboratorio
+- Sistema de citas médicas con bloqueo de períodos (vacaciones, permisos)
+- Dashboard con estadísticas y métricas
+- Gestión de usuarios con roles (admin, médico, enfermería), 2FA, suspensión
 
-# 2. Configurar variables de entorno (ver tabla anterior)
-export DATABASE_URL="postgresql://..."
-export SESSION_SECRET="..."
-export NODE_ENV="production"
+**Portal Público para Pacientes**
+- Página de inicio con información del consultorio
+- Catálogo de servicios
+- Agendamiento de citas en línea con validación de disponibilidad en tiempo real
+- Formulario de contacto
+- Chatbot con IA (Google Gemini)
+- Confirmación, reagendamiento y cancelación de citas por email
+- Respeta horarios de atención y períodos bloqueados configurados en el EHR
 
-# 3. Aplicar migraciones de base de datos
-npm run db:push
+**Configuración y Administración**
+- Configuración del establecimiento (nombre, dirección, RFC, logo)
+- Horarios de atención por día de la semana
+- Períodos bloqueados por rango de fechas (vacaciones, congresos, etc.)
+- Portal habilitado/deshabilitado por tenant
+- Preferencias de usuario (tema, notificaciones, formato de fecha/hora)
 
-# 4. Compilar la aplicación
-npm run build
+### Métricas
 
-# 5. Iniciar el servidor
-npm run start
-```
-
-#### Lista de Verificación para Producción
-
-- [x] PostgreSQL configurado como base de datos principal
-- [x] Rate limiting implementado (1000 req/15min general, 10 req/15min en auth)
-- [x] Bcrypt con 12 rondas de sal para contraseñas
-- [x] Auditoría completa de operaciones críticas (NOM-024)
-- [x] Campos sensibles cifrados en reposo (CURP, teléfonos)
-- [x] Redacción automática de campos sensibles en logs (Pino)
-- [x] Helmet.js configurado para cabeceras HTTP de seguridad
-- [x] Documentación Swagger en `/api-docs`
-- [x] Implementar HTTPS con certificados SSL/TLS (Let's Encrypt + Nginx)
-- [x] Configurar `SESSION_SECRET` y `ENCRYPTION_KEY` con valores aleatorios seguros
-- [x] Configurar respaldos automáticos de la base de datos PostgreSQL (`scripts/backup-db.sh`)
-- [x] Implementar sistema de recuperación de contraseñas (email)
-- [x] Autenticación de dos factores (2FA) con TOTP
-- [x] Configurar proxy inverso Nginx con compresión gzip
-- [ ] Configurar monitoreo y alertas (ej. Sentry, Grafana, UptimeRobot)
-
-## 📊 Evaluación General del Proyecto
-
-### Estado Actual del Desarrollo
-
-El proyecto **Salud Digital** se encuentra en una etapa de **desarrollo avanzado** con todas las funcionalidades clave completamente implementadas y operativas. El sistema es funcional, seguro y cumple con los estándares normativos mexicanos.
-
-### ⭐ Fortalezas del Proyecto
-
-#### 1. **Arquitectura Sólida y Escalable**
-- Stack tecnológico moderno (React 18 + TypeScript + Node.js + Express 4)
-- Monorepo con separación clara de responsabilidades (Cliente, Servidor, Compartido)
-- ORM tipado (Drizzle) con PostgreSQL para operaciones seguras
-- TanStack Query para gestión eficiente de estado asíncrono y caching
-
-#### 2. **Seguridad y Cumplimiento Normativo (NOM-024 / NOM-004)**
-- ✅ **Sistema de autenticación robusto** con roles diferenciados (admin, médico, enfermería)
-- ✅ **Hashing de contraseñas** con bcrypt (12 rondas de sal) y validación de fortaleza zxcvbn
-- ✅ **Sistema de auditoría completo** que registra todas las operaciones críticas con IP y User-Agent
-- ✅ **Firma electrónica** de notas médicas con hash SHA-256
-- ✅ **Control de acceso basado en roles** (RBAC) en todos los endpoints
-- ✅ **Gestión de consentimiento informado** del paciente (LFPDPPP)
-- ✅ **Inmutabilidad de registros** firmados (las notas firmadas no pueden modificarse)
-- ✅ **Cifrado de campos sensibles** en reposo (CURP, teléfonos)
-- ✅ **Redacción de datos sensibles** en logs de producción
-
-#### 3. **Funcionalidades Implementadas**
-- **Gestión Completa de Pacientes**: Registro, búsqueda, actualización y eliminación con validaciones
-- **Expediente Clínico Electrónico**: Creación y consulta de notas médicas con diagnósticos CIE-10
-- **Signos Vitales**: Registro y visualización histórica de signos vitales
-- **Recetas Médicas**: Emisión de recetas con medicamentos, dosis y vías de administración
-- **Órdenes de Laboratorio**: Creación e impresión de órdenes de estudios clínicos
-- **Sistema de Citas**: Agendamiento y gestión de citas médicas
-- **Búsqueda CIE-10**: Integración del catálogo completo de diagnósticos estandarizados
-- **Dashboard Informativo**: Vista general con estadísticas y métricas del sistema
-- **Tema Claro/Oscuro**: Interfaz adaptable según preferencias del usuario
-- **Interoperabilidad FHIR R4**: Exportación e intercambio de datos en estándar HL7
-
-#### 4. **Experiencia de Usuario (UX/UI)**
-- Diseño moderno y profesional con **shadcn/ui** y **Tailwind CSS 4**
-- Interfaz responsiva adaptada a diferentes dispositivos
-- 60+ componentes reutilizables y consistentes
-- Navegación intuitiva con sidebar colapsable
-- Alertas visuales para alergias y datos críticos del paciente
-- Búsqueda de pacientes en tiempo real con autocompletado
-
-#### 5. **Calidad del Código**
-- **TypeScript** para tipado estático y reducción de errores
-- Esquemas Zod + Drizzle compartidos entre frontend y backend
-- Validación de datos en todas las entradas del sistema
-- Patrón Repository en capa de storage para separación de lógica de negocio
-- Cobertura de pruebas: 80% líneas/funciones, 70% ramas (Vitest)
-
-### 📈 Métricas del Proyecto
-
-- **13 Páginas principales** implementadas
-- **15+ Componentes especializados** para la gestión del ECE
-- **60+ Componentes UI** de shadcn/ui integrados
-- **30+ Endpoints API** documentados
-- **18 Endpoints FHIR R4** implementados
-- **Sistema de auditoría** con registro completo de operaciones
-- **Cobertura normativa**: 100% de requisitos NOM-024-SSA3-2012 y NOM-004-SSA3-2012
-
-### 🎯 Logros Destacados
-
-1. **Conformidad Total con NOM-024-SSA3-2012 y NOM-004-SSA3-2012**: El sistema cumple con todos los requisitos de las normas mexicanas para expedientes clínicos electrónicos.
-
-2. **Sistema de Seguridad Multi-capa**:
-   - Autenticación de usuarios con sesiones seguras
-   - Autorización basada en roles (RBAC)
-   - Auditoría completa con trazabilidad de IP
-   - Firma digital de documentos con SHA-256
-   - Cifrado de campos sensibles en reposo
-
-3. **Catálogo CIE-10 Completo**: Integración del catálogo internacional de enfermedades para diagnósticos estandarizados.
-
-4. **Interoperabilidad HL7 FHIR R4**: API completa para intercambio de información clínica con otros sistemas.
-
-5. **Gestión Integral del Paciente**: Desde el registro inicial hasta el seguimiento completo de su historial médico.
-
-### 💡 Conclusión
-
-**Salud Digital** es un sistema de expediente clínico electrónico robusto, seguro y conforme a la normativa mexicana. Con una arquitectura bien diseñada, un stack tecnológico moderno y una cobertura completa de funcionalidades, el proyecto está en excelente estado para continuar su desarrollo y evolución hacia un producto comercial completo.
-
-El código es mantenible, escalable y sigue las mejores prácticas de la industria. La implementación del sistema de seguridad y auditoría demuestra un compromiso serio con la protección de datos sensibles de salud.
-
-**Calificación General: ⭐⭐⭐⭐⭐ (5/5)**
+- **14+ páginas** implementadas en el EHR
+- **10 páginas** del portal público para pacientes
+- **15+ componentes especializados** para la gestión del ECE
+- **60+ componentes UI** de shadcn/ui integrados
+- **30+ endpoints API** del EHR documentados en Swagger
+- **7 endpoints API públicos** del portal
+- **18 endpoints FHIR R4** implementados
+- **Cobertura normativa**: 100% NOM-024-SSA3-2012 y NOM-004-SSA3-2012
 
 ## 🤝 Contribuciones
 
