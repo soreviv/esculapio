@@ -14,7 +14,7 @@ const password = ((): string => {
   }
 
   console.warn("WARNING: No ENCRYPTION_KEY provided in development. Using default development key. This is NOT secure for production use.");
-  return "salud-digital-development-key-default-32";
+  return "esculapio-development-key-default-32";
 })();
 
 // Use a configurable KDF salt. In production, set ENCRYPTION_KDF_SALT to a unique,
@@ -29,7 +29,7 @@ const kdfSalt = ((): string => {
     throw new Error("ENCRYPTION_KDF_SALT environment variable is required in production to ensure data security.");
   }
 
-  return "salud-digital-kdf-salt-dev-only-32x";
+  return "esculapio-kdf-salt-dev-only-32x";
 })();
 
 // Derive the 32-byte AES-256 key from the password using scrypt.

@@ -52,7 +52,7 @@ export function invalidateTenantCache(slug: string) {
 // Reads slug from (in priority order):
 //   1. X-Tenant-Slug header  (future mobile/API clients)
 //   2. URL path prefix        /t/:slug/ (EHR)  or  /p/:slug/ (portal)
-//   3. Subdomain              viveros.salud-digital.mx
+//   3. Subdomain              viveros.otorrinonet.com
 //   4. req.session.tenantId   (fallback for existing /api/ routes)
 
 export async function resolveTenant(
@@ -69,7 +69,7 @@ export async function resolveTenant(
     if (match) slug = match[2];
   }
 
-  // 3. Subdomain (e.g. viveros.salud-digital.mx)
+  // 3. Subdomain (e.g. viveros.otorrinonet.com)
   if (!slug) {
     const base = process.env.BASE_DOMAIN || "";
     const hostname = req.hostname;

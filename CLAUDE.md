@@ -1,4 +1,4 @@
-# CLAUDE.md - Project Guide for Salud Digital (MediRecord)
+# CLAUDE.md - Project Guide for Esculapio (MediRecord)
 
 ## Project Overview
 

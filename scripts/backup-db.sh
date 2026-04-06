@@ -1,16 +1,16 @@
 #!/bin/bash
-# Script de backup para PostgreSQL - Salud Digital
+# Script de backup para PostgreSQL - Esculapio
 # Uso: ./backup-db.sh
 # Configura en cron para backups automáticos:
-# 0 2 * * * /var/www/salud-digital/scripts/backup-db.sh
+# 0 2 * * * /var/www/esculapio/scripts/backup-db.sh
 
 set -e
 
 # Configuración
-DB_NAME="salud_digital"
-DB_USER="salud_digital"
+DB_NAME="esculapio"
+DB_USER="esculapio"
 DB_HOST="localhost"
-BACKUP_DIR="/var/backups/salud-digital"
+BACKUP_DIR="/var/backups/esculapio"
 RETENTION_DAYS=30
 
 # Crear directorio de backups si no existe

@@ -1,6 +1,6 @@
-# Salud Digital - Expediente Clínico Electrónico
+# Esculapio - Expediente Clínico Electrónico
 
-**Salud Digital** es una plataforma de software como servicio (SaaS) para la gestión de expedientes clínicos electrónicos, diseñada para cumplir con la normativa mexicana **NOM-024-SSA3-2012** y **NOM-004-SSA3-2012**. Ofrece una solución integral para profesionales de la salud, permitiendo una administración eficiente, segura y conforme a la ley de la información de los pacientes.
+**Esculapio** es una plataforma de software como servicio (SaaS) para la gestión de expedientes clínicos electrónicos, diseñada para cumplir con la normativa mexicana **NOM-024-SSA3-2012** y **NOM-004-SSA3-2012**. Ofrece una solución integral para profesionales de la salud, permitiendo una administración eficiente, segura y conforme a la ley de la información de los pacientes.
 
 ## ✨ Características Principales
 
@@ -121,7 +121,7 @@ El monorepo está organizado de la siguiente manera para una clara separación d
 
 3. **Configurar variables de entorno**:
     ```bash
-    DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/salud_digital
+    DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/esculapio
     SESSION_SECRET=tu-secreto-seguro-aqui
     NODE_ENV=development
     PORT=5000
@@ -279,7 +279,7 @@ curl "https://otorrinonet.com/fhir/Patient/uuid-del-paciente/\$everything"
 | `NODE_ENV` | No | Entorno de ejecución | `production` / `development` |
 | `PORT` | No | Puerto del servidor (default: 5000) | `5000` |
 | `LOG_LEVEL` | No | Nivel de logging Pino | `info` / `debug` / `warn` |
-| `BASE_DOMAIN` | No | Dominio base para resolución multi-tenant por subdominio | `salud-digital.mx` |
+| `BASE_DOMAIN` | No | Dominio base para resolución multi-tenant por subdominio | `otorrinonet.com` |
 | `SMTP_HOST` | No | Servidor SMTP para emails | `smtp.mailgun.org` |
 | `SMTP_PORT` | No | Puerto SMTP | `587` |
 | `SMTP_USER` | No | Usuario SMTP | `user@dominio.com` |
@@ -380,4 +380,4 @@ Las contribuciones son bienvenidas. Si deseas mejorar el proyecto, por favor, ab
 
 ---
 
-Hecho con ❤️ por el equipo de Salud Digital.
+Hecho con ❤️ por el equipo de Esculapio.

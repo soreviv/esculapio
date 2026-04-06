@@ -1,8 +1,8 @@
-# Configuración de Nginx para Salud Digital
-# Ubicación: /etc/nginx/sites-available/salud-digital
+# Configuración de Nginx para Esculapio
+# Ubicación: /etc/nginx/sites-available/esculapio
 
 # Upstream para la aplicación Node.js
-upstream salud_digital_app {
+upstream esculapio_app {
     server 127.0.0.1:5000;
     keepalive 64;
 }
@@ -32,8 +32,8 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     # Logs
-    access_log /var/log/nginx/salud-digital-access.log;
-    error_log /var/log/nginx/salud-digital-error.log;
+    access_log /var/log/nginx/esculapio-access.log;
+    error_log /var/log/nginx/esculapio-error.log;
 
     # Tamaño máximo de upload (para documentos médicos)
     client_max_body_size 10M;
@@ -47,7 +47,7 @@ server {
 
     # Proxy a la aplicación Node.js
     location / {
-        proxy_pass http://salud_digital_app;
+        proxy_pass http://esculapio_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -62,7 +62,7 @@ server {
 
     # Cache para archivos estáticos
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        proxy_pass http://salud_digital_app;
+        proxy_pass http://esculapio_app;
         proxy_set_header Host $host;
         expires 30d;
         add_header Cache-Control "public, immutable";
@@ -70,7 +70,7 @@ server {
 
     # Documentación API
     location /api-docs {
-        proxy_pass http://salud_digital_app;
+        proxy_pass http://esculapio_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }

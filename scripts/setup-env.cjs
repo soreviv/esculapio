@@ -28,7 +28,7 @@ function ensureKey(key, generator) {
   const regex = new RegExp(`^${key}=(.+)$`, "m");
   const match = content.match(regex);
 
-  if (match && match[1].trim() && match[1].trim() !== "salud-digital-development-key-default-32") {
+  if (match && match[1].trim() && match[1].trim() !== "esculapio-development-key-default-32") {
     console.log(`✓ ${key} ya configurado.`);
     return;
   }

@@ -39,7 +39,7 @@ const SYSTEM_CEDULA = "urn:oid:2.16.840.1.113883.3.215"; // Cédula profesional
 const SYSTEM_CIE10 = "http://hl7.org/fhir/sid/icd-10";
 const SYSTEM_LOINC = "http://loinc.org";
 const SYSTEM_SNOMED = "http://snomed.info/sct";
-const SYSTEM_LOCAL = "http://salud-digital.mx/fhir";
+const SYSTEM_LOCAL = "http://esculapio.mx/fhir";
 
 // =====================
 // Patient Mapper
@@ -927,7 +927,7 @@ export function auditLogToAuditEvent(auditLog: AuditLog): FhirAuditEvent {
       },
     ],
     source: {
-      site: "Salud Digital EHR",
+      site: "Esculapio EHR",
       observer: {
         display: "Sistema de Expediente Clínico Electrónico",
       },
@@ -1048,19 +1048,19 @@ export function createPatientBundle(
 export function getCapabilityStatement(baseUrl: string): FhirCapabilityStatement {
   return {
     resourceType: "CapabilityStatement",
-    id: "salud-digital-capability",
+    id: "esculapio-capability",
     url: `${baseUrl}/fhir/metadata`,
     version: "1.0.0",
-    name: "SaludDigitalFHIRServer",
-    title: "Salud Digital FHIR Server",
+    name: "EsculapioFHIRServer",
+    title: "Esculapio FHIR Server",
     status: "active",
     experimental: false,
     date: new Date().toISOString(),
-    publisher: "Salud Digital",
-    description: "Servidor FHIR R4 del Sistema de Expediente Clínico Electrónico Salud Digital. Cumple con NOM-024-SSA3-2012 y HL7 FHIR R4.",
+    publisher: "Esculapio",
+    description: "Servidor FHIR R4 del Sistema de Expediente Clínico Electrónico Esculapio. Cumple con NOM-024-SSA3-2012 y HL7 FHIR R4.",
     kind: "instance",
     software: {
-      name: "Salud Digital EHR",
+      name: "Esculapio EHR",
       version: "1.0.0",
     },
     implementation: {
