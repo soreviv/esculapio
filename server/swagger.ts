@@ -4,10 +4,10 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "MediRecord API",
+      title: "Esculapio API",
       version: "1.0.0",
       description: `
-API del Sistema de Expediente Clínico Electrónico MediRecord.
+API del Sistema de Expediente Clínico Electrónico Esculapio.
 
 ## Cumplimiento Normativo
 - **NOM-004-SSA3-2012**: Del Expediente Clínico
@@ -24,8 +24,8 @@ La API utiliza sesiones de Express con cookies httpOnly. Todas las rutas protegi
 - **enfermeria**: Registro de signos vitales, notas de enfermería
       `,
       contact: {
-        name: "Soporte MediRecord",
-        email: "soporte@medirecord.mx",
+        name: "Soporte Esculapio",
+        email: "soporte@esculapio.mx",
       },
     },
     servers: [

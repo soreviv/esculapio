@@ -197,7 +197,7 @@ function AppContent() {
 
 // Apply saved color theme before first render to avoid flash
 try {
-  const raw = localStorage.getItem("medirecord-preferences");
+  const raw = localStorage.getItem("esculapio-preferences");
   const colorTheme = (raw ? JSON.parse(raw).colorTheme : null) as ColorTheme | null;
   if (colorTheme && colorTheme !== "azul") applyColorTheme(colorTheme);
 } catch {}

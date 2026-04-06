@@ -1,4 +1,4 @@
-# Salud Digital - Expediente Clínico Electrónico
+# Esculapio - Expediente Clínico Electrónico
 # Robots.txt para control de indexación
 
 # Permitir a todos los bots acceder al sitio

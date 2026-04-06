@@ -216,7 +216,7 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
           </div>
           <h1 className="text-3xl font-bold tracking-tight" data-testid="text-login-title">
-            MediRecord
+            Esculapio
           </h1>
           <p className="text-muted-foreground">
             Sistema de Expediente Clínico Electrónico

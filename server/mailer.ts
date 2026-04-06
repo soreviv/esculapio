@@ -17,7 +17,7 @@ function getClient(): BrevoClient {
 // ─── Branding helpers ─────────────────────────────────────────────────────────
 
 function clinicName(ps: PortalSettings): string {
-  return ps.portalTitle ?? ps.nombreEstablecimiento ?? "Salud Digital";
+  return ps.portalTitle ?? ps.nombreEstablecimiento ?? "Esculapio";
 }
 
 function senderFor(ps: PortalSettings) {
@@ -65,24 +65,24 @@ export async function sendPasswordResetEmail(
   const client = getClient();
 
   await client.transactionalEmails.sendTransacEmail({
-    sender: { name: "Salud Digital", email: process.env.SMTP_FROM ?? "contacto@viveros.click" },
+    sender: { name: "Esculapio", email: process.env.SMTP_FROM ?? "contacto@viveros.click" },
     to: [{ email: toEmail, name: toNombre }],
-    subject: "Restablecimiento de contraseña — Salud Digital",
+    subject: "Restablecimiento de contraseña — Esculapio",
     textContent: [
       `Estimado/a ${toNombre},`,
       "",
-      "Recibimos una solicitud para restablecer la contraseña de su cuenta en Salud Digital.",
+      "Recibimos una solicitud para restablecer la contraseña de su cuenta en Esculapio.",
       "",
       "Use el siguiente enlace para crear una nueva contraseña (válido por 1 hora):",
       resetUrl,
       "",
       "Si usted no realizó esta solicitud, ignore este correo. Su contraseña actual no será modificada.",
       "",
-      "Salud Digital — Sistema de Expediente Clínico Electrónico",
+      "Esculapio — Sistema de Expediente Clínico Electrónico",
     ].join("\n"),
     htmlContent: `
       <p>Estimado/a <strong>${toNombre}</strong>,</p>
-      <p>Recibimos una solicitud para restablecer la contraseña de su cuenta en <strong>Salud Digital</strong>.</p>
+      <p>Recibimos una solicitud para restablecer la contraseña de su cuenta en <strong>Esculapio</strong>.</p>
       <p>
         <a href="${resetUrl}" style="
           display:inline-block;

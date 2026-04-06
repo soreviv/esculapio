@@ -132,7 +132,7 @@ export function log(message: string, source = "express") {
 // API Documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: ".swagger-ui .topbar { display: none }",
-  customSiteTitle: "Salud Digital API Documentation",
+  customSiteTitle: "Esculapio API Documentation",
 }));
 
 app.get("/api-docs.json", (_req, res) => {

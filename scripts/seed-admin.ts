@@ -22,7 +22,7 @@ function prompt(question: string, hidden: boolean = false): Promise<string> {
 
 async function seedAdmin() {
   console.log("========================================");
-  console.log("   MediRecord - Admin User Setup");
+  console.log("   Esculapio - Admin User Setup");
   console.log("========================================\n");
 
   const adminPassword = process.env.ADMIN_PASSWORD;

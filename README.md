@@ -1,6 +1,6 @@
-# Salud Digital - Expediente Clínico Electrónico
+# Esculapio - Expediente Clínico Electrónico
 
-**Salud Digital** es una plataforma de software como servicio (SaaS) para la gestión de expedientes clínicos electrónicos, diseñada para cumplir con la normativa mexicana **NOM-024-SSA3-2012** y **NOM-004-SSA3-2012**. Ofrece una solución integral para profesionales de la salud, permitiendo una administración eficiente, segura y conforme a la ley de la información de los pacientes.
+**Esculapio** es una plataforma de software como servicio (SaaS) para la gestión de expedientes clínicos electrónicos, diseñada para cumplir con la normativa mexicana **NOM-024-SSA3-2012** y **NOM-004-SSA3-2012**. Ofrece una solución integral para profesionales de la salud, permitiendo una administración eficiente, segura y conforme a la ley de la información de los pacientes.
 
 ## ✨ Características Principales
 
@@ -37,7 +37,7 @@ El proyecto está construido con un stack de tecnologías moderno, robusto y esc
 - **Frontend**:
   - [**React 18**](https://react.dev/): Biblioteca para construir interfaces de usuario.
   - [**TypeScript 5**](https://www.typescriptlang.org/): Tipado estático para un desarrollo más seguro.
-  - [**Vite 7**](https://vitejs.dev/): Herramienta de desarrollo frontend de alta velocidad.
+  - [**Vite 8**](https://vitejs.dev/): Herramienta de desarrollo frontend de alta velocidad.
   - [**TanStack Query**](https://tanstack.com/query/latest): Gestión de estado asíncrono y caching de datos.
   - [**Tailwind CSS 4**](https://tailwindcss.com/): Framework de CSS para un diseño rápido y personalizable.
   - [**shadcn/ui**](https://ui.shadcn.com/): Componentes de UI accesibles y reutilizables (60+ componentes).
@@ -380,4 +380,4 @@ Las contribuciones son bienvenidas. Si deseas mejorar el proyecto, por favor, ab
 
 ---
 
-Hecho con ❤️ por el equipo de Salud Digital.
+Hecho con ❤️ por el equipo de Esculapio.

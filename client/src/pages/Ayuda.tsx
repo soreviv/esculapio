@@ -276,7 +276,7 @@ export default function Ayuda() {
                   <Mail className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Correo Electrónico</p>
-                    <p className="text-sm text-muted-foreground">soporte@medirecord.mx</p>
+                    <p className="text-sm text-muted-foreground">soporte@esculapio.mx</p>
                   </div>
                 </div>
 

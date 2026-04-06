@@ -14,7 +14,7 @@ export interface UserPreferences {
   timeFormat: TimeFormat;
 }
 
-const STORAGE_KEY = "medirecord-preferences";
+const STORAGE_KEY = "esculapio-preferences";
 
 const DEFAULTS: UserPreferences = {
   colorTheme: "azul",

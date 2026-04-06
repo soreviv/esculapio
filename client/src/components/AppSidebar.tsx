@@ -107,7 +107,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
             <Building2 className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="font-semibold text-sm">MediRecord</h2>
+            <h2 className="font-semibold text-sm">Esculapio</h2>
             <p className="text-xs text-muted-foreground">NOM-024 Compliant</p>
           </div>
         </div>

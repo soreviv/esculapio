@@ -1,4 +1,4 @@
-# Configuración de Nginx para Salud Digital
+# Configuración de Nginx para Esculapio
 # Ubicación: /etc/nginx/sites-available/salud-digital
 
 # Upstream para la aplicación Node.js

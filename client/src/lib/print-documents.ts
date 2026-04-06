@@ -1540,7 +1540,7 @@ export function printPrescriptionCOFEPRIS({ prescriptions, instruccionesGenerale
   </div>
 
   <div class="rx-footer">
-    Sistema de Gestión de Salud Digital &nbsp;|&nbsp; NOM-004-SSA3-2012 &nbsp;|&nbsp; NOM-024-SSA3-2012 &nbsp;|&nbsp; COFEPRIS
+    Sistema de Gestión de Esculapio &nbsp;|&nbsp; NOM-004-SSA3-2012 &nbsp;|&nbsp; NOM-024-SSA3-2012 &nbsp;|&nbsp; COFEPRIS
   </div>
 
   <script>window.onload = function() { window.print(); }</script>

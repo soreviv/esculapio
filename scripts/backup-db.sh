@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script de backup para PostgreSQL - Salud Digital
+# Script de backup para PostgreSQL - Esculapio
 # Uso: ./backup-db.sh
 # Configura en cron para backups automáticos:
 # 0 2 * * * /var/www/salud-digital/scripts/backup-db.sh

@@ -1036,7 +1036,7 @@ export class DatabaseStorage implements IStorage {
     } else {
       await db.insert(establishmentConfig).values({
         tipoEstablecimiento: "Consultorio",
-        nombreEstablecimiento: "Salud Digital",
+        nombreEstablecimiento: "Esculapio",
         domicilio: "",
         ciudad: "",
         estado: "",
@@ -1086,7 +1086,7 @@ export class DatabaseStorage implements IStorage {
     } else {
       await db.insert(establishmentConfig).values({
         tipoEstablecimiento: "Consultorio",
-        nombreEstablecimiento: "Salud Digital",
+        nombreEstablecimiento: "Esculapio",
         domicilio: "",
         ciudad: "",
         estado: "",

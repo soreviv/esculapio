@@ -927,7 +927,7 @@ export function auditLogToAuditEvent(auditLog: AuditLog): FhirAuditEvent {
       },
     ],
     source: {
-      site: "Salud Digital EHR",
+      site: "Esculapio EHR",
       observer: {
         display: "Sistema de Expediente Clínico Electrónico",
       },
@@ -1052,15 +1052,15 @@ export function getCapabilityStatement(baseUrl: string): FhirCapabilityStatement
     url: `${baseUrl}/fhir/metadata`,
     version: "1.0.0",
     name: "SaludDigitalFHIRServer",
-    title: "Salud Digital FHIR Server",
+    title: "Esculapio FHIR Server",
     status: "active",
     experimental: false,
     date: new Date().toISOString(),
-    publisher: "Salud Digital",
-    description: "Servidor FHIR R4 del Sistema de Expediente Clínico Electrónico Salud Digital. Cumple con NOM-024-SSA3-2012 y HL7 FHIR R4.",
+    publisher: "Esculapio",
+    description: "Servidor FHIR R4 del Sistema de Expediente Clínico Electrónico Esculapio. Cumple con NOM-024-SSA3-2012 y HL7 FHIR R4.",
     kind: "instance",
     software: {
-      name: "Salud Digital EHR",
+      name: "Esculapio EHR",
       version: "1.0.0",
     },
     implementation: {
