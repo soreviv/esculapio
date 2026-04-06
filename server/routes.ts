@@ -452,7 +452,7 @@ export async function registerRoutes(
       }
 
       const totp = new OTPAuth.TOTP({
-        issuer: "MediRecord",
+        issuer: "Esculapio",
         label: user.username,
         secret: OTPAuth.Secret.fromBase32(decrypt(user.totpSecret)),
         digits: 6,
@@ -524,7 +524,7 @@ export async function registerRoutes(
       await storage.setTotpSecret(user.id, encrypt(secret.base32));
 
       const totp = new OTPAuth.TOTP({
-        issuer: "MediRecord",
+        issuer: "Esculapio",
         label: user.username,
         secret,
         digits: 6,
@@ -559,7 +559,7 @@ export async function registerRoutes(
       }
 
       const totp = new OTPAuth.TOTP({
-        issuer: "MediRecord",
+        issuer: "Esculapio",
         label: user.username,
         secret: OTPAuth.Secret.fromBase32(decrypt(user.totpSecret)),
         digits: 6,
@@ -602,7 +602,7 @@ export async function registerRoutes(
       }
 
       const totp = new OTPAuth.TOTP({
-        issuer: "MediRecord",
+        issuer: "Esculapio",
         label: user.username,
         secret: OTPAuth.Secret.fromBase32(decrypt(user.totpSecret)),
         digits: 6,

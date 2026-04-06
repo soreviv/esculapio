@@ -137,7 +137,7 @@ describe("TOTP token validation (otpauth)", () => {
   beforeEach(() => {
     secret = new OTPAuth.Secret({ size: 20 });
     totp = new OTPAuth.TOTP({
-      issuer: "MediRecord",
+      issuer: "Esculapio",
       label: "testuser",
       secret,
       digits: 6,
@@ -168,7 +168,7 @@ describe("TOTP token validation (otpauth)", () => {
   it("otpauth URL is correct format", () => {
     const url = totp.toString();
     expect(url).toMatch(/^otpauth:\/\/totp\//);
-    expect(url).toContain("MediRecord");
+    expect(url).toContain("Esculapio");
     expect(url).toContain("digits=6");
     expect(url).toContain("period=30");
   });

@@ -1,6 +1,6 @@
-# Manual Maestro de Despliegue - Salud Digital (Producción)
+# Manual Maestro de Despliegue - Esculapio (Producción)
 
-Este documento consolida las instrucciones para desplegar el sistema "Salud Digital" en un servidor Linux (Ubuntu 22.04/24.04) desde cero.
+Este documento consolida las instrucciones para desplegar el sistema "Esculapio" en un servidor Linux (Ubuntu 22.04/24.04) desde cero.
 
 **Versión del Documento:** 1.1 (Actualizado Apr-2026)
 **Stack:** Node.js, Nginx, PostgreSQL, PM2.
