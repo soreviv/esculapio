@@ -41,7 +41,7 @@ describe("Crypto Utilities", () => {
       expect(decrypt(null)).toBe(null);
     });
 
-    it("should return error message when decryption fails (tampered data)", () => {
+    it("should throw error when decryption fails (tampered data)", () => {
       const text = "Secret";
       const encrypted = encrypt(text);
       const parts = encrypted.split(":");
@@ -51,11 +51,10 @@ describe("Crypto Utilities", () => {
       const tamperedPayload = (payload[0] === '0' ? '1' : '0') + payload.substring(1);
       const tamperedData = `${parts[0]}:${parts[1]}:${tamperedPayload}`;
 
-      const result = decrypt(tamperedData);
-      expect(result).toBe("Error al desencriptar datos");
+      expect(() => decrypt(tamperedData)).toThrow("Decryption failed");
     });
 
-    it("should return error message when auth tag is tampered", () => {
+    it("should throw error when auth tag is tampered", () => {
       const text = "Secret";
       const encrypted = encrypt(text);
       const parts = encrypted.split(":");
@@ -65,14 +64,12 @@ describe("Crypto Utilities", () => {
       const tamperedTag = (tag[0] === '0' ? '1' : '0') + tag.substring(1);
       const tamperedData = `${parts[0]}:${tamperedTag}:${parts[2]}`;
 
-      const result = decrypt(tamperedData);
-      expect(result).toBe("Error al desencriptar datos");
+      expect(() => decrypt(tamperedData)).toThrow("Decryption failed");
     });
 
-    it("should handle invalid hex strings gracefully", () => {
+    it("should throw error for invalid hex strings", () => {
       const invalidHex = "not-hex:not-hex:not-hex";
-      const result = decrypt(invalidHex);
-      expect(result).toBe("Error al desencriptar datos");
+      expect(() => decrypt(invalidHex)).toThrow("Decryption failed");
     });
   });
 });

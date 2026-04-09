@@ -121,7 +121,7 @@ describe("FHIR Mappers", () => {
 
       expect(result.identifier).toContainEqual({
         use: "official",
-        system: "http://salud-digital.mx/fhir/expediente",
+        system: "http://esculapio.mx/fhir/expediente",
         value: mockPatient.numeroExpediente,
       });
       expect(result.identifier).toContainEqual({

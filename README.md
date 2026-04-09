@@ -121,7 +121,7 @@ El monorepo está organizado de la siguiente manera para una clara separación d
 
 3. **Configurar variables de entorno**:
     ```bash
-    DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/salud_digital
+    DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/esculapio
     SESSION_SECRET=tu-secreto-seguro-aqui
     NODE_ENV=development
     PORT=5000
@@ -279,7 +279,7 @@ curl "https://otorrinonet.com/fhir/Patient/uuid-del-paciente/\$everything"
 | `NODE_ENV` | No | Entorno de ejecución | `production` / `development` |
 | `PORT` | No | Puerto del servidor (default: 5000) | `5000` |
 | `LOG_LEVEL` | No | Nivel de logging Pino | `info` / `debug` / `warn` |
-| `BASE_DOMAIN` | No | Dominio base para resolución multi-tenant por subdominio | `salud-digital.mx` |
+| `BASE_DOMAIN` | No | Dominio base para resolución multi-tenant por subdominio | `otorrinonet.com` |
 | `SMTP_HOST` | No | Servidor SMTP para emails | `smtp.mailgun.org` |
 | `SMTP_PORT` | No | Puerto SMTP | `587` |
 | `SMTP_USER` | No | Usuario SMTP | `user@dominio.com` |

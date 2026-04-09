@@ -39,7 +39,7 @@ const SYSTEM_CEDULA = "urn:oid:2.16.840.1.113883.3.215"; // Cédula profesional
 const SYSTEM_CIE10 = "http://hl7.org/fhir/sid/icd-10";
 const SYSTEM_LOINC = "http://loinc.org";
 const SYSTEM_SNOMED = "http://snomed.info/sct";
-const SYSTEM_LOCAL = "http://salud-digital.mx/fhir";
+const SYSTEM_LOCAL = "http://esculapio.mx/fhir";
 
 // =====================
 // Patient Mapper
@@ -1048,10 +1048,10 @@ export function createPatientBundle(
 export function getCapabilityStatement(baseUrl: string): FhirCapabilityStatement {
   return {
     resourceType: "CapabilityStatement",
-    id: "salud-digital-capability",
+    id: "esculapio-capability",
     url: `${baseUrl}/fhir/metadata`,
     version: "1.0.0",
-    name: "SaludDigitalFHIRServer",
+    name: "EsculapioFHIRServer",
     title: "Esculapio FHIR Server",
     status: "active",
     experimental: false,

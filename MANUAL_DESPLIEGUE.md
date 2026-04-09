@@ -48,9 +48,9 @@ sudo systemctl enable postgresql
 # 3. Configurar usuario y base de datos
 # Reemplaza 'TU_PASSWORD_SEGURA' por una contraseña real.
 sudo -u postgres psql <<EOF
-CREATE USER salud_digital WITH PASSWORD 'TU_PASSWORD_SEGURA';
-CREATE DATABASE salud_digital OWNER salud_digital;
-GRANT ALL PRIVILEGES ON DATABASE salud_digital TO salud_digital;
+CREATE USER esculapio WITH PASSWORD 'TU_PASSWORD_SEGURA';
+CREATE DATABASE esculapio OWNER esculapio;
+GRANT ALL PRIVILEGES ON DATABASE esculapio TO esculapio;
 \q
 EOF
 ```
@@ -65,13 +65,13 @@ sudo mkdir -p /var/www
 cd /var/www
 
 # 2. Clonar repositorio (Usa tu URL de GitHub)
-sudo git clone https://github.com/tu-usuario/Salud-Digital.git salud-digital
+sudo git clone https://github.com/tu-usuario/Esculapio.git esculapio
 
 # 3. Asignar permisos al usuario actual (para no usar sudo en cada paso)
-sudo chown -R $USER:$USER /var/www/salud-digital
+sudo chown -R $USER:$USER /var/www/esculapio
 
 # 4. Instalar dependencias del proyecto
-cd salud-digital
+cd esculapio
 npm install
 ```
 
@@ -95,7 +95,7 @@ Este es el paso más crítico. El sistema necesita variables de entorno para fun
 
    # --- BASE DE DATOS ---
    # Formato: postgresql://usuario:password@host:puerto/nombre_db
-   DATABASE_URL=postgresql://salud_digital:TU_PASSWORD_SEGURA@localhost:5432/salud_digital
+   DATABASE_URL=postgresql://esculapio:TU_PASSWORD_SEGURA@localhost:5432/esculapio
 
    # --- SEGURIDAD ---
    # Genera SESSION_SECRET con:      openssl rand -hex 64

@@ -2,7 +2,7 @@
 set -e
 
 echo "[deploy] Stopping PM2 process..."
-pm2 stop salud-digital 2>/dev/null || true
+pm2 stop esculapio 2>/dev/null || true
 
 echo "[deploy] Building application..."
 npm run build
