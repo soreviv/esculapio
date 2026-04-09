@@ -53,7 +53,6 @@ SELECT
     {"dia":"Martes",    "inicio":"16:00","fin":"19:00","activo":true},
     {"dia":"Miércoles", "inicio":"16:00","fin":"19:00","activo":true},
     {"dia":"Jueves",    "inicio":"10:00","fin":"13:00","activo":true},
-    {"dia":"Jueves",    "inicio":"16:00","fin":"19:00","activo":true},
     {"dia":"Viernes",   "inicio":"10:00","fin":"13:00","activo":true},
     {"dia":"Sábado",    "inicio":"10:00","fin":"13:00","activo":false},
     {"dia":"Domingo",   "inicio":"00:00","fin":"00:00","activo":false}
