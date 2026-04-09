@@ -45,24 +45,28 @@ export default function PortalContact() {
   const telefono  = info?.telefono ?? "";
   const email     = info?.notificationEmail ?? "contacto@otorrinonet.com";
 
-  // Load Google Maps dynamically
+  // Load Google Maps script
   useEffect(() => {
-    if (window.google?.maps) { setMapLoaded(true); initMap(); return; }
+    if (window.google?.maps) { setMapLoaded(true); return; }
     const existingScript = document.querySelector(`script[src*="maps.googleapis.com"]`);
     if (existingScript) {
-      existingScript.addEventListener("load", () => { setMapLoaded(true); initMap(); });
+      existingScript.addEventListener("load", () => setMapLoaded(true));
       return;
     }
-    // Only load if API key is configured
     const MAPS_KEY = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
     if (!MAPS_KEY) return;
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_KEY}`;
     script.async = true;
     script.defer = true;
-    script.onload = () => { setMapLoaded(true); initMap(); };
+    script.onload = () => setMapLoaded(true);
     document.head.appendChild(script);
   }, []);
+
+  // Initialize map only after mapLoaded=true causes the div to render
+  useEffect(() => {
+    if (mapLoaded) initMap();
+  }, [mapLoaded]);
 
   const initMap = () => {
     const location = { lat: 19.4932, lng: -99.1353 }; // Chosica 730, Lindavista
