@@ -1,8 +1,8 @@
-# CLAUDE.md - Project Guide for Esculapio (MediRecord)
+# CLAUDE.md - Project Guide for Esculapio
 
 ## Project Overview
 
-Full-stack Electronic Health Record (EHR) system compliant with Mexican healthcare regulations (NOM-024-SSA3-2012, NOM-004-SSA3-2012) and HIPAA. TypeScript monorepo with React frontend and Express backend.
+**Esculapio** is a high-performance SaaS Electronic Health Record (EHR) system specifically designed for the Mexican medical market. It ensures strict compliance with **NOM-024-SSA3-2012** (electronic recording systems) and **NOM-004-SSA3-2012** (clinical record content). The platform features a React/Vite frontend, an Express/Node.js backend, and a PostgreSQL database with Drizzle ORM, providing a robust, secure, and scalable solution for healthcare management.
 
 ## Quick Commands
 
@@ -40,7 +40,7 @@ script/build.ts      # Custom esbuild + Vite build script
 
 ## Tech Stack
 
-- **Frontend**: React 18, Vite 5, TanStack Query, Tailwind CSS 3, shadcn/ui, Wouter (routing), React Hook Form, Recharts
+- **Frontend**: React 18, Vite 8, TanStack Query, Tailwind CSS 4, shadcn/ui, Wouter (routing), React Hook Form, Recharts
 - **Backend**: Express 4, Drizzle ORM, PostgreSQL, Passport.js (session-based auth), Pino (logging)
 - **Build**: esbuild (server bundle), Vite (client bundle), TypeScript 5.6
 - **Testing**: Vitest 4, @testing-library/react, Supertest

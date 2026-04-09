@@ -37,7 +37,7 @@ El proyecto está construido con un stack de tecnologías moderno, robusto y esc
 - **Frontend**:
   - [**React 18**](https://react.dev/): Biblioteca para construir interfaces de usuario.
   - [**TypeScript 5**](https://www.typescriptlang.org/): Tipado estático para un desarrollo más seguro.
-  - [**Vite 7**](https://vitejs.dev/): Herramienta de desarrollo frontend de alta velocidad.
+  - [**Vite 8**](https://vitejs.dev/): Herramienta de desarrollo frontend de alta velocidad.
   - [**TanStack Query**](https://tanstack.com/query/latest): Gestión de estado asíncrono y caching de datos.
   - [**Tailwind CSS 4**](https://tailwindcss.com/): Framework de CSS para un diseño rápido y personalizable.
   - [**shadcn/ui**](https://ui.shadcn.com/): Componentes de UI accesibles y reutilizables (60+ componentes).
@@ -155,7 +155,7 @@ El monorepo está organizado de la siguiente manera para una clara separación d
 
 ## 🔐 Seguridad y Cumplimiento Normativo
 
-La plataforma ha sido desarrollada teniendo en cuenta los estrictos requisitos de la normativa mexicana:
+La plataforma ha sido desarrollada teniendo en cuenta los estrictos requisitos de la normativa mexicana y las mejores prácticas internacionales de seguridad de la información. Para más detalles, consulta nuestra [**Política de Seguridad (SECURITY.md)**](./SECURITY.md).
 
 - **NOM-024-SSA3-2012**: Se implementan mecanismos de seguridad como:
   - **Control de Acceso**: Autenticación por usuario y contraseña, con roles (`admin`, `medico`, `enfermeria`).
@@ -373,6 +373,10 @@ El servidor en producción sirve el frontend estático desde `dist/public/` y ex
 - **7 endpoints API públicos** del portal
 - **18 endpoints FHIR R4** implementados
 - **Cobertura normativa**: 100% NOM-024-SSA3-2012 y NOM-004-SSA3-2012
+
+## 📄 Licencia
+
+Este proyecto es software propietario. Todos los derechos están reservados por **Esculapio (2024-2025)**. Para más detalles sobre los términos de uso y restricciones, consulta el archivo [**LICENSE**](./LICENSE).
 
 ## 🤝 Contribuciones
 

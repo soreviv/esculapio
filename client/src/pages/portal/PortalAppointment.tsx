@@ -54,8 +54,15 @@ function useDisabledDay(info: PortalPublicInfo | undefined) {
 function formatHorarios(info: PortalPublicInfo | undefined): React.ReactNode {
   const horarios = info?.horarios;
   if (!horarios || horarios.length === 0) return <p>Lun–Vie: 16:00–19:00 / Jue–Vie: 10:00–13:00</p>;
+  const seen = new Set<string>();
   return horarios
     .filter((h) => h.activo)
+    .filter((h) => {
+      const key = `${h.dia}-${h.inicio}-${h.fin}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .map((h, i) => <p key={i}>{h.dia}: {h.inicio} – {h.fin}</p>);
 }
 

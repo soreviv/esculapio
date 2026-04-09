@@ -15,7 +15,7 @@ export default function AvisoPrivacidad() {
     queryKey: ["/api/config/establishment"],
   });
 
-  const establecimiento = config?.nombreEstablecimiento || "MediRecord";
+  const establecimiento = config?.nombreEstablecimiento || "Esculapio";
   const domicilio = config?.domicilio ? `${config.domicilio}${config.ciudad ? `, ${config.ciudad}` : ""}${config.estado ? `, ${config.estado}` : ""}` : null;
   const telefono = config?.telefono || null;
 
@@ -193,7 +193,7 @@ export default function AvisoPrivacidad() {
               </p>
               <div className="bg-muted p-4 rounded-md">
                 <p><strong>Oficial de Protección de Datos Personales</strong></p>
-                <p>Correo: privacidad@medirecord.com</p>
+                <p>Correo: privacidad@esculapio.com</p>
                 {telefono && <p>Teléfono: {telefono}</p>}
                 {domicilio && <p>Domicilio: {domicilio}</p>}
               </div>
