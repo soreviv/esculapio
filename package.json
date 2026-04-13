@@ -141,7 +141,7 @@
     "jsdom": "^29.0.1",
     "tsx": "^4.20.5",
     "typescript": "6.0.2",
-    "vite": "^8.0.5"
+    "vite": "^8.0.8"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
