@@ -6,11 +6,15 @@ let _transport: Transporter | null = null;
 function getTransport(): Transporter {
   if (_transport) return _transport;
 
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
   _transport = nodemailer.createTransport({
     host: process.env.SMTP_HOST ?? "localhost",
     port: Number(process.env.SMTP_PORT ?? 25),
     secure: false,         // Postfix local no requiere TLS en puerto 25
     ignoreTLS: true,       // conexión interna, sin STARTTLS
+    ...(smtpUser && smtpPass ? { auth: { user: smtpUser, pass: smtpPass } } : {}),
   });
 
   return _transport;
