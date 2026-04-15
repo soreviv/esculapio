@@ -14,6 +14,7 @@ const PortalCitaCancelar   = lazy(() => import("./PortalCitaCancelar"));
 const PortalCitaReagendar  = lazy(() => import("./PortalCitaReagendar"));
 const PortalCitaConfirmar  = lazy(() => import("./PortalCitaConfirmar"));
 const PortalCitaAsistencia = lazy(() => import("./PortalCitaAsistencia"));
+const PortalVacunas        = lazy(() => import("./PortalVacunas"));
 
 function PageLoader() {
   return (
@@ -36,6 +37,7 @@ export default function PortalRouter() {
           <Route path="/cita"            component={PortalAppointment} />
           <Route path="/contacto"        component={PortalContact} />
           <Route path="/servicios"       component={PortalServices} />
+          <Route path="/vacunas"         component={PortalVacunas} />
           <Route path="/privacidad"      component={PortalPrivacy} />
           <Route path="/terminos"        component={PortalTerms} />
           {/* Legacy slug routes: /p/:slug/* — backwards compat & dev environment */}
@@ -46,6 +48,7 @@ export default function PortalRouter() {
           <Route path="/p/:slug/cita"            component={PortalAppointment} />
           <Route path="/p/:slug/contacto"        component={PortalContact} />
           <Route path="/p/:slug/servicios"       component={PortalServices} />
+          <Route path="/p/:slug/vacunas"         component={PortalVacunas} />
           <Route path="/p/:slug/privacidad"      component={PortalPrivacy} />
           <Route path="/p/:slug/terminos"        component={PortalTerms} />
           <Route path="/p/:slug"                 component={PortalHome} />

@@ -44,11 +44,19 @@ export default function PortalServices() {
                   </CardHeader>
                   <CardContent>
                     <CardDescription className="text-base mb-6">{service.description}</CardDescription>
-                    <Link href={`/p/${slug}/cita`}>
-                      <Button variant="outline" className="w-full">
-                        Agendar Cita
-                      </Button>
-                    </Link>
+                    {service.id === "2" ? (
+                      <Link href={`/p/${slug}/vacunas`}>
+                        <Button variant="outline" className="w-full">
+                          Ver guía de vacunación
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Link href={`/p/${slug}/cita`}>
+                        <Button variant="outline" className="w-full">
+                          Agendar Cita
+                        </Button>
+                      </Link>
+                    )}
                   </CardContent>
                 </Card>
               );

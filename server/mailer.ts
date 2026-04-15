@@ -1,17 +1,19 @@
-import { BrevoClient } from "@getbrevo/brevo";
+import nodemailer, { type Transporter } from "nodemailer";
 import type { PortalSettings } from "@shared/schema";
 
-let _client: BrevoClient | null = null;
+let _transport: Transporter | null = null;
 
-function getClient(): BrevoClient {
-  if (_client) return _client;
+function getTransport(): Transporter {
+  if (_transport) return _transport;
 
-  if (!process.env.BREVO_API_KEY) {
-    throw new Error("Configuración de correo incompleta. Variable faltante: BREVO_API_KEY");
-  }
+  _transport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST ?? "localhost",
+    port: Number(process.env.SMTP_PORT ?? 25),
+    secure: false,         // Postfix local no requiere TLS en puerto 25
+    ignoreTLS: true,       // conexión interna, sin STARTTLS
+  });
 
-  _client = new BrevoClient({ apiKey: process.env.BREVO_API_KEY });
-  return _client;
+  return _transport;
 }
 
 // ─── Branding helpers ─────────────────────────────────────────────────────────
@@ -20,11 +22,9 @@ function clinicName(ps: PortalSettings): string {
   return ps.portalTitle ?? ps.nombreEstablecimiento ?? "Esculapio";
 }
 
-function senderFor(ps: PortalSettings) {
-  return {
-    name: clinicName(ps),
-    email: ps.notificationEmail ?? process.env.SMTP_FROM ?? "contacto@viveros.click",
-  };
+function senderFor(ps: PortalSettings): string {
+  const email = ps.notificationEmail ?? process.env.SMTP_FROM ?? "contacto@otorrinonet.com";
+  return `"${clinicName(ps)}" <${email}>`;
 }
 
 function portalBaseUrl(tenantSlug: string): string {
@@ -61,14 +61,13 @@ export async function sendPasswordResetEmail(
 
   const baseUrl = process.env.APP_BASE_URL ?? `http://localhost:${process.env.PORT ?? 5000}`;
   const resetUrl = `${baseUrl}/reset-password?token=${plainToken}`;
+  const from = `"Esculapio" <${process.env.SMTP_FROM ?? "contacto@otorrinonet.com"}>`;
 
-  const client = getClient();
-
-  await client.transactionalEmails.sendTransacEmail({
-    sender: { name: "Esculapio", email: process.env.SMTP_FROM ?? "contacto@viveros.click" },
-    to: [{ email: toEmail, name: toNombre }],
+  await getTransport().sendMail({
+    from,
+    to: `"${toNombre}" <${toEmail}>`,
     subject: "Restablecimiento de contraseña — Esculapio",
-    textContent: [
+    text: [
       `Estimado/a ${toNombre},`,
       "",
       "Recibimos una solicitud para restablecer la contraseña de su cuenta en Esculapio.",
@@ -80,7 +79,7 @@ export async function sendPasswordResetEmail(
       "",
       "Esculapio — Sistema de Expediente Clínico Electrónico",
     ].join("\n"),
-    htmlContent: `
+    html: `
       <p>Estimado/a <strong>${toNombre}</strong>,</p>
       <p>Recibimos una solicitud para restablecer la contraseña de su cuenta en <strong>Esculapio</strong>.</p>
       <p>
@@ -113,9 +112,9 @@ export async function sendPasswordResetEmail(
 export interface AppointmentEmailData {
   patientName: string;
   patientEmail: string;
-  fecha: string;       // ISO date string e.g. "2026-04-10"
-  hora: string;        // e.g. "10:30"
-  appointmentType: string; // "primera_vez" | "subsecuente" | "urgencia"
+  fecha: string;
+  hora: string;
+  appointmentType: string;
   actionToken: string;
   tenantSlug: string;
   motivo?: string | null;
@@ -159,12 +158,12 @@ export async function sendAppointmentConfirmationToPatient(
     <p style="color:#6b7280;font-size:0.875em">Si tiene dudas llámenos al ${ps.telefono ?? "consultorio"}.</p>
   `;
 
-  await getClient().transactionalEmails.sendTransacEmail({
-    sender: senderFor(ps),
-    to: [{ email: data.patientEmail, name: data.patientName }],
+  await getTransport().sendMail({
+    from: senderFor(ps),
+    to: `"${data.patientName}" <${data.patientEmail}>`,
     subject: `Cita agendada — ${dateFormatted} a las ${data.hora}`,
-    htmlContent: emailLayout(content, ps),
-    textContent: `Cita agendada: ${typeLabel} el ${dateFormatted} a las ${data.hora}.\nConfirmar: ${confirmUrl}\nCancelar: ${cancelUrl}`,
+    html: emailLayout(content, ps),
+    text: `Cita agendada: ${typeLabel} el ${dateFormatted} a las ${data.hora}.\nConfirmar: ${confirmUrl}\nCancelar: ${cancelUrl}`,
   });
 }
 
@@ -177,7 +176,7 @@ export async function sendAppointmentNotificationToDoctor(
   if (process.env.NODE_ENV === "test") return;
 
   const notifEmail = ps.notificationEmail;
-  if (!notifEmail) return; // not configured
+  if (!notifEmail) return;
 
   const typeLabel = APPOINTMENT_TYPE_LABEL[data.appointmentType] ?? data.appointmentType;
   const dateFormatted = new Date(data.fecha + "T00:00:00").toLocaleDateString("es-MX", {
@@ -197,12 +196,12 @@ export async function sendAppointmentNotificationToDoctor(
     <p style="color:#6b7280;font-size:0.875em">Revise su agenda en el sistema EHR para confirmar o reagendar.</p>
   `;
 
-  await getClient().transactionalEmails.sendTransacEmail({
-    sender: senderFor(ps),
-    to: [{ email: notifEmail, name: clinicName(ps) }],
+  await getTransport().sendMail({
+    from: senderFor(ps),
+    to: `"${clinicName(ps)}" <${notifEmail}>`,
     subject: `Nueva cita portal — ${data.patientName} el ${dateFormatted}`,
-    htmlContent: emailLayout(content, ps),
-    textContent: `Nueva cita portal: ${data.patientName}, ${typeLabel}, ${dateFormatted} ${data.hora}. Email: ${data.patientEmail}`,
+    html: emailLayout(content, ps),
+    text: `Nueva cita portal: ${data.patientName}, ${typeLabel}, ${dateFormatted} ${data.hora}. Email: ${data.patientEmail}`,
   });
 }
 
@@ -237,12 +236,12 @@ export async function sendAppointmentCancellation(
     <p style="color:#6b7280;font-size:0.875em">Si tiene preguntas contáctenos al ${ps.telefono ?? "consultorio"}.</p>
   `;
 
-  await getClient().transactionalEmails.sendTransacEmail({
-    sender: senderFor(ps),
-    to: [{ email: data.patientEmail, name: data.patientName }],
+  await getTransport().sendMail({
+    from: senderFor(ps),
+    to: `"${data.patientName}" <${data.patientEmail}>`,
     subject: `Cita cancelada — ${clinicName(ps)}`,
-    htmlContent: emailLayout(content, ps),
-    textContent: `${reason} Cita cancelada: ${dateFormatted} ${data.hora}.`,
+    html: emailLayout(content, ps),
+    text: `${reason} Cita cancelada: ${dateFormatted} ${data.hora}.`,
   });
 }
 
@@ -278,13 +277,13 @@ export async function sendContactNotification(
     <p style="color:#6b7280;font-size:0.875em">Responda directamente a ${data.email} o desde la bandeja de mensajes en el EHR.</p>
   `;
 
-  await getClient().transactionalEmails.sendTransacEmail({
-    sender: senderFor(ps),
-    to: [{ email: notifEmail, name: clinicName(ps) }],
-    replyTo: { email: data.email, name: data.name },
+  await getTransport().sendMail({
+    from: senderFor(ps),
+    to: `"${clinicName(ps)}" <${notifEmail}>`,
+    replyTo: `"${data.name}" <${data.email}>`,
     subject: `Nuevo mensaje: ${data.subject}`,
-    htmlContent: emailLayout(content, ps),
-    textContent: `Nuevo mensaje de ${data.name} (${data.email}):\n\nAsunto: ${data.subject}\n\n${data.message}`,
+    html: emailLayout(content, ps),
+    text: `Nuevo mensaje de ${data.name} (${data.email}):\n\nAsunto: ${data.subject}\n\n${data.message}`,
   });
 }
 
@@ -322,12 +321,12 @@ export async function sendAppointmentReschedule(
     <p style="color:#6b7280;font-size:0.875em">Si tiene dudas llámenos al ${ps.telefono ?? "consultorio"}.</p>
   `;
 
-  await getClient().transactionalEmails.sendTransacEmail({
-    sender: senderFor(ps),
-    to: [{ email: data.patientEmail, name: data.patientName }],
+  await getTransport().sendMail({
+    from: senderFor(ps),
+    to: `"${data.patientName}" <${data.patientEmail}>`,
     subject: `Cita reagendada — ${dateFormatted} a las ${data.hora}`,
-    htmlContent: emailLayout(content, ps),
-    textContent: `Cita reagendada: ${typeLabel} el ${dateFormatted} a las ${data.hora}.\nConfirmar: ${confirmUrl}\nCancelar: ${cancelUrl}`,
+    html: emailLayout(content, ps),
+    text: `Cita reagendada: ${typeLabel} el ${dateFormatted} a las ${data.hora}.\nConfirmar: ${confirmUrl}\nCancelar: ${cancelUrl}`,
   });
 }
 
@@ -347,11 +346,11 @@ export async function sendContactReply(
     <p style="color:#6b7280;font-size:0.875em">Si tiene más preguntas no dude en contactarnos.</p>
   `;
 
-  await getClient().transactionalEmails.sendTransacEmail({
-    sender: senderFor(ps),
-    to: [{ email: originalData.email, name: originalData.name }],
+  await getTransport().sendMail({
+    from: senderFor(ps),
+    to: `"${originalData.name}" <${originalData.email}>`,
     subject: `Re: ${originalData.subject} — ${clinicName(ps)}`,
-    htmlContent: emailLayout(content, ps),
-    textContent: `Respuesta a su mensaje "${originalData.subject}":\n\n${replyBody}`,
+    html: emailLayout(content, ps),
+    text: `Respuesta a su mensaje "${originalData.subject}":\n\n${replyBody}`,
   });
 }
