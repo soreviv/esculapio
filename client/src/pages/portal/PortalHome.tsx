@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2, Star } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { usePortalSlug } from "./usePortalApi";
 import { usePortalInfo } from "./PortalLayout";
+import { usePortalMeta } from "./usePortalMeta";
 import { portalServices } from "./portalServicesData";
 import PortalLayout from "./PortalLayout";
 import hero640w from "@/assets/portal/hero-640w.webp";
@@ -17,6 +18,11 @@ export default function PortalHome() {
   const prefersReducedMotion = useReducedMotion();
 
   const clinicName = info?.portalTitle ?? info?.nombreEstablecimiento ?? "Consultorio";
+
+  usePortalMeta({
+    title: `${clinicName} — Otorrinolaringología en CDMX`,
+    description: "Consulta, cirugía y tratamiento especializado de oído, nariz y garganta con el Dr. Alejandro Viveros. Agenda tu cita en línea.",
+  });
 
   return (
     <PortalLayout>

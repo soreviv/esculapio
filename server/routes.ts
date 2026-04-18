@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { createCalDAVEvent, deleteCalDAVEvent } from "./caldav";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -1505,7 +1506,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: parsed.error.issues });
       }
       const appointment = await ts(req).createAppointment(parsed.data);
-      
+
       await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "crear",
@@ -1516,7 +1517,9 @@ export async function registerRoutes(
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
       });
-      
+
+      createCalDAVEvent(appointment).catch(() => {});
+
       res.status(201).json(appointment);
     } catch (error) {
       res.status(500).json({ error: "Error creating appointment" });
@@ -1551,7 +1554,7 @@ export async function registerRoutes(
       if (!updatedAppointment) {
         return res.status(404).json({ error: "Appointment not found during update" });
       }
-      
+
       await ts(req).createAuditLog({
         userId: req.session.userId,
         accion: "actualizar",
@@ -1562,7 +1565,13 @@ export async function registerRoutes(
         userAgent: req.get("User-Agent") || null,
         fecha: new Date(),
       });
-      
+
+      if (parsed.data.status === "cancelada") {
+        deleteCalDAVEvent(updatedAppointment.id).catch(() => {});
+      } else {
+        createCalDAVEvent(updatedAppointment).catch(() => {});
+      }
+
       res.json(updatedAppointment);
     } catch (error) {
       res.status(500).json({ error: "Error updating appointment" });

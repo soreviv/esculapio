@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Stethoscope, Ear, Activity, Sparkles, Mic, Ambulance, Syringe } from "lucide-react";
 import { usePortalSlug } from "./usePortalApi";
 import { portalServices } from "./portalServicesData";
+import { usePortalMeta } from "./usePortalMeta";
 import PortalLayout from "./PortalLayout";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -18,6 +19,11 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 
 export default function PortalServices() {
   const slug = usePortalSlug();
+
+  usePortalMeta({
+    title: "Servicios de Otorrinolaringología — OtorrinoNet",
+    description: "Consulta general de ORL, cirugía endoscópica, rinoplastia funcional, laringoscopia, vacunas y urgencias. Agenda tu cita en línea.",
+  });
 
   return (
     <PortalLayout>

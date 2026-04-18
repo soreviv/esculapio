@@ -124,7 +124,7 @@ function AuthenticatedApp({ user, onLogout }: { user: AuthUser; onLogout: () => 
 }
 
 // Portal paths served at the domain root (no /p/:slug prefix)
-const PORTAL_ROOT_PATHS = ["/cita", "/servicios", "/contacto", "/privacidad", "/terminos"];
+const PORTAL_ROOT_PATHS = ["/cita", "/servicios", "/contacto", "/privacidad", "/terminos", "/vacunas"];
 
 function isPortalRoute(pathname: string): boolean {
   if (pathname.startsWith("/p/")) return true;

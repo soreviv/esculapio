@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { usePortalSlug, portalFetch } from "./usePortalApi";
 import { usePortalInfo } from "./PortalLayout";
+import { usePortalMeta } from "./usePortalMeta";
 import PortalLayout from "./PortalLayout";
 
 declare global {
@@ -40,10 +41,15 @@ export default function PortalContact() {
   const { toast } = useToast();
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  const domicilio = info?.domicilio ?? "Chosica 730, Lindavista";
-  const ciudad    = info?.ciudad ?? "Ciudad de México";
-  const telefono  = info?.telefono ?? "";
-  const email     = info?.notificationEmail ?? "contacto@otorrinonet.com";
+  usePortalMeta({
+    title: "Contacto — OtorrinoNet · Dr. Alejandro Viveros",
+    description: "Contáctanos por teléfono, email o formulario. Consultorio ubicado en Chosica 730, Lindavista, CDMX.",
+  });
+
+  const domicilio = info?.domicilio || "Chosica 730, Lindavista";
+  const ciudad    = info?.ciudad || "Ciudad de México";
+  const telefono  = info?.telefono || "";
+  const email     = info?.notificationEmail || "contacto@otorrinonet.com";
 
   // Load Google Maps script
   useEffect(() => {

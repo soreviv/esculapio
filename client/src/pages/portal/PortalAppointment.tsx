@@ -19,6 +19,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { usePortalSlug, portalFetch } from "./usePortalApi";
 import { usePortalInfo } from "./PortalLayout";
+import { usePortalMeta } from "./usePortalMeta";
 import type { PortalPublicInfo } from "./PortalLayout";
 import PortalLayout from "./PortalLayout";
 import type { ClinicHoursDay } from "@shared/schema";
@@ -92,6 +93,11 @@ export default function PortalAppointment() {
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  usePortalMeta({
+    title: "Agendar Cita — OtorrinoNet · Dr. Alejandro Viveros",
+    description: "Reserva tu cita de otorrinolaringología en línea. Elige fecha y hora disponibles. Confirmación inmediata por correo electrónico.",
+  });
 
   const isDisabledDay = useDisabledDay(info);
 
