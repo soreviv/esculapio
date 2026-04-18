@@ -1,7 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, CheckCircle2, Star } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
 import { usePortalSlug } from "./usePortalApi";
 import { usePortalInfo } from "./PortalLayout";
 import { usePortalMeta } from "./usePortalMeta";
@@ -15,7 +14,6 @@ import doctor896w from "@/assets/portal/doctor-profile-896w.webp";
 export default function PortalHome() {
   const slug = usePortalSlug();
   const { data: info } = usePortalInfo();
-  const prefersReducedMotion = useReducedMotion();
 
   const clinicName = info?.portalTitle ?? info?.nombreEstablecimiento ?? "Consultorio";
 
@@ -31,12 +29,7 @@ export default function PortalHome() {
         <section className="relative bg-slate-50 py-20 lg:py-32 overflow-hidden">
           <div className="container mx-auto px-4 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <motion.div
-                initial={prefersReducedMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-                className="max-w-2xl"
-              >
+              <div className="max-w-2xl motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-5 motion-safe:duration-500">
                 <span className="inline-block py-1 px-3 rounded-full bg-secondary/20 text-primary font-bold text-sm mb-6 border border-secondary/20">
                   Dr. Alejandro Viveros Dominguez
                 </span>
@@ -66,14 +59,9 @@ export default function PortalHome() {
                     <span>Tecnología Avanzada</span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={prefersReducedMotion ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: prefersReducedMotion ? 0 : 0.8, delay: prefersReducedMotion ? 0 : 0.2 }}
-                className="relative lg:h-[600px] hidden lg:block"
-              >
+              <div className="relative lg:h-[600px] hidden lg:block motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-90 motion-safe:duration-700 motion-safe:delay-200">
                 <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-secondary/20 rounded-[2rem] transform rotate-3 scale-95 z-0" />
                 <img
                   src={hero1024w}
@@ -98,7 +86,7 @@ export default function PortalHome() {
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
