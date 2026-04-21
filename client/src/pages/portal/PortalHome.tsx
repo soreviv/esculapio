@@ -73,7 +73,7 @@ export default function PortalHome() {
                   className="relative z-10 w-full h-full object-cover rounded-[2rem] shadow-2xl"
                   loading="eager"
                   fetchPriority="high"
-                  decoding="sync"
+                  decoding="async"
                 />
                 <div className="absolute -bottom-8 -left-8 bg-white p-6 rounded-xl shadow-xl z-20 max-w-xs animate-in slide-in-from-bottom-4 duration-1000 border-l-4 border-secondary">
                   <div className="flex items-center gap-4 mb-3">

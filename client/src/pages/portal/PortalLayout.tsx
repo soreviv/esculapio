@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Menu, X, Phone } from "lucide-react";
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { usePortalSlug, portalFetch } from "./usePortalApi";
-import PortalChatWidget from "./PortalChatWidget";
 import type { PortalSettings } from "@shared/schema";
 import logo64w from "@/assets/portal/logo-64w.webp";
+
+const PortalChatWidget = lazy(() => import("./PortalChatWidget"));
 
 // Public portal info: portalSettings minus sensitive keys, plus chatEnabled boolean
 export type PortalPublicInfo = Omit<PortalSettings, "geminiApiKeyEncrypted" | "hcaptchaSecretKey"> & {
@@ -39,7 +40,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   return (
     <div className="flex flex-col min-h-screen font-sans">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
+      <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm relative">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href={`/p/${slug}`} className="flex items-center gap-2">
             {info?.logoUrl ? (
@@ -73,9 +74,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </button>
         </div>
 
-        {/* Mobile nav */}
-        {mobileOpen && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-4 py-3 flex flex-col gap-3">
+        {/* Mobile nav — absolute overlay prevents layout shift (CLS) */}
+        <div
+          className={`md:hidden absolute top-full left-0 right-0 bg-white border-t border-slate-100 px-4 shadow-md overflow-hidden transition-all duration-200 ease-in-out ${mobileOpen ? "max-h-64 py-3" : "max-h-0"}`}
+          aria-hidden={!mobileOpen}
+        >
+          <div className="flex flex-col gap-3">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -87,7 +91,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               </Link>
             ))}
           </div>
-        )}
+        </div>
       </header>
 
       {/* Main content */}
@@ -142,9 +146,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </div>
       </footer>
 
-      {/* Chat widget — only if chatbot is configured */}
+      {/* Chat widget — lazy-loaded to keep framer-motion out of critical bundle */}
       {info?.chatEnabled && (
-        <PortalChatWidget slug={slug} clinicName={clinicName} />
+        <Suspense fallback={null}>
+          <PortalChatWidget slug={slug} clinicName={clinicName} />
+        </Suspense>
       )}
     </div>
   );
