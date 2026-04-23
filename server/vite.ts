@@ -35,6 +35,7 @@ export async function setupVite(server: Server, app: Express) {
   const viteRouteLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
+    message: { error: "Demasiadas solicitudes, intente de nuevo más tarde" },
     standardHeaders: true,
     legacyHeaders: false,
   });
